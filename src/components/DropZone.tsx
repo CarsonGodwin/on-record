@@ -1,0 +1,91 @@
+import { useRef, useState } from 'react'
+import { filesFromDrop } from '../lib/dropFiles'
+
+interface Props {
+  onFiles: (files: File[]) => void
+}
+
+/** The file drop target, dressed as a record sleeve. The record slides out when you hover or drag over it. */
+export function DropZone({ onFiles }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const openPicker = () => inputRef.current?.click()
+
+  return (
+    <div
+      className={dragging ? 'sleeve is-dragging' : 'sleeve'}
+      role="button"
+      tabIndex={0}
+      aria-label="Drop your Spotify data here, or press Enter to choose files"
+      onClick={openPicker}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          openPicker()
+        }
+      }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setDragging(true)
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setDragging(false)
+        filesFromDrop(e.dataTransfer).then((files) => {
+          if (files.length > 0) onFiles(files)
+        })
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".zip,.json"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? [])
+          e.target.value = '' // so picking the same file again still fires onChange
+          if (files.length > 0) onFiles(files)
+        }}
+      />
+      <div className="sleeve__record" aria-hidden="true">
+        <span className="sleeve__label" />
+      </div>
+      <div className="sleeve__cover">
+        <span className="sleeve__kicker">{dragging ? 'Let go' : 'Side A · Your data'}</span>
+        <p className="sleeve__title">
+          {dragging ? (
+            <>
+              Drop it
+              <br />
+              <em>right here.</em>
+            </>
+          ) : (
+            <>
+              Drop your
+              <br />
+              Spotify export
+              <br />
+              <em>here.</em>
+            </>
+          )}
+        </p>
+        <p className="sleeve__hint">
+          The <code>.zip</code> Spotify emailed you, the folder inside it, or the <code>Streaming_History_Audio_*.json</code>{' '}
+          files.
+        </p>
+        <span className="sleeve__cta" aria-hidden="true">
+          <b>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
+            </svg>
+            Choose file
+          </b>
+          <span>or drag it here</span>
+        </span>
+      </div>
+    </div>
+  )
+}
