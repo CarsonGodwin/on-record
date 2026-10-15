@@ -1,6 +1,7 @@
 name: CI
 
-# Cloudflare builds and deploys the site from main; this checks every push and PR first.
+# Cloudflare builds and deploys the site from main; this checks every push and PR first:
+# lint, audit and build in one job, and the data-layer tests in several time zones.
 on:
   push:
     branches: [main]
@@ -32,3 +33,26 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run build
+
+  # Every aggregation works in the viewer's local time, so run the tests in a
+  # few zones: UTC, one behind it with US DST, one at a half hour, and one
+  # ahead of it with southern-hemisphere DST.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tz: [UTC, America/Los_Angeles, Asia/Kolkata, Pacific/Auckland]
+    name: test (${{ matrix.tz }})
+    env:
+      TZ: ${{ matrix.tz }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
