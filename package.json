@@ -23,7 +23,7 @@
   "devDependencies": {
     "@types/d3-force": "^3.0.10",
     "@types/d3-shape": "^3.2.0",
-    "@types/node": "^24.13.3",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
