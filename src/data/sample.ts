@@ -162,7 +162,8 @@ export function generateSampleRecords(): RawStreamRecord[] {
             track = tracks[Math.min(tracks.length - 1, Math.floor(rand() ** 2 * tracks.length))]
           }
           const skipped = s !== obsession && rand() < track.skipChance * (shuffle ? 1.3 : 1)
-          const ms = skipped ? 2_000 + Math.floor(rand() * 28_000) : track.durationMs
+          // Most skips come in the first few seconds, but some land anywhere in the song
+          const ms = skipped ? 1_000 + Math.floor(rand() ** 3 * (track.durationMs - 1_000)) : track.durationMs
           t += ms
           records.push({
             ...base,

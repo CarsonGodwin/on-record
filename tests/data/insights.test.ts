@@ -16,9 +16,9 @@ import {
   smooth,
   songStats,
   topEntries,
-} from './insights'
-import { dayNumber } from './stats'
-import { at, play, sorted } from './testing'
+} from '../../src/data/insights'
+import { dayNumber } from '../../src/data/stats'
+import { at, play, sorted } from '../helpers'
 
 const MIN = 60_000
 

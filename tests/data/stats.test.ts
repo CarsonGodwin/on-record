@@ -8,12 +8,13 @@ import {
   isSkip,
   newArtistsIn,
   platforms,
+  skipTiming,
   startDate,
   summarize,
   topItems,
   weekHourGrid,
-} from './stats'
-import { at, play, sorted } from './testing'
+} from '../../src/data/stats'
+import { at, play, sorted } from '../helpers'
 
 describe('startDate', () => {
   it('works back from the end time', () => {
@@ -94,6 +95,22 @@ describe('summarize', () => {
     expect(s.skipRate).toBeCloseTo(1 / 3)
     expect(s.shuffleRate).toBeCloseTo(1 / 3)
     expect(s.offlineShare).toBeCloseTo(120_000 / s.totalMs)
+  })
+})
+
+describe('skipTiming', () => {
+  it('bins skipped songs by how far in, in 5-second steps', () => {
+    const t = skipTiming([
+      play(at(2024, 1, 1, 8), { skipped: true, msPlayed: 0 }),
+      play(at(2024, 1, 1, 9), { skipped: true, msPlayed: 4_999 }),
+      play(at(2024, 1, 1, 10), { reasonEnd: 'fwdbtn', msPlayed: 5_000 }),
+      play(at(2024, 1, 1, 11), { skipped: true, msPlayed: 59_999 }),
+      play(at(2024, 1, 1, 12), { skipped: true, msPlayed: 90_000 }), // counted, but past the first minute
+      play(at(2024, 1, 1, 13), { msPlayed: 3_000 }), // ended early but not skipped
+      play(at(2024, 1, 1, 14), { kind: 'episode', skipped: true, msPlayed: 1_000 }),
+    ])
+    expect(t.skips).toBe(4 + 1)
+    expect(t.bins).toEqual([2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
   })
 })
 

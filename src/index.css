@@ -251,6 +251,9 @@ em {
   font-weight: 800;
   cursor: pointer;
   transition: transform 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .round-button:hover {
@@ -269,6 +272,23 @@ em {
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.segmented--scroll {
+  padding-bottom: 12px;
+  border-radius: 22px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(244, 241, 234, 0.3) transparent;
+  overscroll-behavior-x: contain;
+}
+
+.segmented--scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.segmented--scroll::-webkit-scrollbar-thumb {
+  background: rgba(244, 241, 234, 0.3);
+  border-radius: 999px;
 }
 
 .segmented__option {
@@ -758,12 +778,10 @@ th {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: clamp(20px, 3vw, 32px);
+  padding: clamp(26px, 3.6vw, 38px);
   border-radius: 10px;
   color: var(--accent-ink);
   background:
-    repeating-linear-gradient(0deg, rgba(11, 10, 15, 0.12) 0 2px, transparent 2px 14px),
-    radial-gradient(circle at 85% 18%, #ffd23d 0 13%, transparent 13.5%),
     linear-gradient(160deg, #ff277c 0%, #a053fd 58%, #3778f5 100%);
   box-shadow: 0 50px 90px -30px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -789,9 +807,9 @@ th {
 
 .sleeve__title {
   margin: 0;
-  font-size: clamp(2rem, 4.6vw, 3.4rem);
+  font-size: clamp(1.8rem, 4vw, 3rem);
   font-weight: 800;
-  line-height: 0.9;
+  line-height: 0.92;
   letter-spacing: -0.045em;
 }
 
@@ -1969,13 +1987,27 @@ th {
 }
 
 .dots__readout {
+  display: grid;
   margin: 0 0 10px;
-  min-height: 2.9em; /* fits the idle hint on two lines so hovering never shifts the chart */
   font-size: 0.92rem;
 }
 
+/* The hint and a dot's details share one cell: the box is as tall as the taller of the two at any width */
+.dots__readout > * {
+  grid-area: 1 / 1;
+}
+
+.dots__readout.is-hovering .dots__hint {
+  visibility: hidden;
+}
+
 .dots__dot {
+  cursor: pointer;
   transition: stroke 0.15s;
+}
+
+.clock__hit {
+  cursor: pointer;
 }
 
 .dots__dot.is-on {
@@ -2636,14 +2668,13 @@ th {
 
 .pulse__line {
   fill: none;
-  stroke: var(--text);
+  stroke: var(--c);
   stroke-width: 1.6;
   stroke-linejoin: round;
   transition: stroke 0.15s;
 }
 
 .pulse__ridge.is-on .pulse__line {
-  stroke: var(--c);
   stroke-width: 2.6;
   filter: drop-shadow(0 0 8px var(--c));
 }
@@ -3201,6 +3232,14 @@ th {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.studio__ultra {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 .button:disabled {

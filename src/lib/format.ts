@@ -64,7 +64,7 @@ export function equivalents(ms: number): { days: number; flights: number; marath
     days: hours / 24,
     // New York to Tokyo, about 14 hours
     flights: hours / 14,
-    // Every extended-edition Lord of the Rings film back to back, about 11.4 hours
-    marathons: hours / 11.4,
+    // All eight Harry Potter films back to back, 19 hours 41 minutes (1,181 minutes)
+    marathons: (hours * 60) / 1181,
   }
 }

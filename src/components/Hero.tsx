@@ -50,7 +50,7 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
         </p>
         <p className="hero__eq">
           That’s <b>{formatNumber(eq.days)} days</b> of sound. <b>{formatNumber(eq.flights)} flights</b> from New York to Tokyo.{' '}
-          <b>{formatNumber(eq.marathons)}</b> back-to-back extended Lord of the Rings marathons.
+          <b>{formatNumber(eq.marathons)}</b> back-to-back marathons of all eight Harry Potter films.
         </p>
         <div className="hero__actions">
           <a className="button button--big" href="#record">

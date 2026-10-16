@@ -1,5 +1,6 @@
 import { dayNumber, fromDayNumber, startDate } from '../data/stats'
 import { formatHour, formatMonthShort } from '../lib/format'
+import { TOP_ARTISTS } from '../lib/palette'
 import type { Play } from '../types'
 
 /*
@@ -12,10 +13,10 @@ export const MINUTES = 1440
 export const TAU = Math.PI * 2
 export const GROOVE = 'rgba(244, 241, 234, 0.3)'
 export const PODCAST = '#8d86a0'
-export const SLOT_OTHER = 8
-export const SLOT_PODCAST = 9
+export const SLOT_OTHER = TOP_ARTISTS
+export const SLOT_PODCAST = TOP_ARTISTS + 1
 /** Draw order: the background first, the top artist last so it sits on top */
-const DRAW_ORDER = [SLOT_OTHER, SLOT_PODCAST, 7, 6, 5, 4, 3, 2, 1, 0]
+const DRAW_ORDER = [SLOT_OTHER, SLOT_PODCAST, ...Array.from({ length: TOP_ARTISTS }, (_, i) => TOP_ARTISTS - 1 - i)]
 
 export const DISPLAY = '"Bricolage Grotesque Variable", system-ui, sans-serif'
 export const MONO = '"JetBrains Mono Variable", ui-monospace, monospace'
@@ -140,6 +141,44 @@ export interface DrawOptions {
   guideMinute: number
   /** On-screen magnification already applied to the context: hairlines and small text are divided by it so they stay screen-sized */
   zoom?: number
+  /** The part of the drawing that's on screen, in drawing coordinates: grooves outside it are skipped, which keeps deep zooms quick */
+  visible?: { x0: number; y0: number; x1: number; y1: number }
+}
+
+export interface Visible {
+  rMin: number
+  rMax: number
+  /** On-screen times of day, in minutes; `to` can run past midnight */
+  from: number
+  to: number
+}
+
+/** The radii and times of day that reach the visible rectangle, padded by `pad` for line widths and glow */
+export function visibleWindow(c: number, v: DrawOptions['visible'], pad: number): Visible {
+  const all = { rMin: 0, rMax: Infinity, from: 0, to: MINUTES }
+  if (!v) return all
+  const x0 = v.x0 - pad - c
+  const y0 = v.y0 - pad - c
+  const x1 = v.x1 + pad - c
+  const y1 = v.y1 + pad - c
+  const nx = Math.max(x0, 0, -x1)
+  const ny = Math.max(y0, 0, -y1)
+  const rMin = Math.hypot(nx, ny)
+  const rMax = Math.hypot(Math.max(-x0, x1), Math.max(-y0, y1))
+  // With the center on screen every time of day is too
+  if (rMin === 0) return { ...all, rMax }
+  // Otherwise the rectangle covers less than half a turn: measure its corners from its middle
+  const toMinutes = (x: number, y: number) => ((Math.atan2(y, x) + Math.PI / 2) / TAU) * MINUTES
+  const mid = toMinutes((x0 + x1) / 2, (y0 + y1) / 2)
+  let lo = 0
+  let hi = 0
+  for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) {
+    const d = ((((toMinutes(x, y) - mid) % MINUTES) + MINUTES * 1.5) % MINUTES) - MINUTES / 2
+    lo = Math.min(lo, d)
+    hi = Math.max(hi, d)
+  }
+  const from = (((mid + lo) % MINUTES) + MINUTES) % MINUTES
+  return { rMin, rMax, from, to: from + hi - lo }
 }
 
 /** Draws the record into a size × size square at the current origin. Doesn't clear first. */
@@ -148,6 +187,8 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
   const c = g.center
   const z = o.zoom ?? 1
   const hair = Math.max(1, o.size / 1400) / z
+  const view = visibleWindow(c, o.visible, (o.size * 0.02) / z)
+  const onScreen = (r: number) => r >= view.rMin && r <= view.rMax
 
   // The disc
   const body = ctx.createRadialGradient(c, c, 0, c, c, g.disc)
@@ -163,6 +204,7 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
   ctx.lineWidth = hair
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)'
   for (let r = g.inner; r < g.disc; r += o.size * 0.0055) {
+    if (!onScreen(r)) continue
     ctx.beginPath()
     ctx.arc(c, c, r, 0, TAU)
     ctx.stroke()
@@ -171,6 +213,7 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
   // Month or year boundaries
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.09)'
   for (const guide of o.guides) {
+    if (!onScreen(g.inner + guide.ring * g.ring)) continue
     ctx.beginPath()
     ctx.arc(c, c, g.inner + guide.ring * g.ring, 0, TAU)
     ctx.stroke()
@@ -189,6 +232,11 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
     for (let k = 0; k < model.count; k++) {
       if (model.slot[k] !== slot) continue
       const r = g.inner + (model.ring[k] + 0.5) * g.ring
+      if (!onScreen(r)) continue
+      const from = model.from[k]
+      const to = model.to[k]
+      // Off to the side of the screen, unless the window wraps past midnight onto it
+      if (!((from < view.to && to > view.from) || from < view.to - MINUTES)) continue
       const a0 = (model.from[k] / MINUTES) * TAU - Math.PI / 2
       const a1 = Math.max((model.to[k] / MINUTES) * TAU - Math.PI / 2, a0 + 0.002)
       ctx.moveTo(c + r * Math.cos(a0), c + r * Math.sin(a0))

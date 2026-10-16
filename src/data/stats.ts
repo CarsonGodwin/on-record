@@ -103,6 +103,29 @@ export function summarize(plays: Play[]): Summary {
   }
 }
 
+/** Width of each step in skipTiming's histogram, and how many steps it has: the first minute in 5s steps */
+export const SKIP_STEP_MS = 5_000
+export const SKIP_STEPS = 12
+
+export interface SkipTiming {
+  /** Skipped songs by how far in they were skipped, in SKIP_STEP_MS steps. Skips after the first minute aren't binned */
+  bins: number[]
+  /** Every skipped song, including those skipped after the first minute */
+  skips: number
+}
+
+export function skipTiming(plays: Play[]): SkipTiming {
+  const bins = Array(SKIP_STEPS).fill(0)
+  let skips = 0
+  for (const p of plays) {
+    if (p.kind !== 'track' || !isSkip(p)) continue
+    skips++
+    const step = Math.floor(p.msPlayed / SKIP_STEP_MS)
+    if (step < SKIP_STEPS) bins[step]++
+  }
+  return { bins, skips }
+}
+
 // ---------- Rankings ----------
 
 export type Category = 'artist' | 'track' | 'album' | 'show'

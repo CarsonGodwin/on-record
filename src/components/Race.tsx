@@ -131,7 +131,16 @@ export function Race({ bins, race, colors }: Props) {
             setChoice(!playing)
           }}
         >
-          {playing ? '❚❚' : t >= frames - 1 ? '↻' : '▶'}
+          {playing ? (
+            <svg width="16" height="18" viewBox="0 0 16 18" fill="currentColor" aria-hidden="true">
+              <rect x="1" y="1" width="4.5" height="16" rx="1.2" />
+              <rect x="10.5" y="1" width="4.5" height="16" rx="1.2" />
+            </svg>
+          ) : t >= frames - 1 ? (
+            '↻'
+          ) : (
+            '▶'
+          )}
         </button>
         <input
           type="range"

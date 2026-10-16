@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { fromDayNumber } from '../data/stats'
 import { formatDuration, formatHour, formatLongDate, formatNumber, formatTime } from '../lib/format'
 import { useWidth } from '../lib/hooks'
@@ -28,7 +28,7 @@ import { ZoomControls } from './ZoomControls'
 interface Props {
   plays: Play[]
   model: RecordModel
-  /** Colors per slot: 8 artists, then everyone else, then podcasts */
+  /** Colors per slot: 10 artists, then everyone else, then podcasts */
   slotColors: string[]
   legend: string[]
   title: string
@@ -59,7 +59,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
   const view = zoom.view
   const zoomed = view.s > 1.01
   // The view the canvas was last drawn at; between redraws a CSS transform stretches it to the live view
-  const [drawn, setDrawn] = useState<View>(IDENTITY)
+  const drawn = useRef<View>(IDENTITY)
   const drawCost = useRef(0)
 
   const guides = useMemo(() => recordGuides(model), [model])
@@ -141,15 +141,35 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
     }
   }, [])
 
-  // A full redraw only when the view settles (or every frame, if drawing is cheap); it stays sharp at any zoom
+  // Redraws keep pace with a pan or pinch, as often as drawing cost allows, so it stays sharp at any zoom;
+  // between redraws a CSS transform stretches the last one to the live view.
+  // The pixels and that transform always change together, outside React, so the record never jumps against
+  // the overlay (needle, rings) for a frame: layout effects land in the same paint as the overlay.
+  const liveView = useRef(view)
   const settledView = useRef(view)
-  useEffect(() => {
+  const drawLatest = useRef<() => void>(() => {})
+  const lastDraw = useRef(0)
+  const queued = useRef({ timer: 0, frame: 0 })
+
+  /** Stretches the last drawing to the live view */
+  function place(canvas: HTMLCanvasElement) {
+    const v = liveView.current
+    const d = drawn.current
+    const k = v.s / d.s
+    canvas.style.transform = k === 1 && v.x === d.x && v.y === d.y ? '' : `translate(${v.x - k * d.x}px, ${v.y - k * d.y}px) scale(${k})`
+  }
+
+  useLayoutEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
+    liveView.current = view
+    place(canvas)
     const onlyMoved = settledView.current !== view
     settledView.current = view
-    const draw = () => {
+    drawLatest.current = () => {
+      // Always the newest view React has put on screen, even if this closure is older
+      const view = liveView.current
       const t0 = performance.now()
       const dpr = Math.min(window.devicePixelRatio || 1, 2.5)
       const px = Math.round(size * dpr)
@@ -172,18 +192,46 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
         guides,
         guideMinute,
         zoom: view.s,
+        visible: {
+          x0: (-view.x * dpr) / view.s,
+          y0: (-view.y * dpr) / view.s,
+          x1: (canvas.width - view.x * dpr) / view.s,
+          y1: (canvas.height - view.y * dpr) / view.s,
+        },
       })
       ctx.setTransform(1, 0, 0, 1, 0, 0)
-      drawCost.current = performance.now() - t0
-      setDrawn(view)
+      lastDraw.current = performance.now()
+      drawCost.current = lastDraw.current - t0
+      drawn.current = view
+      place(canvas)
     }
+    const q = queued.current
     if (!onlyMoved) {
-      draw()
+      window.clearTimeout(q.timer)
+      cancelAnimationFrame(q.frame)
+      q.timer = q.frame = 0
+      drawLatest.current()
       return
     }
-    const id = window.setTimeout(() => requestAnimationFrame(draw), drawCost.current < 12 ? 0 : 140)
-    return () => window.clearTimeout(id)
+    // One redraw in flight at a time, drawing whatever the view is by then.
+    // Slow draws leave a gap after each one so the gesture itself doesn't stutter.
+    if (q.timer || q.frame) return
+    const wait = Math.max(0, lastDraw.current + drawCost.current * 2 - performance.now())
+    q.timer = window.setTimeout(() => {
+      q.timer = 0
+      q.frame = requestAnimationFrame(() => {
+        q.frame = 0
+        drawLatest.current()
+      })
+    }, wait)
   }, [model, size, slotColors, focus, title, subtitle, guides, guideMinute, fontsReady, view])
+  useEffect(() => {
+    const q = queued.current
+    return () => {
+      window.clearTimeout(q.timer)
+      cancelAnimationFrame(q.frame)
+    }
+  }, [])
 
   /** Moves the needle to wherever the pointer is on the record */
   function pick(e: { clientX: number; clientY: number }, hold: boolean) {
@@ -228,7 +276,6 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
   const cy = view.y + view.s * g.center
   const ringOnScreen = ringR * view.s
   const grooveOnScreen = g.ring * view.s
-  const stretch = view.s / drawn.s
   const stripColor = (slot: number) => (slot === SLOT_OTHER ? STRIP_OTHER : slotColors[slot])
 
   return (
@@ -237,11 +284,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
         <div className={zoomed ? 'vinyl__platter is-zoomed' : 'vinyl__platter'} ref={platterRef} style={{ width: size, height: size }}>
           <canvas
             ref={canvasRef}
-            style={{
-              width: size,
-              height: size,
-              transform: stretch === 1 && view.x === drawn.x && view.y === drawn.y ? undefined : `translate(${view.x - stretch * drawn.x}px, ${view.y - stretch * drawn.y}px) scale(${stretch})`,
-            }}
+            style={{ width: size, height: size }}
             role="img"
             aria-label={`Your listening as a vinyl record: ${model.days} grooves, one per day. Use the controls next to it to explore one day at a time.`}
             onPointerMove={(e) => {

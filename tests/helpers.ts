@@ -1,4 +1,4 @@
-import type { Play } from '../types'
+import type { Play } from '../src/types'
 
 /*
  * Builders for tests. Times are local, like the app's own aggregations, so the

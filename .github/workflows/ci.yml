@@ -1,7 +1,7 @@
 name: CI
 
 # Cloudflare builds and deploys the site from main; this checks every push and PR first:
-# lint, audit and build in one job, and the data-layer tests in several time zones.
+# lint, audit and build in one job, and the tests in several time zones.
 on:
   push:
     branches: [main]

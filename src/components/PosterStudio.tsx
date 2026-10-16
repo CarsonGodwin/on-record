@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useWidth } from '../lib/hooks'
-import { POSTER_SIZES, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
+import { POSTER_DESIGN_SIZES, POSTER_SIZES, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { Segmented } from './ui'
 
 /*
@@ -10,9 +10,17 @@ import { Segmented } from './ui'
 
 const DESIGNS: { value: PosterDesign; label: string }[] = [
   { value: 'record', label: 'The Record' },
+  { value: 'deep', label: 'Deep dive' },
+  { value: 'story', label: 'Story' },
+  { value: 'sleeve', label: 'Sleeve' },
+  { value: 'annotated', label: 'Annotated' },
+  { value: 'macro', label: 'Macro' },
   { value: 'constellation', label: 'Constellation' },
   { value: 'pulse', label: 'Pulse' },
 ]
+
+/** Deep dive can also come out this many times bigger, so a single day's groove gets real pixels */
+const ULTRA_SCALES = [4, 3, 2]
 
 const PAPERS: { value: PosterPaper; label: string; swatch: string }[] = [
   { value: 'midnight', label: 'Midnight', swatch: '#0b0a0f' },
@@ -34,15 +42,20 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const [title, setTitle] = useState('On Record')
   const deferredTitle = useDeferredValue(title)
   const [fontsReady, setFontsReady] = useState(false)
-  const [busy, setBusy] = useState<'download' | 'share' | null>(null)
+  const [busy, setBusy] = useState<'download' | 'ultra' | 'share' | null>(null)
   const [canShare] = useState(supportsFileShare)
   // Safari only opens the share sheet straight after a tap, so on phones the full-size image is made ahead of time
   const readyBlob = useRef<{ key: string; data: PosterData; blob: Blob } | null>(null)
 
-  const spec = POSTER_SIZES[size]
-  const cssW = Math.min(width, size === 'story' ? 330 : 440)
+  // Some designs are drawn for one size only, so the size picker narrows to what they support
+  const sizes = POSTER_DESIGN_SIZES[design] ?? (Object.keys(POSTER_SIZES) as PosterSize[])
+  const activeSize = sizes.includes(size) ? size : sizes[0]
+  const usesTitle = design !== 'deep' && design !== 'story'
+  const spec = POSTER_SIZES[activeSize]
+  const cssW = Math.min(width, activeSize === 'story' ? 330 : 440)
   const cssH = (cssW * spec.height) / spec.width
   const finalTitle = deferredTitle.trim() || 'On Record'
+  const hasUltra = design === 'deep'
   const fileName = `on-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
 
   useEffect(() => {
@@ -68,18 +81,28 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     renderPoster(ctx, canvas.width, canvas.height, data, { design, paper, title: finalTitle })
   }, [data, design, paper, finalTitle, cssW, cssH, fontsReady])
 
-  const fullSize = useCallback(async (): Promise<Blob | null> => {
-    await document.fonts.ready
-    const canvas = document.createElement('canvas')
-    canvas.width = spec.width
-    canvas.height = spec.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    renderPoster(ctx, spec.width, spec.height, data, { design, paper, title: finalTitle })
-    return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
-  }, [spec, data, design, paper, finalTitle])
+  const fullSize = useCallback(
+    async (scales: number[] = [1]): Promise<Blob | null> => {
+      await document.fonts.ready
+      // Browsers cap canvas size (phones far lower than desktops), so step down until one fits
+      for (const scale of scales) {
+        const canvas = document.createElement('canvas')
+        canvas.width = spec.width * scale
+        canvas.height = spec.height * scale
+        const ctx = canvas.getContext('2d')
+        if (!ctx) continue
+        renderPoster(ctx, canvas.width, canvas.height, data, { design, paper, title: finalTitle })
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+        // Free the pixels now rather than whenever the GC gets to it
+        canvas.width = canvas.height = 0
+        if (blob) return blob
+      }
+      return null
+    },
+    [spec, data, design, paper, finalTitle],
+  )
 
-  const optionsKey = `${design}|${size}|${paper}|${finalTitle}`
+  const optionsKey = `${design}|${activeSize}|${paper}|${finalTitle}`
 
   useEffect(() => {
     if (!canShare || !fontsReady) return
@@ -90,11 +113,11 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     return () => clearTimeout(timer)
   }, [canShare, fontsReady, fullSize, optionsKey, data])
 
-  function save(blob: Blob) {
+  function save(blob: Blob, name = fileName) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = fileName
+    a.download = name
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
@@ -104,6 +127,18 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     try {
       const blob = await fullSize()
       if (blob) save(blob)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function downloadUltra() {
+    setBusy('ultra')
+    try {
+      // Let the button repaint as "Rendering…" before the long draw blocks the page
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      const blob = await fullSize(ULTRA_SCALES)
+      if (blob) save(blob, fileName.replace(/\.png$/, '-ultra.png'))
     } finally {
       setBusy(null)
     }
@@ -144,16 +179,16 @@ export function PosterStudio({ data, design, onDesign }: Props) {
       <div className="studio__controls">
         <div className="field">
           <span className="field__label">Design</span>
-          <Segmented label="Poster design" value={design} onChange={onDesign} options={DESIGNS} />
+          <Segmented label="Poster design" scrollable value={design} onChange={onDesign} options={DESIGNS} />
         </div>
 
         <div className="field">
           <span className="field__label">Size</span>
           <Segmented
             label="Poster size"
-            value={size}
+            value={activeSize}
             onChange={setSize}
-            options={(Object.keys(POSTER_SIZES) as PosterSize[]).map((key) => ({
+            options={sizes.map((key) => ({
               value: key,
               label: `${POSTER_SIZES[key].label} ${POSTER_SIZES[key].ratio}`,
             }))}
@@ -175,10 +210,12 @@ export function PosterStudio({ data, design, onDesign }: Props) {
           </div>
         </div>
 
-        <label className="field">
-          <span className="field__label">Title</span>
-          <input className="text-input" value={title} maxLength={24} onChange={(e) => setTitle(e.target.value)} placeholder="On Record" />
-        </label>
+        {usesTitle && (
+          <label className="field">
+            <span className="field__label">Title</span>
+            <input className="text-input" value={title} maxLength={24} onChange={(e) => setTitle(e.target.value)} placeholder="On Record" />
+          </label>
+        )}
 
         <div className="studio__actions">
           <button type="button" className="button button--big" onClick={download} disabled={busy !== null}>
@@ -190,6 +227,16 @@ export function PosterStudio({ data, design, onDesign }: Props) {
             </button>
           )}
         </div>
+        {hasUltra && (
+          <div className="studio__ultra">
+            <button type="button" className="button button--ghost" onClick={downloadUltra} disabled={busy !== null}>
+              {busy === 'ultra' ? 'Rendering… this takes a moment' : '↓ Ultra HD PNG'}
+            </button>
+            <span className="field__note">
+              Up to {spec.width * ULTRA_SCALES[0]} × {spec.height * ULTRA_SCALES[0]} px · zoom in until every groove is a single day
+            </span>
+          </div>
+        )}
         <p className="hint">Made right here on your device. Nothing is uploaded.</p>
       </div>
     </div>

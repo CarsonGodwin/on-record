@@ -70,7 +70,7 @@ export default function App() {
 
       <main className="landing__main">
         <div className="landing__copy">
-          <p className="eyebrow">Your Spotify listening history, made into something you’d hang on a wall</p>
+          <p className="eyebrow">An in-depth analysis of your entire Spotify history</p>
           <h1 className="landing__title">
             Your life,
             <br />
@@ -78,7 +78,7 @@ export default function App() {
           </h1>
           <p className="landing__lede">
             Drop in your Spotify export and get every day of your listening pressed into vinyl. Your eras, your 3 AM artist, the
-            songs you always skip, the scenes you drift between, and a poster worth hanging up.
+            songs you always skip, the scenes you drift between, and a poster worth sharing.
           </p>
 
           {state.status === 'error' && (

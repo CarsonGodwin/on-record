@@ -9,12 +9,26 @@ interface SegmentedProps<T> {
   value: T
   onChange: (value: T) => void
   className?: string
+  /** Long lists: shows a scrollbar and lets the mouse wheel scroll sideways */
+  scrollable?: boolean
 }
 
 /** A row of toggle buttons where exactly one is selected */
-export function Segmented<T>({ label, options, value, onChange, className }: SegmentedProps<T>) {
+export function Segmented<T>({ label, options, value, onChange, className, scrollable }: SegmentedProps<T>) {
+  const classes = ['segmented', scrollable && 'segmented--scroll', className].filter(Boolean).join(' ')
   return (
-    <div className={className ? `segmented ${className}` : 'segmented'} role="group" aria-label={label}>
+    <div
+      className={classes}
+      role="group"
+      aria-label={label}
+      onWheel={
+        scrollable
+          ? (e) => {
+              if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY
+            }
+          : undefined
+      }
+    >
       {options.map((o) => (
         <button
           key={String(o.value)}
