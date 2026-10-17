@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from 'react'
 
 /** Tracks an element's content-box width */
 export function useWidth(ref: RefObject<HTMLElement | null>, fallback = 800): number {
@@ -68,4 +68,17 @@ export function useCountUp(target: number, active: boolean, duration = 1600): nu
     return () => cancelAnimationFrame(frame)
   }, [target, active, duration, reduced])
   return reduced && active ? target : value
+}
+
+/** Whether a media query matches right now, kept up to date as the window changes */
+export function useMediaQuery(query: string): boolean {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const list = matchMedia(query)
+      list.addEventListener('change', onChange)
+      return () => list.removeEventListener('change', onChange)
+    },
+    [query],
+  )
+  return useSyncExternalStore(subscribe, () => matchMedia(query).matches)
 }

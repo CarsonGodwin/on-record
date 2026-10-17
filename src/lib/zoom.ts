@@ -28,6 +28,8 @@ interface Options {
   width: number
   height: number
   max: number
+  /** While true, a single finger belongs to something else (like a hold-and-drag scrub) and doesn't pan */
+  busy?: RefObject<boolean>
 }
 
 interface Point {
@@ -38,7 +40,7 @@ interface Point {
 /** Pixels a press can wander before it counts as a drag rather than a tap */
 const DRAG_SLOP = 5
 
-export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, max }: Options): PanZoom {
+export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, max, busy }: Options): PanZoom {
   const [view, setViewState] = useState<View>(IDENTITY)
   const viewRef = useRef(view)
   const bounds = useRef({ width, height, max })
@@ -152,7 +154,7 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
         setView({ s, x: mid.x - cx * s, y: mid.y - cy * s })
         return
       }
-      if (v0.s <= 1) return
+      if (v0.s <= 1 || busy?.current) return
       const p = now[0]
       const p0 = start.pts[0]
       if (!dragged) {
@@ -222,7 +224,7 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
       el.removeEventListener('gesturechange', gestureChange)
       cancelAnimationFrame(tween.current)
     }
-  }, [ref, setView, zoomAt])
+  }, [ref, setView, zoomAt, busy])
 
   return { view, max, zoomBy, reset }
 }

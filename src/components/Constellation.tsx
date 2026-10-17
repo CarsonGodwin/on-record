@@ -82,7 +82,8 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
     return map
   }, [links])
 
-  const shown = pinned ?? active
+  // A selection can outlive its star (a new year, or a phone trimming the sky), so ignore ids no longer drawn
+  const shown = [pinned, active].find((id) => id !== null && layout.has(id)) ?? null
   const isLit = (id: string) => !shown || id === shown || neighbors.get(shown)?.has(id)
   // More names fit as the stars spread out
   const labelled = new Set(nodes.slice(0, Math.round((narrow ? 8 : 14) * view.s * view.s)).map((n) => n.id))

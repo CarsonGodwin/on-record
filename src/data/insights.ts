@@ -481,8 +481,8 @@ export interface Records {
   firstPlay: { title: string; artist: string; date: number } | null
   marathon: Session | null
   avgSessionMs: number
-  /** Played in the most different months */
-  evergreen: { title: string; artist: string; months: number } | null
+  /** Played in the most different months, out of the months with any music */
+  evergreen: { title: string; artist: string; months: number; activeMonths: number } | null
   /** A former favorite you haven't touched in a while */
   forgotten: { artist: string; lastPlayed: number; ms: number } | null
 }
@@ -493,6 +493,7 @@ export function records(plays: Play[], sessionList: Session[]): Records {
   const avgSessionMs = sessionList.length ? sum(sessionList.map((s) => s.ms)) / sessionList.length : 0
 
   const songMonths = new Map<string, { title: string; artist: string; months: Set<number> }>()
+  const activeMonths = new Set<number>()
   const artistMs = new Map<string, number>()
   const artistLast = new Map<string, number>()
   for (const p of plays) {
@@ -508,11 +509,14 @@ export function records(plays: Play[], sessionList: Session[]): Records {
       songMonths.set(key, s)
     }
     s.months.add(d.getFullYear() * 12 + d.getMonth())
+    activeMonths.add(d.getFullYear() * 12 + d.getMonth())
   }
 
   let evergreen: Records['evergreen'] = null
   for (const s of songMonths.values()) {
-    if (!evergreen || s.months.size > evergreen.months) evergreen = { title: s.title, artist: s.artist, months: s.months.size }
+    if (!evergreen || s.months.size > evergreen.months) {
+      evergreen = { title: s.title, artist: s.artist, months: s.months.size, activeMonths: activeMonths.size }
+    }
   }
 
   // Among your top 20 artists, the biggest one you've gone quiet on for 4+ months

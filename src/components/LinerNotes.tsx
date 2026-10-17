@@ -43,10 +43,11 @@ export function LinerNotes({ profile, fun, rec, summary, devices, isAllTime }: P
     })
   }
   if (rec.evergreen) {
+    // The song that shows up in the most different months: the value is the song, the detail says how it won
     records.push({
-      label: 'Evergreen',
-      value: `${formatNumber(rec.evergreen.months)} months`,
-      detail: `${rec.evergreen.title} by ${rec.evergreen.artist} kept coming back`,
+      label: 'Evergreen song',
+      value: rec.evergreen.title,
+      detail: `${rec.evergreen.artist}. Played in ${formatNumber(rec.evergreen.months)} of the ${formatNumber(rec.evergreen.activeMonths)} months you listened`,
     })
   }
   if (rec.firstPlay) {

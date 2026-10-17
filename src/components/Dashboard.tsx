@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   artistGraph,
   artistSeries,
@@ -33,10 +33,11 @@ import { Pulse } from './Pulse'
 import { Race } from './Race'
 import { River, RiverTable } from './River'
 import { TopCharts } from './TopCharts'
+import { TrackMenu, type Track } from './TrackMenu'
 import { Chapter, Segmented, Side } from './ui'
 import { Vinyl } from './Vinyl'
 
-const TRACKS = [
+const TRACKS: Track[] = [
   { id: 'record', num: 'A1', title: 'The Record' },
   { id: 'eras', num: 'A2', title: 'Eras' },
   { id: 'race', num: 'A3', title: 'The Race' },
@@ -50,6 +51,8 @@ const TRACKS = [
   { id: 'poster', num: 'D2', title: 'The Poster' },
 ]
 
+const SIDES: Record<string, string> = { A: 'Time', B: 'Rhythm', C: 'Taste', D: 'Take it home' }
+
 interface Props {
   result: LoadResult
   isSample: boolean
@@ -62,6 +65,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const [year, setYear] = useState<number | null>(null)
   const [posterDesign, setPosterDesign] = useState<PosterDesign>('record')
   const [current, setCurrent] = useState<string | null>(null)
+  // Once a finger has scrubbed the record, its how-to stays hidden until new data comes in
+  const [scrubLearned, setScrubLearned] = useState(false)
+  const topbarRef = useRef<HTMLElement>(null)
 
   // Everything below is computed from `plays`, so the year filter scopes the whole page
   const plays = useMemo(() => filterByYear(all, year), [all, year])
@@ -145,6 +151,19 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     document.getElementById('poster')?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // Sticky things and jump targets sit just under the top bar, whose height changes with the screen
+  useEffect(() => {
+    const bar = topbarRef.current
+    if (!bar) return
+    const root = document.documentElement
+    const observer = new ResizeObserver(() => root.style.setProperty('--topbar-h', `${bar.getBoundingClientRect().height}px`))
+    observer.observe(bar)
+    return () => {
+      observer.disconnect()
+      root.style.removeProperty('--topbar-h')
+    }
+  }, [])
+
   // Light up the current track in the side nav
   useEffect(() => {
     const sections = TRACKS.map((t) => document.getElementById(t.id)).filter((el): el is HTMLElement => el !== null)
@@ -160,10 +179,13 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
   return (
     <div className="dash">
-      <header className="topbar">
-        <a className="brand" href="#top">
-          On Record<span className="brand__dot" aria-hidden="true" />
+      <header className="topbar" ref={topbarRef}>
+        <a className="brand" href="#top" aria-label="On Record, back to the top">
+          <span className="brand__name">On Record</span>
+          <span className="brand__dot" aria-hidden="true" />
         </a>
+        {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
+        <TrackMenu tracks={TRACKS} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />
         <Segmented
           className="topbar__years"
           label="Time period"
@@ -171,6 +193,19 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           onChange={setYear}
           options={[{ value: null, label: 'All time' }, ...years.map((y) => ({ value: y, label: String(y) }))]}
         />
+        <select
+          className="topbar__select"
+          aria-label="Time period"
+          value={year === null ? 'all' : String(year)}
+          onChange={(e) => setYear(e.target.value === 'all' ? null : Number(e.target.value))}
+        >
+          <option value="all">All time</option>
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
         <div className="topbar__actions">
           <button type="button" className="button button--small" onClick={() => makePoster(posterDesign)}>
             Poster
@@ -208,7 +243,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
         {!hasMusic && <p className="empty">There’s no music in this period, only podcasts. Most of the visuals below need songs.</p>}
 
-        <Side label="Side A" title="Time" />
+        <Side label="Side A" title={SIDES.A} />
 
         <Chapter id="record" num="A1" title="The Record" lede="Every day you listened, pressed into vinyl. One groove per day, one arc per song, placed by the time it played.">
           <Vinyl
@@ -220,6 +255,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             title={recordTitle}
             subtitle={recordSubtitle}
             onPoster={() => makePoster('record')}
+            learned={scrubLearned}
+            onLearned={() => setScrubLearned(true)}
           />
         </Chapter>
 
@@ -227,7 +264,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           id="eras"
           num="A2"
           title="Eras"
-          lede="Who ruled your listening, and when. Each stream swells with an artist’s hours; the pills on top mark the stretches one artist led."
+          lede="Who ruled your listening, and when."
           table={() => <RiverTable bins={bins} totals={totals} artists={legend} />}
         >
           {hasMusic ? <River bins={bins} totals={totals} eras={eras} artists={legend} colors={colors} /> : <NotEnough />}
@@ -242,7 +279,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           {race.names.length > 1 ? <Race key={year ?? 'all'} bins={bins} race={race} colors={colors} /> : <NotEnough />}
         </Chapter>
 
-        <Side label="Side B" title="Rhythm" />
+        <Side label="Side B" title={SIDES.B} />
 
         <Chapter
           id="clock"
@@ -268,7 +305,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           {songs.length >= 5 ? <LoveHate songs={songs} skipRate={summary.skipRate} /> : <NotEnough />}
         </Chapter>
 
-        <Side label="Side C" title="Taste" />
+        <Side label="Side C" title={SIDES.C} />
 
         <Chapter
           id="constellation"
@@ -284,7 +321,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           id="pulse"
           num="C2"
           title="Pulse"
-          lede="Your top artists in the order you found them. Each line is one artist’s listening over time, scaled to their own peak. Yes, it’s that album cover."
+          lede="Your top artists over time, one line each. Yes, it’s that album cover."
         >
           {pulseLines.length >= 2 ? (
             <Pulse
@@ -304,7 +341,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           <TopCharts plays={plays} />
         </Chapter>
 
-        <Side label="Side D" title="Take it home" />
+        <Side label="Side D" title={SIDES.D} />
 
         <Chapter id="notes" num="D1" title="Liner Notes" lede="Records, habits, and what kind of listener all of this adds up to.">
           <LinerNotes profile={profile} fun={fun} rec={rec} summary={summary} devices={devices} isAllTime={year === null} />

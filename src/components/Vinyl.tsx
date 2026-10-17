@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { fromDayNumber } from '../data/stats'
 import { formatDuration, formatHour, formatLongDate, formatNumber, formatTime } from '../lib/format'
-import { useWidth } from '../lib/hooks'
+import { useMediaQuery, useSeen, useWidth } from '../lib/hooks'
+import { COARSE, useHoldDrag } from '../lib/pointer'
 import { IDENTITY, usePanZoom, type View } from '../lib/zoom'
 import type { Play } from '../types'
 import {
@@ -23,6 +25,10 @@ import { ZoomControls } from './ZoomControls'
  * "The Record": your listening pressed into vinyl. The record is the overview;
  * the deck beside it zooms into one day. Pick a day by tapping a groove, with
  * the slider, or the arrows, and the tonearm follows.
+ *
+ * On a phone the deck splits in two: the readout sits above the record, where
+ * a thumb on the record doesn't cover it, and the controls go below. Touch
+ * and hold the record, then drag, to skim it the way a mouse does by hovering.
  */
 
 interface Props {
@@ -34,6 +40,9 @@ interface Props {
   title: string
   subtitle: string
   onPoster: () => void
+  /** Whether a finger has scrubbed the record yet; lives above the record so a year switch doesn't bring the how-to back */
+  learned: boolean
+  onLearned: () => void
 }
 
 interface Needle {
@@ -45,7 +54,9 @@ interface Needle {
 /** Brighter "everyone else" for the day strip, where arcs are bigger */
 const STRIP_OTHER = 'rgba(244, 241, 234, 0.42)'
 
-export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPoster }: Props) {
+/** Matches the CSS breakpoint where the record and deck stack */
+const STACKED = '(max-width: 900px)'
+export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPoster, learned, onLearned }: Props) {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const width = useWidth(stageRef, 560)
@@ -55,7 +66,37 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
   // Deep enough that a single day's groove gets about 10px wide
   const maxZoom = Math.min(100, Math.max(6, 10 / g.ring))
   const platterRef = useRef<HTMLDivElement>(null)
-  const zoom = usePanZoom(platterRef, { width: size, height: size, max: maxZoom })
+  const stacked = useMediaQuery(STACKED)
+
+  const [needle, setNeedle] = useState<Needle | null>(null)
+  const [scrubbing, setScrubbing] = useState(false)
+  // Hovering previews a day; clicking pins it until you click away
+  const [pinned, setPinned] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // The how-to on touch screens: shown once the record is in view, gone at the first touch
+  const seen = useSeen(platterRef, 0.6)
+  const [touched, setTouched] = useState(false)
+  // While a finger scrubs with the readout scrolled out of view, a small label under the top bar stands in for it
+  const readoutRef = useRef<HTMLDivElement>(null)
+  const [tip, setTip] = useState(false)
+
+  // Hold and drag with a finger: skims the record like a hovering mouse, and lands where you let go
+  const holding = useHoldDrag(platterRef, {
+    onStart: (e) => {
+      setScrubbing(true)
+      setTouched(true)
+      setTip(readoutHidden())
+      pick(e, false)
+    },
+    onMove: (e) => pick(e, false),
+    onEnd: () => {
+      setScrubbing(false)
+      setTip(false)
+      setPinned(true)
+      if (!learned) onLearned()
+    },
+  })
+  const zoom = usePanZoom(platterRef, { width: size, height: size, max: maxZoom, busy: holding })
   const view = zoom.view
   const zoomed = view.s > 1.01
   // The view the canvas was last drawn at; between redraws a CSS transform stretches it to the live view
@@ -74,11 +115,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
     return best
   }, [model])
 
-  const [needle, setNeedle] = useState<Needle | null>(null)
-  const [scrubbing, setScrubbing] = useState(false)
-  // Hovering previews a day; clicking pins it until you click away
-  const [pinned, setPinned] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const coach = COARSE && seen && !learned && !touched && !zoomed
 
   useEffect(() => {
     if (!pinned) return
@@ -233,6 +270,14 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
     }
   }, [])
 
+  /** True when the stacked readout's date or song is under the top bar or below the screen */
+  function readoutHidden() {
+    const r = readoutRef.current?.getBoundingClientRect()
+    if (!r) return false
+    const bar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 0
+    return r.top < bar || r.top + 120 > window.innerHeight
+  }
+
   /** Moves the needle to wherever the pointer is on the record */
   function pick(e: { clientX: number; clientY: number }, hold: boolean) {
     // Measure against the platter: the canvas itself may be mid-stretch
@@ -278,139 +323,186 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
   const grooveOnScreen = g.ring * view.s
   const stripColor = (slot: number) => (slot === SLOT_OTHER ? STRIP_OTHER : slotColors[slot])
 
+  const heading = (
+    <>
+      <div className="deck__date">{formatLongDate(date)}</div>
+      <div className="deck__meta">
+        {model.dayMinutes[ring] > 0 ? (
+          <>
+            {formatDuration(model.dayMinutes[ring] * 60_000)} of listening · {formatNumber(day.plays)} plays
+            {ring === biggest && <span className="deck__badge">Biggest day</span>}
+          </>
+        ) : (
+          'A quiet day: nothing played'
+        )}
+      </div>
+    </>
+  )
+
+  const strip = (
+    <DayStrip
+      arcs={day.arcs}
+      model={model}
+      color={stripColor}
+      minute={minute}
+      onMinute={(m) => {
+        setTouched(true)
+        select({ ring, minute: m })
+      }}
+    />
+  )
+
+  const now = (
+    <div className="deck__now">
+      <span className="deck__time">{formatTime(at)}</span>
+      {playing ? (
+        <span className="deck__track">
+          <strong>{playing.title}</strong>
+          <span>{playing.artist}</span>
+        </span>
+      ) : (
+        <span className="deck__track deck__track--quiet">
+          <strong>Nothing playing</strong>
+          {next && (
+            <span>
+              Next, at {formatTime(new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, Math.round(model.from[nextArc])))}:{' '}
+              {next.title} by {next.artist}
+            </span>
+          )}
+        </span>
+      )}
+    </div>
+  )
+
+  const controls = (
+    <>
+      {/* Always rendered: quiet days keep the same height as busy ones */}
+      <p className="deck__top">
+        {day.top.length > 0 && (
+          <>
+            Mostly{' '}
+            {day.top.map(([artist], i) => (
+              <span key={artist}>
+                {i > 0 && (i === day.top.length - 1 ? ' and ' : ', ')}
+                <b>{artist}</b>
+              </span>
+            ))}
+          </>
+        )}
+      </p>
+
+      <div className="deck__nav">
+        <button type="button" className="icon-button" aria-label="Previous day" onClick={() => goTo(ring - 1)} disabled={ring <= 0}>
+          ‹
+        </button>
+        <input
+          type="range"
+          className="scrubber"
+          min={0}
+          max={model.days - 1}
+          value={ring}
+          aria-label="Day"
+          aria-valuetext={formatLongDate(date)}
+          onChange={(e) => goTo(Number(e.target.value))}
+          style={{ ['--progress' as string]: `${(ring / Math.max(model.days - 1, 1)) * 100}%` }}
+        />
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Next day"
+          onClick={() => goTo(ring + 1)}
+          disabled={ring >= model.days - 1}
+        >
+          ›
+        </button>
+      </div>
+      <div className="deck__jumps">
+        <button type="button" className="chip-button" onClick={() => select({ ring: biggest, minute: null })}>
+          Biggest day
+        </button>
+        <button type="button" className="chip-button" onClick={randomDay}>
+          Random day
+        </button>
+      </div>
+    </>
+  )
+
   return (
     <div className="vinyl" ref={rootRef}>
-      <div className="vinyl__stage" ref={stageRef}>
-        <div className={zoomed ? 'vinyl__platter is-zoomed' : 'vinyl__platter'} ref={platterRef} style={{ width: size, height: size }}>
-          <canvas
-            ref={canvasRef}
-            style={{ width: size, height: size }}
-            role="img"
-            aria-label={`Your listening as a vinyl record: ${model.days} grooves, one per day. Use the controls next to it to explore one day at a time.`}
-            onPointerMove={(e) => {
-              if (e.pointerType !== 'mouse' || pinned || e.buttons !== 0) return
-              setScrubbing(true)
-              pick(e, false)
-            }}
-            onPointerLeave={() => setScrubbing(false)}
-            onClick={(e) => {
-              setScrubbing(false)
-              pick(e, true)
-            }}
-          />
-          <div
-            className="vinyl__sheen"
-            style={{ inset: size * 0.045, transform: zoomed ? `translate(${view.x}px, ${view.y}px) scale(${view.s})` : undefined }}
-            aria-hidden="true"
-          />
-          <svg className={['vinyl__overlay', scrubbing && 'is-scrubbing', pinned && 'is-pinned'].filter(Boolean).join(' ')} width={size} height={size} aria-hidden="true">
-            {grooveOnScreen >= 5 ? (
-              // Zoomed in far enough to see the groove itself: bracket it instead of drawing over it
-              <>
-                <circle cx={cx} cy={cy} r={ringOnScreen - grooveOnScreen / 2 - 1} className="vinyl__ring vinyl__ring--edge" />
-                <circle cx={cx} cy={cy} r={ringOnScreen + grooveOnScreen / 2 + 1} className="vinyl__ring vinyl__ring--edge" />
-              </>
-            ) : (
-              <circle cx={cx} cy={cy} r={ringOnScreen} className="vinyl__ring" />
-            )}
-            <circle cx={cx + ringOnScreen * Math.sin(angle)} cy={cy - ringOnScreen * Math.cos(angle)} r={5} className="vinyl__needle" />
-            {!zoomed && <Tonearm size={size} radius={ringR} />}
-          </svg>
+      {/* Stacked, this holds the readout, the record and its controls */}
+      <div className="vinyl__turntable">
+        {stacked && (
+          // Above the record on phones, where a thumb on the record would otherwise cover what it's reading
+          <div className="deck deck--readout" ref={readoutRef} aria-live="polite">
+            {heading}
+            {now}
+            {strip}
+          </div>
+        )}
+
+        <div className="vinyl__stage" ref={stageRef}>
+          <div className={zoomed ? 'vinyl__platter is-zoomed' : 'vinyl__platter'} ref={platterRef} style={{ width: size, height: size }}>
+            <canvas
+              ref={canvasRef}
+              style={{ width: size, height: size }}
+              role="img"
+              aria-label={`Your listening as a vinyl record: ${model.days} grooves, one per day. Use the controls next to it to explore one day at a time.`}
+              onPointerMove={(e) => {
+                if (e.pointerType !== 'mouse' || pinned || e.buttons !== 0) return
+                setScrubbing(true)
+                pick(e, false)
+              }}
+              onPointerLeave={() => setScrubbing(false)}
+              onClick={(e) => {
+                setScrubbing(false)
+                setTouched(true)
+                pick(e, true)
+              }}
+            />
+            <div
+              className="vinyl__sheen"
+              style={{ inset: size * 0.045, transform: zoomed ? `translate(${view.x}px, ${view.y}px) scale(${view.s})` : undefined }}
+              aria-hidden="true"
+            />
+            <svg className={['vinyl__overlay', scrubbing && 'is-scrubbing', pinned && 'is-pinned'].filter(Boolean).join(' ')} width={size} height={size} aria-hidden="true">
+              {grooveOnScreen >= 5 ? (
+                // Zoomed in far enough to see the groove itself: bracket it instead of drawing over it
+                <>
+                  <circle cx={cx} cy={cy} r={ringOnScreen - grooveOnScreen / 2 - 1} className="vinyl__ring vinyl__ring--edge" />
+                  <circle cx={cx} cy={cy} r={ringOnScreen + grooveOnScreen / 2 + 1} className="vinyl__ring vinyl__ring--edge" />
+                </>
+              ) : (
+                <circle cx={cx} cy={cy} r={ringOnScreen} className="vinyl__ring" />
+              )}
+              <circle cx={cx + ringOnScreen * Math.sin(angle)} cy={cy - ringOnScreen * Math.cos(angle)} r={5} className="vinyl__needle" />
+              {!zoomed && <Tonearm size={size} radius={ringR} />}
+            </svg>
+            {coach && <Coach size={size} radius={(g.inner + g.outer) / 2} />}
+            {tip &&
+              createPortal(
+                <div className="scrub-tip" aria-hidden="true">
+                  <span className="scrub-tip__when">
+                    {formatLongDate(date)} · {formatTime(at)}
+                  </span>
+                  <span className="scrub-tip__what">{playing ? `${playing.title} · ${playing.artist}` : 'Nothing playing'}</span>
+                </div>,
+                document.body,
+              )}
+          </div>
+          <ZoomControls zoom={zoom} className="vinyl__zoom" />
         </div>
-        <ZoomControls zoom={zoom} className="vinyl__zoom" />
+        {stacked && <div className="deck deck--controls">{controls}</div>}
       </div>
 
       <div className="vinyl__side">
-        <div className="deck" aria-live="polite">
-          <div className="deck__date">{formatLongDate(date)}</div>
-          <div className="deck__meta">
-            {model.dayMinutes[ring] > 0 ? (
-              <>
-                {formatDuration(model.dayMinutes[ring] * 60_000)} of listening · {formatNumber(day.plays)} plays
-                {ring === biggest && <span className="deck__badge">Biggest day</span>}
-              </>
-            ) : (
-              'A quiet day: nothing played'
-            )}
+        {!stacked && (
+          <div className="deck" aria-live="polite">
+            {heading}
+            {strip}
+            {now}
+            {controls}
           </div>
-
-          <DayStrip
-            arcs={day.arcs}
-            model={model}
-            color={stripColor}
-            minute={minute}
-            onMinute={(m) => select({ ring, minute: m })}
-          />
-
-          <div className="deck__now">
-            <span className="deck__time">{formatTime(at)}</span>
-            {playing ? (
-              <span className="deck__track">
-                <strong>{playing.title}</strong>
-                <span>{playing.artist}</span>
-              </span>
-            ) : (
-              <span className="deck__track deck__track--quiet">
-                <strong>Nothing playing</strong>
-                {next && (
-                  <span>
-                    Next, at {formatTime(new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, Math.round(model.from[nextArc])))}:{' '}
-                    {next.title} by {next.artist}
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
-
-          {/* Always rendered: quiet days keep the same height as busy ones */}
-          <p className="deck__top">
-            {day.top.length > 0 && (
-              <>
-                Mostly{' '}
-                {day.top.map(([artist], i) => (
-                  <span key={artist}>
-                    {i > 0 && (i === day.top.length - 1 ? ' and ' : ', ')}
-                    <b>{artist}</b>
-                  </span>
-                ))}
-              </>
-            )}
-          </p>
-
-          <div className="deck__nav">
-            <button type="button" className="icon-button" aria-label="Previous day" onClick={() => goTo(ring - 1)} disabled={ring <= 0}>
-              ‹
-            </button>
-            <input
-              type="range"
-              className="scrubber"
-              min={0}
-              max={model.days - 1}
-              value={ring}
-              aria-label="Day"
-              aria-valuetext={formatLongDate(date)}
-              onChange={(e) => goTo(Number(e.target.value))}
-              style={{ ['--progress' as string]: `${(ring / Math.max(model.days - 1, 1)) * 100}%` }}
-            />
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Next day"
-              onClick={() => goTo(ring + 1)}
-              disabled={ring >= model.days - 1}
-            >
-              ›
-            </button>
-          </div>
-          <div className="deck__jumps">
-            <button type="button" className="chip-button" onClick={() => select({ ring: biggest, minute: null })}>
-              Biggest day
-            </button>
-            <button type="button" className="chip-button" onClick={randomDay}>
-              Random day
-            </button>
-          </div>
-        </div>
+        )}
 
         <ul className="legend" aria-label="Artist colors">
           {legend.map((artist, i) => (
@@ -438,13 +530,31 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
           )}
         </ul>
         <p className="hint">
-          Hover the record to preview a day, click to hold it, click away to let go. Zoom in to see single days up close. Tap an artist to light up only their grooves.
+          {COARSE
+            ? 'Tap a groove to pick a day. Hold and drag on the record to skim, or drag along the strip to move through a day. Pinch to zoom. Tap an artist to light up only their grooves.'
+            : 'Hover the record to preview a day, click to hold it, click away to let go. Zoom in to see single days up close. Tap an artist to light up only their grooves.'}
         </p>
 
         <button type="button" className="button button--ghost" onClick={onPoster}>
           Make it a poster →
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * A how-to for touch screens: a ghost fingertip rests on the record, then
+ * drags along the grooves. Gone at the first touch, and for good once you've
+ * scrubbed.
+ */
+function Coach({ size, radius }: { size: number; radius: number }) {
+  return (
+    <div className="coach" aria-hidden="true">
+      <div className="coach__orbit">
+        <span className="coach__finger" style={{ left: size / 2 - 22, top: size / 2 - radius - 22 }} />
+      </div>
+      <span className="coach__label">Hold, then drag to skim</span>
     </div>
   )
 }
@@ -461,7 +571,8 @@ interface StripProps {
 function DayStrip({ arcs, model, color, minute, onMinute }: StripProps) {
   const ref = useRef<HTMLDivElement>(null)
   const w = useWidth(ref, 300)
-  const h = 46
+  // Taller for fingers
+  const h = COARSE ? 54 : 46
   const x = (m: number) => (m / MINUTES) * w
 
   function fromEvent(e: PointerEvent<SVGSVGElement>) {
@@ -498,7 +609,7 @@ function DayStrip({ arcs, model, color, minute, onMinute }: StripProps) {
           />
         ))}
         <line x1={x(minute)} x2={x(minute)} y1={-2} y2={h + 2} className="strip__needle" />
-        <circle cx={x(minute)} cy={h + 2} r={4} className="strip__knob" />
+        <circle cx={x(minute)} cy={h + 2} r={COARSE ? 6 : 4} className="strip__knob" />
         {[0, 6, 12, 18, 24].map((hr) => (
           <text
             key={hr}

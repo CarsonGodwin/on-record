@@ -1,11 +1,11 @@
 import { area, curveBasis, stack, stackOffsetWiggle, stackOrderInsideOut } from 'd3-shape'
-import { useCallback, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { artistSeries, type Bins, type Era } from '../data/insights'
 import { formatDate, formatDuration, formatMonthShort, formatMonthYearShort, formatPercent } from '../lib/format'
 import { useWidth } from '../lib/hooks'
-import { leaveUnlessTouch } from '../lib/pointer'
+import { COARSE, leaveUnlessTouch } from '../lib/pointer'
 import { colorFor } from '../lib/palette'
-import { FloatTip } from './ui'
+import { FloatTip, ReadingGuide } from './ui'
 
 /*
  * "Eras": a streamgraph of your top artists over time, with the stretches where
@@ -95,8 +95,33 @@ export function River({ bins, totals, eras, artists, colors }: Props) {
     setHover({ i, x: e.clientX, y: e.clientY })
   }
 
+  const lead = colorFor(colors, artists[0])
+  const unit = bins.size === 'month' ? 'month' : 'week'
+
   return (
     <div className="river" ref={wrapRef}>
+      <ReadingGuide
+        takeaway={erasTakeaway(bins, eras)}
+        items={[
+          {
+            glyph: <rect x={1} y={4} width={26} height={8} rx={4} fill={eras[0] ? colorFor(colors, eras[0].artist) : lead} />,
+            text: 'An era: a stretch when one artist led',
+          },
+          {
+            glyph: <path d="M1 7.5C9 7 15 2 27 1.5V14.5C15 14 9 9 1 8.5Z" fill={lead} />,
+            text: `Thicker stream = more hours that ${unit}`,
+          },
+          {
+            glyph: (
+              <>
+                <line x1={14} x2={14} y1={1} y2={15} stroke="currentColor" strokeWidth={1.5} />
+                <circle cx={14} cy={8} r={3} fill="currentColor" />
+              </>
+            ),
+            text: `${COARSE ? 'Tap' : 'Hover'} anywhere for that ${unit}’s top artists`,
+          },
+        ]}
+      />
       <svg
         width={width}
         height={height}
@@ -183,7 +208,9 @@ export function River({ bins, totals, eras, artists, colors }: Props) {
           {eras.map((era) => (
             <li key={`${era.artist}-${era.start}`} className="era" style={{ ['--era' as string]: colorFor(colors, era.artist) }}>
               <span className="era__name">
-                The <em>{era.artist}</em> era
+                {/* "The The Paper Moons era" reads wrong; a name that starts with "The" brings its own */}
+                {/^the /i.test(era.artist) ? '' : 'The '}
+                <em>{era.artist}</em> era
               </span>
               <span className="era__meta">
                 {eraRange(bins, era)} · {formatPercent(era.share)} of your music
@@ -193,6 +220,19 @@ export function River({ bins, totals, eras, artists, colors }: Props) {
         </ol>
       )}
     </div>
+  )
+}
+
+/** The chart in one sentence: how many eras, the longest, and the latest */
+function erasTakeaway(bins: Bins, eras: Era[]): ReactNode {
+  if (eras.length === 0) return 'No one artist stayed on top for long here, so there are no eras. Just a mix.'
+  const longest = eras.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a))
+  const latest = eras.reduce((a, b) => (b.start > a.start ? b : a))
+  return (
+    <>
+      {eras.length === 1 ? 'One era' : `${eras.length} eras`}. The longest was <em>{longest.artist}</em>, {eraRange(bins, longest)}
+      {latest === longest ? '.' : <>. The latest: <em>{latest.artist}</em>.</>}
+    </>
   )
 }
 

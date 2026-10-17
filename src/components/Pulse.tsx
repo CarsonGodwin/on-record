@@ -5,12 +5,12 @@ import { formatDate, formatDuration, formatMonthYearShort } from '../lib/format'
 import { usePageScroll, useWidth } from '../lib/hooks'
 import { leaveUnlessTouch } from '../lib/pointer'
 import { colorFor } from '../lib/palette'
-import { FloatTip } from './ui'
+import { FloatTip, ReadingGuide } from './ui'
 
 /*
  * "Pulse": a ridgeline of your top artists in the order you found them, drawn
  * like a certain famous album cover. Each line is one artist's listening over
- * time, scaled to that artist's own peak.
+ * time, scaled to that artist's own peak. The one you pick comes to the front.
  */
 
 interface Props {
@@ -72,6 +72,13 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
   function onMove(e: MouseEvent<SVGSVGElement>) {
     if (!pinned) setHover(locate(e))
   }
+  // Drawn top to bottom so each ridge hides the ones behind it, except the picked one, which goes last to sit in front
+  const order = artists.map((_, row) => row)
+  if (shown) order.push(...order.splice(shown.row, 1))
+  const first = artists[0]
+  const newest = artists[artists.length - 1]
+  const found = (artist: string) => (firstHeard.has(artist) ? ` in ${formatMonthYearShort(firstHeard.get(artist)!)}` : '')
+
   function onClick(e: MouseEvent<SVGSVGElement>) {
     const at = locate(e)
     if (pinned?.row === at.row) {
@@ -83,7 +90,26 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
   }
 
   return (
-    <div className="pulse" ref={ref}>
+    <div className={shown ? 'pulse has-focus' : 'pulse'} ref={ref}>
+      <ReadingGuide
+        takeaway={
+          <>
+            Top to bottom is the order you found them: <em>{first}</em>
+            {found(first)}, down to <em>{newest}</em>
+            {found(newest)}.
+          </>
+        }
+        items={[
+          {
+            glyph: <path d="M1 14H9C12 14 13 2 16 2S20 14 23 14H27" fill="none" stroke={colorFor(colors, first)} strokeWidth={1.8} />,
+            text: `One line per artist, peaking at their biggest ${bins.size === 'month' ? 'month' : 'week'}`,
+          },
+          {
+            glyph: <line x1={1} x2={27} y1={10} y2={10} stroke="currentColor" strokeWidth={1.8} />,
+            text: 'Flat: not listening yet, or anymore',
+          },
+        ]}
+      />
       <svg
         ref={svgRef}
         width={width}
@@ -95,7 +121,8 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
         onPointerLeave={leaveUnlessTouch(clearHover)}
         onClick={onClick}
       >
-        {artists.map((artist, row) => {
+        {order.map((row) => {
+          const artist = artists[row]
           const values = series.get(artist)!
           // Each ridge is scaled to its own peak: this chart is about shape, the tooltip has the hours
           const peak = Math.max(...values, 1)
@@ -122,14 +149,29 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
                   </text>
                 </>
               )}
-              {narrow && on && (
-                <text x={left + 4} y={base - 6} className="pulse__name pulse__name--inline">
-                  {artist}
-                </text>
-              )}
             </g>
           )
         })}
+        {/* No margin for names on a phone: each line is named where it starts, on the flat stretch before you found them */}
+        {narrow &&
+          artists.map((artist, row) => {
+            const values = series.get(artist)!
+            const peak = Math.max(...values, 1)
+            const enters = Math.max(0, values.findIndex((v) => v > peak * 0.04))
+            const label = artist.length > 20 ? `${artist.slice(0, 19)}…` : artist
+            const fits = x(enters) - left > label.length * 6.4 + 10
+            return (
+              <text
+                key={artist}
+                x={fits ? x(enters) - 6 : left + 2}
+                y={baseline(row) - 4}
+                textAnchor={fits ? 'end' : 'start'}
+                className={shown?.row === row ? 'pulse__tag is-on' : 'pulse__tag'}
+              >
+                {label}
+              </text>
+            )
+          })}
         {shown && (
           <g className="pulse__marker" style={{ ['--c' as string]: colorFor(colors, artists[shown.row]) }}>
             <line x1={x(shown.i)} x2={x(shown.i)} y1={baseline(shown.row)} y2={peakY(shown.row, shown.i)} />
@@ -201,8 +243,8 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
           {pinned
             ? `Drag the slider to move through time, arrows to change artist. ${narrow ? 'Tap' : 'Click'} the line again to let go.`
             : narrow
-              ? 'Tap a line to see whose it is.'
-              : 'Hover a line to see whose it is, click to keep it.'}
+              ? 'Tap a line for its hours.'
+              : 'Hover a line for its hours, click to keep it.'}
         </span>
         <button type="button" className="button button--ghost button--small" onClick={onPoster}>
           Make it a poster →

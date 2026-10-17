@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { filesFromDrop } from '../lib/dropFiles'
+import { COARSE } from '../lib/pointer'
 
 interface Props {
   onFiles: (files: File[]) => void
@@ -64,7 +65,8 @@ export function DropZone({ onFiles }: Props) {
             </>
           ) : (
             <>
-              Drop your
+              {/* Phones can't drag files, so there it's a tap */}
+              {COARSE ? 'Add your' : 'Drop your'}
               <br />
               Spotify export
               <br />
@@ -83,7 +85,7 @@ export function DropZone({ onFiles }: Props) {
             </svg>
             Choose file
           </b>
-          <span>or drag it here</span>
+          {!COARSE && <span>or drag it here</span>}
         </span>
       </div>
     </div>

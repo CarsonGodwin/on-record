@@ -150,3 +150,31 @@ export function FloatTip({ x, y, onDismiss, className, children }: TipProps) {
     document.body,
   )
 }
+
+interface GuideItem {
+  /** Marks drawn in a 28×16 box, echoing the chart's own */
+  glyph: ReactNode
+  text: ReactNode
+}
+
+/**
+ * How to read a chart, before you have to figure it out: a one-line takeaway
+ * from your data, then a key that ties each kind of mark to what it means.
+ */
+export function ReadingGuide({ takeaway, items }: { takeaway?: ReactNode; items: GuideItem[] }) {
+  return (
+    <div className="guide">
+      {takeaway && <p className="guide__takeaway">{takeaway}</p>}
+      <ul className="guide__key" aria-label="How to read it">
+        {items.map((item, i) => (
+          <li key={i}>
+            <svg className="guide__glyph" viewBox="0 0 28 16" width={28} height={16} aria-hidden="true">
+              {item.glyph}
+            </svg>
+            <span>{item.text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}

@@ -94,11 +94,17 @@ export default function App() {
             </div>
           )}
 
-          <div className="landing__actions">
-            <button type="button" className="button button--big" onClick={() => load(loadSample, true)}>
-              <span className="button__icon">▶</span> Spin the demo record
+        </div>
+
+        {/* Your own export is the main way in; the demo is the fallback underneath it */}
+        <div className="landing__import">
+          <DropZone onFiles={(files) => load(() => loadFiles(files), false)} />
+
+          <div className="landing__demo">
+            <span className="landing__note">No export yet? Look around with made-up listening.</span>
+            <button type="button" className="button button--ghost button--small" onClick={() => load(loadSample, true)}>
+              ▶ Try the demo
             </button>
-            <span className="landing__note">No export yet? This one is made-up data.</span>
           </div>
 
           <p className="privacy">
@@ -106,8 +112,6 @@ export default function App() {
             browser, and nothing is uploaded or stored.
           </p>
         </div>
-
-        <DropZone onFiles={(files) => load(() => loadFiles(files), false)} />
       </main>
 
       <ul className="features" aria-label="What you get">
