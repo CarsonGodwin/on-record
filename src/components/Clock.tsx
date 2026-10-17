@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Daypart, HourSlot } from '../data/insights'
 import { formatDuration, formatHour, formatPercent } from '../lib/format'
 import { HEAT, SERIES } from '../lib/palette'
@@ -15,6 +15,23 @@ const INNER = 72
 const OUTER = 190
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_NAMES = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays']
+
+/** Runs `clear` when a press lands anywhere except on an element matching `keep` */
+function useClickAway(active: boolean, keep: string, clear: () => void) {
+  // Callers pass inline callbacks; reading the latest through a ref keeps the listener from re-subscribing every render
+  const clearRef = useRef(clear)
+  useEffect(() => {
+    clearRef.current = clear
+  })
+  useEffect(() => {
+    if (!active) return
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest(keep)) clearRef.current()
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [active, keep])
+}
 
 /** Point at radius r, angle a (radians clockwise from the top) */
 function at(r: number, a: number): [number, number] {
@@ -40,8 +57,14 @@ export function Clock({ hours, parts, grid }: Props) {
   const max = Math.max(...hours.map((h) => h.ms), 1)
   const total = hours.reduce((s, h) => s + h.ms, 0) || 1
   const peak = hours.reduce((best, h) => (h.ms > best.ms ? h : best), hours[0])
-  const [active, setActive] = useState<number | null>(null)
+  const [hover, setHover] = useState<number | null>(null)
+  // A clicked hour stays selected until it is clicked again
+  const [picked, setPicked] = useState<number | null>(null)
+  const active = picked ?? hover
   const shown = hours[active ?? peak.hour]
+  const toggle = (hour: number) => setPicked(picked === hour ? null : hour)
+
+  useClickAway(picked !== null, '.clock__hit', () => setPicked(null))
   const night = hours.filter((h) => h.hour >= 18 || h.hour < 6).reduce((s, h) => s + h.ms, 0) / total
   const step = (Math.PI * 2) / 24
 
@@ -81,11 +104,19 @@ export function Clock({ hours, parts, grid }: Props) {
                   tabIndex={0}
                   role="button"
                   aria-label={`${formatHour(h.hour)}: ${formatDuration(h.ms)}`}
-                  onPointerEnter={(e) => isHover(e) && setActive(h.hour)}
-                  onPointerDown={() => setActive(h.hour)}
-                  onPointerLeave={leaveUnlessTouch(() => setActive(null))}
-                  onFocus={() => setActive(h.hour)}
-                  onBlur={() => setActive(null)}
+                  aria-pressed={picked === h.hour}
+                  className="clock__hit"
+                  onPointerEnter={(e) => isHover(e) && setHover(h.hour)}
+                  onPointerLeave={leaveUnlessTouch(() => setHover(null))}
+                  onClick={() => toggle(h.hour)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      toggle(h.hour)
+                    }
+                  }}
+                  onFocus={() => setHover(h.hour)}
+                  onBlur={() => setHover(null)}
                 />
               </g>
             )
@@ -109,7 +140,7 @@ export function Clock({ hours, parts, grid }: Props) {
 
           <g className="clock__center" aria-live="polite">
             <text x={C} y={C - 20} textAnchor="middle" className="clock__center-label">
-              {active === null ? 'Peak hour' : 'At'}
+              {active === null ? 'Peak hour' : picked !== null ? 'Selected' : 'At'}
             </text>
             <text x={C} y={C + 12} textAnchor="middle" className="clock__center-value">
               {formatHour(shown.hour)}
@@ -155,20 +186,24 @@ export function Clock({ hours, parts, grid }: Props) {
 function DotMatrix({ grid }: { grid: number[][] }) {
   const max = Math.max(...grid.flat(), 1)
   const [hover, setHover] = useState<{ d: number; h: number } | null>(null)
+  // A clicked dot stays selected until it is clicked again
+  const [picked, setPicked] = useState<{ d: number; h: number } | null>(null)
+  const shown = picked ?? hover
+  useClickAway(picked !== null, '.dots__dot', () => setPicked(null))
   const cell = 18
   const left = 40
   return (
     <div className="dots">
-      <p className="dots__readout" aria-live="polite">
-        {hover ? (
-          <>
-            <strong>{formatDuration(grid[hover.d][hover.h])}</strong>{' '}
+      <p className={shown ? 'dots__readout is-hovering' : 'dots__readout'} aria-live="polite">
+        {/* The hint stays in the layout while a dot's details cover it, so the box never changes height */}
+        <span className="dots__hint muted">Every hour of the week. Bigger, brighter dots mean more listening. Click one to keep it selected.</span>
+        {shown && (
+          <span>
+            <strong>{formatDuration(grid[shown.d][shown.h])}</strong>{' '}
             <span className="muted">
-              on {DAY_NAMES[hover.d]} at {formatHour(hover.h)}
+              on {DAY_NAMES[shown.d]} at {formatHour(shown.h)}
             </span>
-          </>
-        ) : (
-          <span className="muted">Every hour of the week. Bigger, brighter dots mean more listening. Tap one for details.</span>
+          </span>
         )}
       </p>
       <svg viewBox={`0 0 ${left + 24 * cell} ${7 * cell + 20}`} role="img" aria-label="Listening by weekday and hour">
@@ -186,9 +221,9 @@ function DotMatrix({ grid }: { grid: number[][] }) {
                   cy={d * cell + cell / 2}
                   r={ms ? 1.5 + Math.sqrt(f) * (cell / 2 - 2) : 1}
                   fill={ms ? HEAT[Math.min(HEAT.length - 1, Math.floor(f * HEAT.length))] : 'rgba(244,241,234,0.12)'}
-                  className={hover?.d === d && hover.h === h ? 'dots__dot is-on' : 'dots__dot'}
+                  className={shown?.d === d && shown.h === h ? 'dots__dot is-on' : 'dots__dot'}
                   onPointerEnter={(e) => isHover(e) && setHover({ d, h })}
-                  onPointerDown={() => setHover({ d, h })}
+                  onClick={() => setPicked(picked?.d === d && picked.h === h ? null : { d, h })}
                   onPointerLeave={leaveUnlessTouch(() => setHover(null))}
                 />
               )

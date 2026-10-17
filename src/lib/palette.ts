@@ -1,20 +1,23 @@
 /*
  * Chart colors. Validated with the dataviz skill's validate_palette.js against
  * the page surface (#0b0a0f, dark mode):
- *  - SERIES: worst adjacent CVD ΔE 11.9, normal-vision ΔE 28, all >= 3:1 contrast
+ *  - SERIES: worst adjacent CVD ΔE 11.9, normal-vision ΔE 18.9, all >= 3:1 contrast
  *  - HEAT: single-hue ordinal ramp, monotone lightness, dim end 2.16:1
  * Keep the order: it's what keeps neighbours distinguishable for colorblind readers.
  */
-export const SERIES = ['#ff277c', '#0ca2bc', '#e86104', '#0ba985', '#a053fd', '#b68901', '#3778f5', '#58a805']
+export const SERIES = ['#ff277c', '#0ca2bc', '#e86104', '#0ba985', '#a053fd', '#b68901', '#3778f5', '#58a805', '#b3189f', '#944b40']
 
-/** Anything outside the top 8 */
+/** How many top artists get a color of their own */
+export const TOP_ARTISTS = SERIES.length
+
+/** Anything outside the top 10 */
 export const OTHER = '#4a4652'
 
 /** Sequential ramp for magnitude, dim to bright */
 export const HEAT = ['#81254a', '#aa285d', '#d5286e', '#f74180', '#fe7999', '#feadba', '#fedade']
 
 /**
- * Gives the view's top artists a color each. Artists in the all-time top 8 keep
+ * Gives the view's top artists a color each. Artists in the all-time top 10 keep
  * their all-time slot, so filtering to a year never repaints a survivor.
  */
 export function assignColors(viewTop: string[], allTop: string[]): Map<string, string> {

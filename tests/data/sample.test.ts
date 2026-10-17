@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { binArtistTotals, dailyTotals, findEras, hourProfile, makeBins, raceFrames, records, sessions } from './insights'
-import { loadSample } from './load'
-import { filterByYear, getYears, summarize, topItems, weekHourGrid } from './stats'
+import { binArtistTotals, dailyTotals, findEras, hourProfile, makeBins, raceFrames, records, sessions } from '../../src/data/insights'
+import { loadSample } from '../../src/data/load'
+import { filterByYear, getYears, summarize, topItems, weekHourGrid } from '../../src/data/stats'
 
 /*
  * Runs the demo record through the whole pipeline and checks that the numbers

@@ -37,7 +37,7 @@ No data yet? Use **Spin the demo record**.
 ```bash
 npm install
 npm run dev
-npm test        # data-layer tests (Vitest)
+npm test        # tests in tests/{data,viz,lib} (Vitest)
 ```
 
 ## Deploying

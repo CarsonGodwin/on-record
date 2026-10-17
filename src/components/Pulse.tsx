@@ -27,6 +27,7 @@ const noop = () => {}
 
 export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
   const width = useWidth(ref, 900)
   const narrow = width < 640
   const step = narrow ? 24 : 30
@@ -57,6 +58,17 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
     const i = Math.max(0, Math.min(n - 1, Math.round(((px - left) / innerW) * (n - 1))))
     return { row, i, x: e.clientX, y: e.clientY }
   }
+  // Where a ridge sits at a given bin, so the marker and pinned tooltip ride the line.
+  // curveBasis passes through the ends but smooths each inner point with its neighbors
+  function peakY(row: number, i: number) {
+    const values = series.get(artists[row])!
+    const v = i === 0 || i === values.length - 1 ? values[i] : (values[i - 1] + 4 * values[i] + values[i + 1]) / 6
+    return baseline(row) - (v / Math.max(...values, 1)) * amp
+  }
+  function pinAt(row: number, i: number) {
+    const rect = svgRef.current!.getBoundingClientRect()
+    setPinned({ row, i, x: rect.left + x(i), pageY: rect.top + window.scrollY + peakY(row, i) })
+  }
   function onMove(e: MouseEvent<SVGSVGElement>) {
     if (!pinned) setHover(locate(e))
   }
@@ -66,13 +78,14 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
       setPinned(null)
       setHover(at)
     } else {
-      setPinned({ row: at.row, i: at.i, x: at.x, pageY: at.y + window.scrollY })
+      pinAt(at.row, at.i)
     }
   }
 
   return (
     <div className="pulse" ref={ref}>
       <svg
+        ref={svgRef}
         width={width}
         height={height}
         role="img"
@@ -117,6 +130,12 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
             </g>
           )
         })}
+        {shown && (
+          <g className="pulse__marker" style={{ ['--c' as string]: colorFor(colors, artists[shown.row]) }}>
+            <line x1={x(shown.i)} x2={x(shown.i)} y1={baseline(shown.row)} y2={peakY(shown.row, shown.i)} />
+            <circle cx={x(shown.i)} cy={peakY(shown.row, shown.i)} r={4} />
+          </g>
+        )}
         {!narrow && (
           <>
             <text x={left - 14} y={14} textAnchor="end" className="axis-title">
@@ -144,8 +163,47 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
           <span className="float-tip__big">{formatDuration(totals[shown.i].get(artists[shown.row]) ?? 0)}</span>
         </FloatTip>
       )}
+      {pinned && (
+        <div className="pulse__scrub" style={{ ['--c' as string]: colorFor(colors, artists[pinned.row]) }}>
+          <button
+            type="button"
+            className="pulse__step"
+            aria-label="Previous artist"
+            disabled={pinned.row === 0}
+            onClick={() => pinAt(pinned.row - 1, pinned.i)}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="pulse__step"
+            aria-label="Next artist"
+            disabled={pinned.row === artists.length - 1}
+            onClick={() => pinAt(pinned.row + 1, pinned.i)}
+          >
+            ↓
+          </button>
+          <input
+            type="range"
+            className="scrubber"
+            min={0}
+            max={n - 1}
+            step={1}
+            value={pinned.i}
+            aria-label={`Move through time for ${artists[pinned.row]}`}
+            onChange={(e) => pinAt(pinned.row, Number(e.target.value))}
+            style={{ ['--progress' as string]: `${(pinned.i / Math.max(n - 1, 1)) * 100}%` }}
+          />
+        </div>
+      )}
       <div className="pulse__foot">
-        <span className="muted">{pinned ? 'Click the line again to let go.' : narrow ? 'Tap a line to see whose it is.' : 'Hover a line to see whose it is, click to keep it.'}</span>
+        <span className="muted">
+          {pinned
+            ? `Drag the slider to move through time, arrows to change artist. ${narrow ? 'Tap' : 'Click'} the line again to let go.`
+            : narrow
+              ? 'Tap a line to see whose it is.'
+              : 'Hover a line to see whose it is, click to keep it.'}
+        </span>
         <button type="button" className="button button--ghost button--small" onClick={onPoster}>
           Make it a poster →
         </button>

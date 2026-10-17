@@ -15,12 +15,12 @@ import {
   sessions,
   songStats,
 } from '../data/insights'
-import { filterByYear, funStats, getYears, newArtistsIn, platforms, summarize, topItems, weekHourGrid } from '../data/stats'
+import { filterByYear, funStats, getYears, newArtistsIn, platforms, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
 import { formatHour, formatNumber } from '../lib/format'
-import { assignColors, OTHER } from '../lib/palette'
+import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import type { LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
-import type { PosterData, PosterDesign } from '../viz/poster'
+import { posterMoments, type PosterData, type PosterDesign } from '../viz/poster'
 import { buildRecord, GROOVE, PODCAST } from '../viz/record'
 import { Calendar } from './Calendar'
 import { Clock, ClockTable } from './Clock'
@@ -67,10 +67,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const plays = useMemo(() => filterByYear(all, year), [all, year])
   const summary = useMemo(() => summarize(plays), [plays])
 
-  // Colors follow the artist: all-time top 8 keep their color when you pick a year
-  const allTop = useMemo(() => topItems(all, 'artist', 'time', 8).map((r) => r.label), [all])
+  // Colors follow the artist: all-time top 10 keep their color when you pick a year
+  const allTop = useMemo(() => topItems(all, 'artist', 'time', TOP_ARTISTS).map((r) => r.label), [all])
   const topArtists = useMemo(() => topItems(plays, 'artist', 'time', 16), [plays])
-  const legend = useMemo(() => topArtists.slice(0, 8).map((r) => r.label), [topArtists])
+  const legend = useMemo(() => topArtists.slice(0, TOP_ARTISTS).map((r) => r.label), [topArtists])
   const colors = useMemo(() => assignColors(legend, allTop), [legend, allTop])
 
   const bins = useMemo(() => makeBins(plays, year), [plays, year])
@@ -93,6 +93,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         .sort((a, b) => (firstHeard.get(a) ?? 0) - (firstHeard.get(b) ?? 0)),
     [topArtists, firstHeard],
   )
+  // On the page every ridge gets its own color, so only the colored top 10 make the cut
+  const pulseLines = useMemo(() => pulseArtists.filter((a) => colors.has(a)), [pulseArtists, colors])
 
   const sessionList = useMemo(() => sessions(plays), [plays])
   const rec = useMemo(() => records(plays, sessionList), [plays, sessionList])
@@ -102,6 +104,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     [plays, hours, summary.skipRate, summary.shuffleRate],
   )
   const devices = useMemo(() => platforms(plays), [plays])
+  const wear = useMemo(() => wearOut(all, year), [all, year])
   const newArtists = useMemo(() => (year === null ? null : newArtistsIn(all, year)), [all, year])
 
   const span = years.length > 1 ? `${years[0]}–${years[years.length - 1]}` : String(years[0])
@@ -111,7 +114,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   // The record and the poster draw from the same model
   const record = useMemo(() => buildRecord(plays, legend, year), [plays, legend, year])
   const slotColors = useMemo(
-    () => [...Array.from({ length: 8 }, (_, i) => colors.get(legend[i]) ?? OTHER), GROOVE, PODCAST],
+    () => [...Array.from({ length: TOP_ARTISTS }, (_, i) => colors.get(legend[i]) ?? OTHER), GROOVE, PODCAST],
     [colors, legend],
   )
   const recordTitle = year === null ? 'ALL TIME' : String(year)
@@ -124,14 +127,16 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       record,
       recordColors: slotColors,
       recordTitle,
-      tracklist: topArtists.slice(0, 8).map((r) => ({ name: r.label, color: colors.get(r.label) ?? OTHER, ms: r.ms })),
+      tracklist: topArtists.slice(0, TOP_ARTISTS).map((r) => ({ name: r.label, color: colors.get(r.label) ?? OTHER, ms: r.ms })),
       graph: { ...graph, layout: layoutConstellation(graph.nodes, graph.links) },
       colors,
       pulse: { artists: pulseArtists, series: artistSeries(totals, pulseArtists, bins.size === 'month' ? 1 : 2) },
       stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, peak: formatHour(peak.hour) },
+      wearOut: wear,
       listener: profile.title,
+      moments: posterMoments(record, fun, rec),
     }),
-    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, peak, profile],
+    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, profile, fun, rec],
   )
 
   /** Jumps to the poster studio with a design picked */
@@ -281,11 +286,11 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           title="Pulse"
           lede="Your top artists in the order you found them. Each line is one artist’s listening over time, scaled to their own peak. Yes, it’s that album cover."
         >
-          {pulseArtists.length >= 2 ? (
+          {pulseLines.length >= 2 ? (
             <Pulse
               bins={bins}
               totals={totals}
-              artists={pulseArtists}
+              artists={pulseLines}
               firstHeard={firstHeard}
               colors={colors}
               onPoster={() => makePoster('pulse')}

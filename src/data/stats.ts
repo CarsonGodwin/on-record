@@ -103,6 +103,79 @@ export function summarize(plays: Play[]): Summary {
   }
 }
 
+// ---------- Song wear-out ----------
+
+/** How many plays of a song wearOut follows; later plays pool into the last step */
+export const WEAR_MAX = 30
+/** Only songs started at least this often count, so the first steps all follow the same songs */
+export const WEAR_MIN_SONG_PLAYS = 8
+/** A step is only drawn with at least this many plays behind it, after pooling */
+const WEAR_MIN_STEP = 30
+
+export interface WearOut {
+  /** Skip rate (0–1) on the nth play of a song, from the 1st. Later steps pool their neighbours; ends where plays run thin */
+  rates: number[]
+  /** Skip rate over every play counted */
+  average: number
+  /** The play (1-based) with the lowest skip rate */
+  best: number
+  /** The first play after `best` where the skip rate is back up to the average, or null if it never gets there */
+  wornOut: number | null
+}
+
+/**
+ * How the skip rate changes the more times you've heard a song. Plays are
+ * numbered across the whole history, so a year's view still knows a song was
+ * on its 40th play. `allPlays` must be sorted by time, as the loader hands them over.
+ */
+export function wearOut(allPlays: Play[], year: number | null): WearOut {
+  const totals = new Map<string, number>()
+  for (const p of allPlays) if (p.kind === 'track') totals.set(trackKey(p), (totals.get(trackKey(p)) ?? 0) + 1)
+
+  const plays = Array(WEAR_MAX).fill(0)
+  const skips = Array(WEAR_MAX).fill(0)
+  const heard = new Map<string, number>()
+  for (const p of allPlays) {
+    if (p.kind !== 'track') continue
+    const key = trackKey(p)
+    const n = (heard.get(key) ?? 0) + 1
+    heard.set(key, n)
+    if ((totals.get(key) ?? 0) < WEAR_MIN_SONG_PLAYS) continue
+    if (year !== null && startDate(p).getFullYear() !== year) continue
+    const step = Math.min(n, WEAR_MAX) - 1
+    plays[step]++
+    if (isSkip(p)) skips[step]++
+  }
+
+  // Fewer songs reach each later play, so later steps borrow from their neighbours.
+  // The last step already pools every play past WEAR_MAX, so it stays on its own.
+  const last = WEAR_MAX - 1
+  const rates: number[] = []
+  for (let i = 0; i < WEAR_MAX; i++) {
+    const r = Math.floor((i + 1) / 5)
+    const lo = i === last ? last : Math.max(0, i - r)
+    const hi = i === last ? last : Math.min(last - 1, i + r)
+    let n = 0
+    let k = 0
+    for (let j = lo; j <= hi; j++) {
+      n += plays[j]
+      k += skips[j]
+    }
+    // Stop at the first play number nobody reached, or once there's too little to go on
+    if (plays[i] === 0 || n < WEAR_MIN_STEP) break
+    rates.push(k / n)
+  }
+
+  const counted = plays.reduce((a, b) => a + b, 0)
+  const average = counted ? skips.reduce((a, b) => a + b, 0) / counted : 0
+  let bestIndex = 0
+  rates.forEach((r, i) => {
+    if (r < rates[bestIndex]) bestIndex = i
+  })
+  const back = rates[bestIndex] < average ? rates.findIndex((r, i) => i > bestIndex && r >= average) : -1
+  return { rates, average, best: bestIndex + 1, wornOut: back === -1 ? null : back + 1 }
+}
+
 // ---------- Rankings ----------
 
 export type Category = 'artist' | 'track' | 'album' | 'show'

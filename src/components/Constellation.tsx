@@ -86,6 +86,7 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   const isLit = (id: string) => !shown || id === shown || neighbors.get(shown)?.has(id)
   // More names fit as the stars spread out
   const labelled = new Set(nodes.slice(0, Math.round((narrow ? 8 : 14) * view.s * view.s)).map((n) => n.id))
+  const radius = (n: GraphNode) => starSize(n.ms, maxMs) * (narrow ? 0.85 : 1) * grow
 
   const activeLinks = shown
     ? links
@@ -93,6 +94,53 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
         .sort((a, b) => b.count - a.count)
         .map((l) => ({ other: l.source === shown ? l.target : l.source, count: l.count }))
     : []
+
+  // Where each visible name goes. With a star selected on a phone the sky is too
+  // tight to name every neighbor, so names are placed strongest link first, in the
+  // first free spot around the star; any that don't fit are listed in the readout
+  type Label = { x: number; y: number; anchor: 'middle' | 'start' | 'end' }
+  const labels = (() => {
+    const placed = new Map<string, Label>()
+    const charW = narrow ? 7.4 : 7
+    const boxes: { x0: number; x1: number; y0: number; y1: number }[] = []
+    const place = (n: GraphNode, avoid: boolean) => {
+      const p = pos(n.id)
+      const r = radius(n)
+      const w = n.id.length * charW + 6
+      // Keep centred names inside the sky instead of half off its edge
+      const cx = Math.max(w / 2, Math.min(width - w / 2, p.x))
+      const spots: (Label & { x0: number })[] = [
+        { x: cx, y: p.y + r + 14, anchor: 'middle', x0: cx - w / 2 },
+        { x: cx, y: p.y - r - 7, anchor: 'middle', x0: cx - w / 2 },
+        { x: p.x + r + 5, y: p.y + 4, anchor: 'start', x0: p.x + r + 2 },
+        { x: p.x - r - 5, y: p.y + 4, anchor: 'end', x0: p.x - r - 2 - w },
+      ]
+      for (const { x0, ...spot } of avoid ? spots : spots.slice(0, 1)) {
+        const box = { x0, x1: x0 + w, y0: spot.y - 12, y1: spot.y + 4 }
+        if (avoid && (box.x0 < 0 || box.x1 > width || boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1))) continue
+        boxes.push(box)
+        placed.set(n.id, spot)
+        return
+      }
+    }
+    if (!shown) {
+      for (const n of nodes) if (labelled.has(n.id)) place(n, false)
+    } else if (!narrow) {
+      for (const n of nodes) if (isLit(n.id)) place(n, false)
+    } else {
+      const byId = new Map(nodes.map((n) => [n.id, n]))
+      const self = byId.get(shown)!
+      const p = pos(shown)
+      const r = radius(self)
+      // The selected star itself stays clear
+      boxes.push({ x0: p.x - r, x1: p.x + r, y0: p.y - r, y1: p.y + r })
+      place(self, true)
+      for (const l of activeLinks) place(byId.get(l.other)!, true)
+    }
+    return placed
+  })()
+  // Neighbors past the top three that didn't get a name on the sky
+  const unnamed = activeLinks.slice(3).filter((l) => !labels.has(l.other))
 
   return (
     <div className="constellation" ref={ref}>
@@ -145,7 +193,7 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
         {nodes.map((n) => {
           const p = pos(n.id)
           const color = colors.get(n.id) ?? STARLIGHT
-          const r = starSize(n.ms, maxMs) * (narrow ? 0.85 : 1) * grow
+          const r = radius(n)
           const lit = isLit(n.id)
           return (
             <g
@@ -171,14 +219,18 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
               <circle cx={p.x} cy={p.y} r={r} fill={color} />
               <circle cx={p.x} cy={p.y} r={r * 0.35} fill="#fff" opacity={0.75} />
               <circle cx={p.x} cy={p.y} r={Math.max(r + 8, 14)} fill="transparent" />
-              {(shown ? n.id === shown || (lit && !narrow) : labelled.has(n.id)) && (
-                <text x={p.x} y={p.y + r + 14} textAnchor="middle" className="constellation__label">
-                  {n.id}
-                </text>
-              )}
             </g>
           )
         })}
+
+        {/* Names sit above every star so a neighbor's glow never covers them */}
+        <g aria-hidden="true" pointerEvents="none">
+          {[...labels].map(([id, label]) => (
+            <text key={id} x={label.x} y={label.y} textAnchor={label.anchor} className="constellation__label">
+              {id}
+            </text>
+          ))}
+        </g>
       </svg>
       <ZoomControls zoom={zoom} className="constellation__zoom" />
       </div>
@@ -198,6 +250,11 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
                   </span>
                 ))}
                 .
+                {unnamed.length > 0 && (
+                  <>
+                    {' '}Also linked: {unnamed.map((l) => l.other).join(', ')}.
+                  </>
+                )}
               </span>
             ) : (
               <span>A lone star: rarely played next to your other favorites.</span>

@@ -11,9 +11,12 @@ import {
   startDate,
   summarize,
   topItems,
+  wearOut,
+  WEAR_MAX,
+  WEAR_MIN_SONG_PLAYS,
   weekHourGrid,
-} from './stats'
-import { at, play, sorted } from './testing'
+} from '../../src/data/stats'
+import { at, play, sorted } from '../helpers'
 
 describe('startDate', () => {
   it('works back from the end time', () => {
@@ -94,6 +97,53 @@ describe('summarize', () => {
     expect(s.skipRate).toBeCloseTo(1 / 3)
     expect(s.shuffleRate).toBeCloseTo(1 / 3)
     expect(s.offlineShare).toBeCloseTo(120_000 / s.totalMs)
+  })
+})
+
+describe('wearOut', () => {
+  // `count` plays of one song, a day apart from Jan 1, skipping the plays whose number is in `skipped`
+  const song = (uri: string, count: number, skipped: (n: number) => boolean, year = 2024) =>
+    Array.from({ length: count }, (_, i) => play(at(year, 1, 1 + i), { uri, skipped: skipped(i + 1) }))
+
+  it('numbers plays per song and pools the late ones', () => {
+    // 40 songs heard 35 times: skipped on the 1st play and from the 25th on
+    const plays = sorted(Array.from({ length: 40 }, (_, k) => song(`s${k}`, 35, (n) => n === 1 || n >= 25)).flat())
+    const w = wearOut(plays, null)
+    expect(w.rates).toHaveLength(WEAR_MAX)
+    expect(w.rates[0]).toBe(1)
+    expect(w.rates[1]).toBe(0)
+    expect(w.rates[WEAR_MAX - 1]).toBe(1) // plays 30 to 35 pool into the last step
+    expect(w.average).toBeCloseTo(12 / 35)
+    expect(w.best).toBe(2)
+    // Play 20 borrows from plays 16 to 24, none skipped. Play 24 borrows from 20 to 28,
+    // four of them skipped: the first step back above the average
+    expect(w.rates[19]).toBe(0)
+    expect(w.rates[23]).toBeCloseTo(4 / 9)
+    expect(w.wornOut).toBe(24)
+  })
+
+  it('leaves out songs played only a few times', () => {
+    const plays = sorted([...Array.from({ length: 40 }, (_, k) => song(`s${k}`, 10, () => false)).flat(), ...song('rare', WEAR_MIN_SONG_PLAYS - 1, () => true)])
+    const w = wearOut(plays, null)
+    expect(w.average).toBe(0)
+    expect(w.wornOut).toBeNull()
+  })
+
+  it('stops where plays run thin', () => {
+    const plays = sorted(Array.from({ length: 40 }, (_, k) => song(`s${k}`, 10, () => false)).flat())
+    // Plays 1 to 10 have 40 each; past that there is nothing to borrow from
+    expect(wearOut(plays, null).rates).toHaveLength(10)
+  })
+
+  it('counts earlier years toward the play number, but only rates plays in the year', () => {
+    // Old songs: 10 plays in 2023, then 5 skipped ones in 2024. New songs: 15 plays in 2024, none skipped
+    const old = Array.from({ length: 40 }, (_, k) => [...song(`old${k}`, 10, () => false, 2023), ...song(`old${k}`, 5, () => true, 2024)])
+    const fresh = Array.from({ length: 40 }, (_, k) => song(`new${k}`, 15, () => false, 2024))
+    const w = wearOut(sorted([...old, ...fresh].flat()), 2024)
+    expect(w.rates).toHaveLength(15)
+    expect(w.rates[0]).toBe(0) // the old songs' 2024 plays are their 11th to 15th, not their first
+    expect(w.rates[14]).toBe(0.5)
+    expect(w.average).toBe(200 / 800)
   })
 })
 
