@@ -10,7 +10,7 @@ Everything runs in your browser. There's no server, and your data is never uploa
 
 | | |
 |---|---|
-| **The Record** | Every day of listening as a vinyl record: one groove per day, arcs placed by time of day. Tap a groove (or use the slider) and the deck beside it unrolls that day into a 24-hour strip; the tonearm follows. |
+| **The Record** | Every day of listening as a vinyl record: one groove per day, arcs placed by time of day. Tap a groove (or use the slider) and the deck beside it unrolls that day into a 24-hour strip; the tonearm follows. On a phone, hold and drag on the record to skim it. |
 | **Eras** | Streamgraph of your top artists, with the stretches one artist led your listening called out as eras. |
 | **The Race** | Bar chart race of cumulative hours per artist. |
 | **Around the Clock** | 24-hour radial chart, your artist for each part of the day, and a weekday × hour dot matrix. |

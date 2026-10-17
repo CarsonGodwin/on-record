@@ -553,7 +553,8 @@ th {
   position: relative;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 24px clamp(16px, 4vw, 56px) 80px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) max(clamp(16px, 4vw, 56px), env(safe-area-inset-right, 0px)) 80px
+    max(clamp(16px, 4vw, 56px), env(safe-area-inset-left, 0px));
   min-height: 100vh;
 }
 
@@ -625,14 +626,27 @@ th {
   margin-top: clamp(32px, 8vh, 90px);
 }
 
+/* The sleeve, then the demo and privacy note under it */
+.landing__import {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.landing__demo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  /* Clear of the record peeking out of the sleeve */
+  margin-top: 6px;
+}
+
 @media (max-width: 860px) {
   .landing__main {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .sleeve {
-    width: min(78%, 380px);
-    margin: 0 18% 0 0;
-    justify-self: start;
   }
 }
 
@@ -665,14 +679,6 @@ th {
   color: var(--muted);
   max-width: 52ch;
   margin: 0;
-}
-
-.landing__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px 18px;
-  margin: 32px 0 26px;
 }
 
 .landing__note {
@@ -714,11 +720,20 @@ th {
 .sleeve {
   position: relative;
   width: min(100%, 470px);
-  justify-self: center;
+  align-self: center;
   aspect-ratio: 1;
   cursor: pointer;
   margin-right: 14%;
   outline: none;
+}
+
+/* One column: the sleeve sits left, leaving room on the right for the record peeking out */
+@media (max-width: 860px) {
+  .sleeve {
+    width: min(82%, 380px);
+    margin: 0;
+    align-self: flex-start;
+  }
 }
 
 .sleeve__record {
@@ -966,10 +981,21 @@ th {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px clamp(16px, 4vw, 40px);
+  /* With viewport-fit=cover the bar reaches up under a phone's status bar, so nothing scrolls by above it */
+  padding: calc(12px + env(safe-area-inset-top, 0px)) max(clamp(16px, 4vw, 40px), env(safe-area-inset-right, 0px)) 12px
+    max(clamp(16px, 4vw, 40px), env(safe-area-inset-left, 0px));
   background: rgba(11, 10, 15, 0.72);
-  backdrop-filter: blur(18px) saturate(1.4);
   border-bottom: 1px solid var(--line);
+}
+
+/* The blur sits on a layer behind the bar: on the bar itself, iOS Safari stops matching its status bar area to it */
+.topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
 }
 
 .topbar__years {
@@ -981,19 +1007,198 @@ th {
   gap: 8px;
 }
 
+/* Phone-only pieces of the top bar */
+.trackmenu,
+.topbar__select {
+  display: none;
+}
+
+/* Phones: one row. The dot, the section you're in (tap for the tracklist), and the year as a dropdown.
+   Poster and New data move into the tracklist. */
 @media (max-width: 760px) {
   .topbar {
-    flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    padding-bottom: 10px;
   }
+  .topbar .brand__name,
+  .topbar__years,
   .topbar__actions {
-    margin-left: auto;
+    display: none;
   }
-  .topbar__years {
-    order: 3;
-    width: 100%;
-    margin: 0;
+  .topbar .brand {
+    padding: 10px 4px;
+    margin: -10px 0;
   }
+  .trackmenu {
+    display: block;
+    flex: 1;
+    min-width: 0;
+  }
+  .topbar__select {
+    display: block;
+  }
+}
+
+.trackmenu__button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(244, 241, 234, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.trackmenu__num {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--accent);
+}
+
+.trackmenu__title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trackmenu__chevron {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin: -3px 2px 0;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 0.2s;
+}
+
+.trackmenu__button[aria-expanded='true'] .trackmenu__chevron {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.trackmenu__sheet {
+  position: fixed;
+  top: var(--topbar-h, 60px);
+  left: 0;
+  right: 0;
+  max-height: calc(100dvh - var(--topbar-h, 60px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 16px 22px;
+  background: var(--bg-raise);
+  border-bottom: 1px solid var(--line-strong);
+  /* Dims the page under the sheet */
+  box-shadow: 0 0 0 100vmax rgba(5, 4, 8, 0.6);
+  animation: sheet-down 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes sheet-down {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+.trackmenu__sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 12px;
+}
+
+.trackmenu__side {
+  margin: 0 0 6px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.trackmenu__side span {
+  margin-left: 4px;
+  color: var(--faint);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+.trackmenu__sheet ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.trackmenu__sheet ol a {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 8px;
+  margin: 0 -8px;
+  border-radius: 10px;
+  color: var(--text);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.trackmenu__sheet ol a span {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+
+.trackmenu__sheet ol a[aria-current='true'] {
+  background: rgba(244, 241, 234, 0.08);
+}
+
+.trackmenu__sheet ol a[aria-current='true'] span {
+  color: var(--accent);
+}
+
+.trackmenu__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.trackmenu__foot a {
+  margin-right: auto;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* A native dropdown: the phone's own picker is the easiest thing to tap. 16px text stops iOS zooming in on focus. */
+.topbar__select {
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 30px 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%) right 17px top 50% / 5px 5px no-repeat,
+    linear-gradient(-45deg, transparent 50%, var(--muted) 50%) right 12px top 50% / 5px 5px no-repeat,
+    rgba(244, 241, 234, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  appearance: none;
+  cursor: pointer;
 }
 
 .tracklist {
@@ -1058,7 +1263,7 @@ th {
 .dash__main {
   max-width: 1140px;
   margin: 0 auto;
-  padding: 0 clamp(16px, 4vw, 48px) 80px;
+  padding: 0 max(clamp(16px, 4vw, 48px), env(safe-area-inset-right, 0px)) 80px max(clamp(16px, 4vw, 48px), env(safe-area-inset-left, 0px));
 }
 
 /* Hero */
@@ -1233,7 +1438,7 @@ th {
 
 .chapter {
   padding: 56px 0 24px;
-  scroll-margin-top: 80px;
+  scroll-margin-top: calc(var(--topbar-h, 64px) + 16px);
 }
 
 .chapter__head {
@@ -1291,10 +1496,20 @@ th {
   align-items: start;
 }
 
+/* Stacked (same breakpoint as STACKED in Vinyl.tsx) */
 @media (max-width: 900px) {
   .vinyl {
     grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
   }
+}
+
+/* The record, plus on phones the readout above it and the controls below */
+.vinyl__turntable {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
 }
 
 .vinyl__stage {
@@ -1329,6 +1544,10 @@ th {
 /* Zoomed in, the record is cropped to its square and a finger pans instead of scrolling the page */
 .vinyl__platter {
   touch-action: pan-y;
+  /* A held finger scrubs: no text selection or callout menu */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .vinyl__platter.is-zoomed {
@@ -1392,6 +1611,63 @@ th {
   stroke-width: 2;
 }
 
+/* The touch how-to: a ghost fingertip holds, then drags along the grooves */
+.coach {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: coach-in 0.5s 0.6s both;
+}
+
+@keyframes coach-in {
+  from { opacity: 0; }
+}
+
+.coach__orbit {
+  position: absolute;
+  inset: 0;
+  animation: coach-orbit 3.6s ease-in-out infinite;
+}
+
+@keyframes coach-orbit {
+  0%, 32% { transform: rotate(-150deg); }
+  78%, 100% { transform: rotate(-95deg); }
+}
+
+.coach__finger {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(244, 241, 234, 0.3);
+  border: 2px solid rgba(244, 241, 234, 0.9);
+  animation: coach-press 3.6s ease-in-out infinite;
+}
+
+@keyframes coach-press {
+  0% { opacity: 0; transform: scale(1.5); box-shadow: 0 0 0 0 rgba(255, 39, 124, 0.8); }
+  10% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 39, 124, 0.8); }
+  /* The hold: a ring swells out, then the drag inward across the days */
+  32% { transform: scale(0.9); box-shadow: 0 0 0 16px rgba(255, 39, 124, 0); }
+  78% { opacity: 1; transform: scale(0.9) translateY(34px); box-shadow: 0 0 0 16px rgba(255, 39, 124, 0); }
+  90%, 100% { opacity: 0; transform: scale(1.1) translateY(34px); box-shadow: 0 0 0 16px rgba(255, 39, 124, 0); }
+}
+
+.coach__label {
+  position: absolute;
+  left: 50%;
+  bottom: 5%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(11, 10, 15, 0.88);
+  border: 1px solid var(--line-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+
 .tonearm__arm {
   transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.2, 1);
   filter: drop-shadow(4px 10px 8px rgba(0, 0, 0, 0.55));
@@ -1449,6 +1725,71 @@ th {
   background: linear-gradient(180deg, #08070b, #121018);
   border: 1px solid var(--line);
   box-shadow: inset 0 0 40px rgba(255, 39, 124, 0.05);
+}
+
+/* Phones: the readout half of the deck, above the record */
+.deck--readout {
+  gap: 10px;
+  padding: 14px 16px 12px;
+}
+
+/* Stands in for the readout while a finger scrubs and the readout is scrolled away */
+.scrub-tip {
+  position: fixed;
+  z-index: 50;
+  top: calc(var(--topbar-h, 60px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 9px 16px;
+  border-radius: 14px;
+  background: rgba(21, 19, 27, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  text-align: center;
+}
+
+.scrub-tip span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scrub-tip__when {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.scrub-tip__what {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.deck--readout .deck__date {
+  font-size: 1.15rem;
+}
+
+/* One line each for the song and artist, so the readout never changes height */
+.deck--readout .deck__now {
+  align-items: center;
+  height: 46px;
+}
+
+.deck--readout .deck__time {
+  font-size: 1.3rem;
+}
+
+.deck--readout .deck__track span {
+  -webkit-line-clamp: 1;
+}
+
+.deck--controls {
+  gap: 14px;
 }
 
 .deck__date {
@@ -1609,6 +1950,55 @@ th {
 .icon-button:disabled {
   opacity: 0.3;
   cursor: default;
+}
+
+/* ---------- Reading guide: a takeaway and a key above charts that need one ---------- */
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.guide__takeaway {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.guide__takeaway em {
+  font-size: 1.18em;
+}
+
+@media (max-width: 640px) {
+  .guide__takeaway {
+    font-size: 1.02rem;
+  }
+}
+
+.guide__key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.guide__key li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guide__glyph {
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 /* ---------- A2 Eras ---------- */
@@ -2674,17 +3064,44 @@ th {
   filter: drop-shadow(0 0 8px var(--c));
 }
 
+/* The picked ridge is drawn last; a see-through fill keeps the lines it covers faintly visible */
+.pulse__ridge.is-on .pulse__fill {
+  fill-opacity: 0.8;
+}
+
+.pulse.has-focus .pulse__ridge:not(.is-on) .pulse__line {
+  stroke-opacity: 0.45;
+}
+
+/* Phones: each line's name, where the line starts */
+.pulse__tag {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  paint-order: stroke;
+  stroke: #000;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.pulse__tag.is-on {
+  fill: var(--text);
+  font-weight: 700;
+}
+
+.pulse.has-focus .pulse__tag:not(.is-on) {
+  opacity: 0.5;
+}
+
+.pulse .guide {
+  padding: 0 22px;
+}
+
 .pulse__name {
   fill: var(--muted);
   font-family: var(--mono);
   font-size: 11.5px;
-}
-
-.pulse__name--inline {
-  fill: var(--text);
-  paint-order: stroke;
-  stroke: #000;
-  stroke-width: 4px;
 }
 
 .pulse__ridge.is-on .pulse__name {
@@ -2713,7 +3130,7 @@ th {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 22px;
+  padding: 12px 22px calc(12px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, #000 70%, rgba(0, 0, 0, 0));
 }
 

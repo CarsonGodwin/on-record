@@ -40,7 +40,8 @@ export function Race({ bins, race, colors }: Props) {
     let raf = 0
     let last = performance.now()
     const tick = (now: number) => {
-      tRef.current = Math.min(frames - 1, tRef.current + (now - last) / frameMs)
+      // The first frame's timestamp can predate `last`, which would step t below 0
+      tRef.current = Math.min(frames - 1, tRef.current + Math.max(0, now - last) / frameMs)
       last = now
       setT(tRef.current)
       if (tRef.current >= frames - 1) {
@@ -53,7 +54,7 @@ export function Race({ bins, race, colors }: Props) {
     return () => cancelAnimationFrame(raf)
   }, [playing, frames, frameMs])
 
-  const f0 = Math.min(Math.floor(t), frames - 1)
+  const f0 = Math.max(0, Math.min(Math.floor(t), frames - 1))
   const f1 = Math.min(frames - 1, f0 + 1)
   const frac = t - f0
   const n = race.names.length

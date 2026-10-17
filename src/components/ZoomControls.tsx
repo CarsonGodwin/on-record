@@ -1,6 +1,6 @@
+import { COARSE } from '../lib/pointer'
 import type { PanZoom } from '../lib/zoom'
 
-const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
 const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
 /** − / + / reset buttons for a pan-zoom box, with a hint for the gestures */
@@ -23,7 +23,7 @@ export function ZoomControls({ zoom, className }: { zoom: PanZoom; className?: s
           Reset
         </button>
       ) : (
-        <span className="zoombar__hint">{coarse ? 'Pinch to zoom' : `Pinch or ${mac ? '⌘' : 'Ctrl'}-scroll to zoom`}</span>
+        <span className="zoombar__hint">{COARSE ? 'Pinch to zoom' : `Pinch or ${mac ? '⌘' : 'Ctrl'}-scroll to zoom`}</span>
       )}
     </div>
   )

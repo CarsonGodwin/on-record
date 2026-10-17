@@ -297,7 +297,7 @@ describe('records', () => {
   it('finds the first song, the marathon and the evergreen', () => {
     expect(r.firstPlay).toEqual({ title: 'Then', artist: 'Gone', date: at(2024, 1, 2).getTime() })
     expect(r.marathon?.ms).toBe(3_600_000)
-    expect(r.evergreen).toEqual({ title: 'Always', artist: 'Stays', months: 3 })
+    expect(r.evergreen).toEqual({ title: 'Always', artist: 'Stays', months: 3, activeMonths: 3 })
   })
 
   it('finds a big artist gone quiet for four months', () => {

@@ -1,0 +1,104 @@
+import { useEffect, useRef, useState } from 'react'
+
+/*
+ * The tracklist for phones, where the side nav doesn't fit: the top bar names
+ * the section you're in, and tapping it drops down every section to jump to.
+ */
+
+export interface Track {
+  id: string
+  /** Track number, e.g. "A1"; the letter is the side */
+  num: string
+  title: string
+}
+
+interface Props {
+  tracks: Track[]
+  /** Side letter → side title, e.g. A → "Time" */
+  sides: Record<string, string>
+  current: string | null
+  onPoster: () => void
+  onReset: () => void
+}
+
+export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const track = tracks.find((t) => t.id === current)
+
+  useEffect(() => {
+    if (!open) return
+    const outside = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
+
+  return (
+    <div className="trackmenu" ref={ref}>
+      <button type="button" className="trackmenu__button" aria-expanded={open} aria-controls="trackmenu-sheet" onClick={() => setOpen(!open)}>
+        {track ? (
+          <>
+            <span className="trackmenu__num">{track.num}</span>
+            <span className="trackmenu__title">{track.title}</span>
+          </>
+        ) : (
+          <span className="trackmenu__title">Tracklist</span>
+        )}
+        <span className="trackmenu__chevron" aria-hidden="true" />
+      </button>
+
+      {open && (
+        <nav className="trackmenu__sheet" id="trackmenu-sheet" aria-label="Sections">
+          <div className="trackmenu__sides">
+            {Object.entries(sides).map(([side, title]) => (
+              <div key={side}>
+                <p className="trackmenu__side">
+                  Side {side} <span>{title}</span>
+                </p>
+                <ol>
+                  {tracks
+                    .filter((t) => t.num.startsWith(side))
+                    .map((t) => (
+                      <li key={t.id}>
+                        <a href={`#${t.id}`} aria-current={t.id === current ? 'true' : undefined} onClick={() => setOpen(false)}>
+                          <span>{t.num}</span>
+                          {t.title}
+                        </a>
+                      </li>
+                    ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+          <div className="trackmenu__foot">
+            <a href="#top" onClick={() => setOpen(false)}>
+              Back to the top
+            </a>
+            <button type="button" className="button button--ghost button--small" onClick={onReset}>
+              New data
+            </button>
+            <button
+              type="button"
+              className="button button--small"
+              onClick={() => {
+                setOpen(false)
+                onPoster()
+              }}
+            >
+              Poster
+            </button>
+          </div>
+        </nav>
+      )}
+    </div>
+  )
+}
