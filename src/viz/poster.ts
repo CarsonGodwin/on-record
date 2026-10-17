@@ -1,6 +1,6 @@
 import { area, curveBasis, line } from 'd3-shape'
 import type { GraphLink, GraphNode, Records } from '../data/insights'
-import { dayNumber, type FunStats, type SkipTiming } from '../data/stats'
+import { dayNumber, type FunStats, type WearOut } from '../data/stats'
 import { formatDate, formatDuration, formatNumber } from '../lib/format'
 import { mulberry32 } from '../lib/random'
 import { starSize, type Layout } from './constellation'
@@ -59,8 +59,8 @@ export interface PosterData {
   colors: Map<string, string>
   pulse: { artists: string[]; series: Map<string, number[]> }
   stats: { hours: number; streams: number; artists: number; peak: string }
-  /** Share of songs skipped (0–1), and when in the song the skips came */
-  skips: { rate: number } & SkipTiming
+  /** How the skip rate climbs or falls the more times a song has been played */
+  wearOut: WearOut
   listener: string
   /** Standout days and runs, for the designs that point them out on the record */
   moments: PosterMoment[]

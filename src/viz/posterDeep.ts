@@ -1,4 +1,4 @@
-import { fromDayNumber } from '../data/stats'
+import { WEAR_MAX, fromDayNumber } from '../data/stats'
 import { formatDate, formatNumber } from '../lib/format'
 import type { PosterData } from './poster'
 import { DISPLAY, MINUTES, SLOT_OTHER, TAU, drawRecord, mix, quietestMinute, recordGeometry, type RecordModel } from './record'
@@ -395,66 +395,128 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     })
   }
 
-  // 3. How far into a song I give up on it. The first ten seconds are lit: that's where skips pile up
+  // 3. How songs wear out: the skip rate by how many times I'd already heard the song, against my average.
+  // It usually dips once a song is familiar, then climbs back as I tire of it
   {
-    const x = panel(2, 'How fast I skip', 'Songs I skipped, by seconds in')
-    const { rate, bins, skips } = data.skips
+    const x = panel(2, 'How songs wear out', 'Skip rate by times heard')
+    const { rates, average, best, wornOut } = data.wearOut
     const bh = chartH - 2.2 * u
-    const bw = pw / bins.length
     const floor = chartTop + bh
-
-    // The skip rate, top right
+    const n = rates.length
     ctx.textBaseline = 'alphabetic'
-    ctx.textAlign = 'right'
-    ctx.fillStyle = ink
-    ctx.font = font(700, 3.4 * u)
-    ctx.fillText(`${Math.round(rate * 100)}%`, x + pw, chartTop + 2.4 * u)
-    const statW = ctx.measureText(`${Math.round(rate * 100)}%`).width
-    ctx.fillStyle = soft
-    ctx.font = font(500, 1.2 * u)
-    ctx.fillText('of songs skipped', x + pw, chartTop + 4.1 * u)
-    const statLeft = x + pw - Math.max(statW, ctx.measureText('of songs skipped').width)
-    const statBottom = chartTop + 4.8 * u
 
-    if (skips === 0) {
+    if (n < 3) {
+      ctx.fillStyle = soft
+      ctx.font = font(500, 1.2 * u)
       ctx.textAlign = 'left'
-      ctx.fillText('Not a single skip', x, floor - 0.6 * u)
+      ctx.fillText('Not enough repeat plays yet', x, floor - 0.6 * u)
     } else {
-      // The share in the first ten seconds, top left beside the lit bars
-      const tx = x + 2 * bw + 0.4 * u
-      const note: [string, number, number][] = [
-        [`${Math.round(((bins[0] + bins[1]) / skips) * 100)}% of skips`, 700, 1.3],
-        ['in the first', 500, 1.2],
-        ['10 seconds', 500, 1.2],
-      ]
-      let noteRight = tx
+      const px = (i: number) => x + (i / (n - 1)) * pw
+
+      // The note goes in whichever top corner the curve leaves emptier
+      const note: [string, number, number][] =
+        wornOut !== null
+          ? [['Tired of a song', 700, 1.3], [`by play ${wornOut}${wornOut === WEAR_MAX ? '+' : ''}`, 500, 1.2]]
+          : [['Least skipped', 700, 1.3], [`on play ${best}`, 500, 1.2]]
+      const noteW = Math.max(
+        ...note.map(([text, weight, size]) => {
+          ctx.font = font(weight, size * u)
+          return ctx.measureText(text).width
+        }),
+      )
+      const under = (i: number, left: number) => px(i) >= left - 0.6 * u && px(i) <= left + noteW + 0.6 * u
+      const peakUnder = (left: number) => Math.max(0, ...rates.filter((_, i) => under(i, left)))
+      const noteLeft = peakUnder(x) <= peakUnder(x + pw - noteW) ? x : x + pw - noteW
+
+      // The rates sit in a narrow band, so the scale starts below the lowest one rather than at zero.
+      // It's stretched so the curve passes under the note, with some headroom everywhere else
+      const lowest = Math.min(...rates)
+      const base = Math.max(0, lowest - 0.8 * (Math.max(average, ...rates) - lowest))
+      const room = (floor - (chartTop + 3.4 * u)) / bh
+      const top = Math.max(base + 0.01, base + (average - base) / 0.9, ...rates.map((r, i) => base + (r - base) / (under(i, noteLeft) ? room : 0.9)))
+      const py = (r: number) => floor - ((r - base) / (top - base)) * bh
+
+      // Sweet spot: the plays around the lowest point, where I almost never skip
+      const bestRate = rates[best - 1]
+      if (average > bestRate) {
+        const limit = bestRate + 0.25 * (average - bestRate)
+        let lo = best - 1
+        let hi = best - 1
+        while (lo > 0 && rates[lo - 1] <= limit) lo--
+        while (hi < n - 1 && rates[hi + 1] <= limit) hi++
+        const x0 = Math.max(x, px(lo - 0.5))
+        const x1 = Math.min(x + pw, px(hi + 0.5))
+        // Only drawn when its label fits under the curve
+        ctx.font = font(500, 1.2 * u)
+        if (ctx.measureText('sweet spot').width <= x1 - x0 + 1.6 * u && py(bestRate) < floor - 2 * u) {
+          // Starts under the note when they share a corner
+          const bandTop = x0 < noteLeft + noteW && x1 > noteLeft ? chartTop + 3.4 * u : chartTop
+          ctx.fillStyle = mix(bg, accent, 0.14)
+          ctx.fillRect(x0, bandTop, x1 - x0, floor - bandTop)
+          ctx.fillStyle = soft
+          ctx.textAlign = 'center'
+          ctx.fillText('sweet spot', Math.min(Math.max((x0 + x1) / 2, x + 3 * u), x + pw - 3 * u), floor - 0.6 * u)
+        }
+      }
+
+      ctx.fillStyle = faint
+      ctx.fillRect(x, floor, pw, Math.max(1, 0.12 * u))
+
+      // My average, labelled on the side of the line the curve's end leaves free
+      const ay = py(average)
+      ctx.strokeStyle = soft
+      ctx.lineWidth = Math.max(1, 0.12 * u)
+      ctx.setLineDash([0.45 * u, 0.45 * u])
+      ctx.beginPath()
+      ctx.moveTo(x, ay)
+      ctx.lineTo(x + pw, ay)
+      ctx.stroke()
+      ctx.setLineDash([])
+      const noteOnRight = noteLeft > x
+      const below = (rates[n - 1] > average || (noteOnRight && ay < chartTop + 4.6 * u)) && ay + 1.6 * u < floor
+      ctx.fillStyle = soft
+      ctx.font = font(500, 1.2 * u)
+      ctx.textAlign = 'right'
+      ctx.fillText(`average ${Math.round(average * 100)}%`, x + pw, below ? ay + 1.5 * u : ay - 0.5 * u)
+
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 0.32 * u
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      rates.forEach((r, i) => (i === 0 ? ctx.moveTo(px(i), py(r)) : ctx.lineTo(px(i), py(r))))
+      ctx.stroke()
+
+      // The play the note is about
+      const mark = (wornOut ?? best) - 1
+      ctx.beginPath()
+      ctx.arc(px(mark), py(rates[mark]), 0.6 * u, 0, TAU)
+      ctx.fillStyle = accent
+      ctx.fill()
+      ctx.strokeStyle = bg
+      ctx.lineWidth = 0.25 * u
+      ctx.stroke()
+
       ctx.textAlign = 'left'
       ctx.fillStyle = ink
       note.forEach(([text, weight, size], j) => {
         ctx.font = font(weight, size * u)
-        ctx.fillText(text, tx, chartTop + (0.9 + j * 1.55) * u)
-        noteRight = Math.max(noteRight, tx + ctx.measureText(text).width)
+        ctx.fillText(text, noteLeft, chartTop + (0.9 + j * 1.55) * u)
       })
 
-      // Bars under the note or the skip rate are scaled to stay clear of them
-      const room = floor - statBottom - 0.4 * u
-      const covered = (i: number) => i >= 2 && (x + i * bw < noteRight || x + (i + 1) * bw > statLeft)
-      const max = Math.max(1, ...bins.map((v, i) => (covered(i) ? (v * bh) / room : v)))
-      bins.forEach((v, i) => {
-        const h = (v / max) * bh
-        ctx.fillStyle = i < 2 ? accent : mix(bg, accent, 0.4)
-        ctx.fillRect(x + i * bw + bw * 0.08, floor - h, bw * 0.84, h)
-      })
+      // Play numbers along the bottom
+      const ordinal = (k: number) => {
+        const teen = k % 100 >= 11 && k % 100 <= 13
+        return `${k}${teen ? 'th' : ['th', 'st', 'nd', 'rd'][k % 10] ?? 'th'}`
+      }
+      ctx.fillStyle = soft
+      ctx.font = font(500, 1.2 * u)
+      ctx.fillText('1st play', x, chartTop + chartH)
+      ctx.textAlign = 'center'
+      for (const k of [10, 20]) if (k < n - 3) ctx.fillText(ordinal(k), px(k - 1), chartTop + chartH)
+      ctx.textAlign = 'right'
+      ctx.fillText(n === WEAR_MAX ? `${WEAR_MAX}th+` : ordinal(n), x + pw, chartTop + chartH)
     }
-
-    ctx.fillStyle = soft
-    ctx.font = font(500, 1.2 * u)
-    ctx.textAlign = 'left'
-    ctx.fillText('0s', x, chartTop + chartH)
-    ctx.textAlign = 'center'
-    ctx.fillText('30s', x + (bins.length / 2) * bw, chartTop + chartH)
-    ctx.textAlign = 'right'
-    ctx.fillText('1 min', x + pw, chartTop + chartH)
   }
 
   // ---------- Your #1, year by year (month by month for a single year) ----------

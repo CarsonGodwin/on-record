@@ -92,6 +92,9 @@ export function generateSampleRecords(): RawStreamRecord[] {
     })
 
   const records: RawStreamRecord[] = []
+  // Plays so far per track: new songs get skipped more, favourites less, and then they wear out
+  const heard = new Map<string, number>()
+  const fatigue = (n: number) => 0.7 + 0.8 * Math.exp(-(n - 1) / 2) + Math.min(20, Math.max(0, n - 12)) * 0.04
   const totalDays = Math.round((END.getTime() - START.getTime()) / 86_400_000)
   // Late sessions on the last night would otherwise spill into the next year
   const cutoff = new Date(END.getFullYear(), END.getMonth(), END.getDate() + 1).getTime()
@@ -161,7 +164,9 @@ export function generateSampleRecords(): RawStreamRecord[] {
             const tracks = tracksByArtist[artist]
             track = tracks[Math.min(tracks.length - 1, Math.floor(rand() ** 2 * tracks.length))]
           }
-          const skipped = s !== obsession && rand() < track.skipChance * (shuffle ? 1.3 : 1)
+          const n = (heard.get(track.uri) ?? 0) + 1
+          heard.set(track.uri, n)
+          const skipped = s !== obsession && rand() < Math.min(0.95, track.skipChance * (shuffle ? 1.3 : 1) * fatigue(n))
           // Most skips come in the first few seconds, but some land anywhere in the song
           const ms = skipped ? 1_000 + Math.floor(rand() ** 3 * (track.durationMs - 1_000)) : track.durationMs
           t += ms

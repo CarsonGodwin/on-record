@@ -275,20 +275,14 @@ em {
 }
 
 .segmented--scroll {
-  padding-bottom: 12px;
   border-radius: 22px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(244, 241, 234, 0.3) transparent;
   overscroll-behavior-x: contain;
+  cursor: grab;
+  user-select: none;
 }
 
-.segmented--scroll::-webkit-scrollbar {
-  height: 6px;
-}
-
-.segmented--scroll::-webkit-scrollbar-thumb {
-  background: rgba(244, 241, 234, 0.3);
-  border-radius: 999px;
+.segmented--scroll:active {
+  cursor: grabbing;
 }
 
 .segmented__option {
@@ -2655,7 +2649,8 @@ th {
   border-radius: 24px;
   background: #000;
   border: 1px solid var(--line);
-  overflow: hidden;
+  /* clip, not hidden, so the sticky scrubber can still stick */
+  overflow: clip;
 }
 
 .pulse svg {
@@ -2694,6 +2689,64 @@ th {
 
 .pulse__ridge.is-on .pulse__name {
   fill: var(--text);
+}
+
+.pulse__marker line {
+  stroke: var(--c);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.7;
+}
+
+.pulse__marker circle {
+  fill: var(--c);
+  stroke: #000;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px var(--c));
+}
+
+.pulse__scrub {
+  /* Stays on screen while you scroll the ridges, so a tall chart never hides it */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  background: linear-gradient(to top, #000 70%, rgba(0, 0, 0, 0));
+}
+
+.pulse__scrub .scrubber {
+  margin-left: 8px;
+  /* Takes the selected ridge's color instead of the site accent */
+  background: linear-gradient(90deg, var(--c) var(--progress), var(--line-strong) var(--progress));
+}
+
+.pulse__scrub .scrubber::-webkit-slider-thumb {
+  background: var(--c);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent);
+}
+
+.pulse__scrub .scrubber::-moz-range-thumb {
+  background: var(--c);
+}
+
+.pulse__step {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.pulse__step:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .pulse__date {

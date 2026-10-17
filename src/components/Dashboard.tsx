@@ -15,7 +15,7 @@ import {
   sessions,
   songStats,
 } from '../data/insights'
-import { filterByYear, funStats, getYears, newArtistsIn, platforms, skipTiming, summarize, topItems, weekHourGrid } from '../data/stats'
+import { filterByYear, funStats, getYears, newArtistsIn, platforms, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
 import { formatHour, formatNumber } from '../lib/format'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import type { LoadResult } from '../types'
@@ -104,7 +104,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     [plays, hours, summary.skipRate, summary.shuffleRate],
   )
   const devices = useMemo(() => platforms(plays), [plays])
-  const skips = useMemo(() => skipTiming(plays), [plays])
+  const wear = useMemo(() => wearOut(all, year), [all, year])
   const newArtists = useMemo(() => (year === null ? null : newArtistsIn(all, year)), [all, year])
 
   const span = years.length > 1 ? `${years[0]}–${years[years.length - 1]}` : String(years[0])
@@ -132,11 +132,11 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       colors,
       pulse: { artists: pulseArtists, series: artistSeries(totals, pulseArtists, bins.size === 'month' ? 1 : 2) },
       stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, peak: formatHour(peak.hour) },
-      skips: { rate: summary.skipRate, ...skips },
+      wearOut: wear,
       listener: profile.title,
       moments: posterMoments(record, fun, rec),
     }),
-    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, skips, peak, profile, fun, rec],
+    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, profile, fun, rec],
   )
 
   /** Jumps to the poster studio with a design picked */

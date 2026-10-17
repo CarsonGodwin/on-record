@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 /** Small shared building blocks used across the dashboard. */
@@ -9,22 +9,49 @@ interface SegmentedProps<T> {
   value: T
   onChange: (value: T) => void
   className?: string
-  /** Long lists: shows a scrollbar and lets the mouse wheel scroll sideways */
+  /** Long lists: drag with the mouse to scroll sideways (touch scrolls natively) */
   scrollable?: boolean
 }
 
 /** A row of toggle buttons where exactly one is selected */
 export function Segmented<T>({ label, options, value, onChange, className, scrollable }: SegmentedProps<T>) {
   const classes = ['segmented', scrollable && 'segmented--scroll', className].filter(Boolean).join(' ')
+  const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null)
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return
+    const el = e.currentTarget
+    drag.current = { x: e.clientX, left: el.scrollLeft, moved: false }
+    const move = (ev: globalThis.PointerEvent) => {
+      const d = drag.current
+      if (!d) return
+      const dx = ev.clientX - d.x
+      if (!d.moved && Math.abs(dx) < 4) return
+      d.moved = true
+      el.scrollLeft = d.left - dx
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      // Leave `moved` set just long enough to swallow the click that follows a drag
+      setTimeout(() => (drag.current = null), 50)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+
   return (
     <div
       className={classes}
       role="group"
       aria-label={label}
-      onWheel={
+      onPointerDown={scrollable ? onPointerDown : undefined}
+      onClickCapture={
         scrollable
           ? (e) => {
-              if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY
+              if (drag.current?.moved) e.stopPropagation()
             }
           : undefined
       }
