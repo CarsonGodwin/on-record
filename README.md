@@ -10,6 +10,7 @@ Everything runs in your browser. There's no server, and your data is never uploa
 
 | | |
 |---|---|
+| **The Long Play** | The whole record played back like a story, one slide per track: A1 presses your record groove by groove while you watch, then each chapter gets a pocket version of its chart and the one thing it says, ending on the poster. Tap to skip, hold to pause, or open any track in full. |
 | **The Record** | Every day of listening as a vinyl record: one groove per day, arcs placed by time of day. Tap a groove (or use the slider) and the deck beside it unrolls that day into a 24-hour strip; the tonearm follows. On a phone, hold and drag on the record to skim it. |
 | **Eras** | Streamgraph of your top artists, with the stretches one artist led your listening called out as eras. |
 | **The Race** | Bar chart race of cumulative hours per artist. |
@@ -58,6 +59,7 @@ src/
   data/insights.ts      Time bins, eras, race frames, sessions, artist graph, listener profile
   viz/record.ts         The vinyl drawing, shared by the chart and the poster
   viz/constellation.ts  The artist-graph layout, shared by the chart and the poster
+  viz/pressing.ts       The record pressed a groove at a time, for The Long Play
   viz/poster.ts         Poster rendering (all three designs)
   lib/palette.ts        Chart colors (validated for colorblind separation on the dark surface)
   lib/dropFiles.ts      Drag-and-drop, including dropped folders

@@ -16,7 +16,7 @@ export const PODCAST = '#8d86a0'
 export const SLOT_OTHER = TOP_ARTISTS
 export const SLOT_PODCAST = TOP_ARTISTS + 1
 /** Draw order: the background first, the top artist last so it sits on top */
-const DRAW_ORDER = [SLOT_OTHER, SLOT_PODCAST, ...Array.from({ length: TOP_ARTISTS }, (_, i) => TOP_ARTISTS - 1 - i)]
+export const DRAW_ORDER = [SLOT_OTHER, SLOT_PODCAST, ...Array.from({ length: TOP_ARTISTS }, (_, i) => TOP_ARTISTS - 1 - i)]
 
 export const DISPLAY = '"Bricolage Grotesque Variable", system-ui, sans-serif'
 export const MONO = '"JetBrains Mono Variable", ui-monospace, monospace'

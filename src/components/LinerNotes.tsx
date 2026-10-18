@@ -174,7 +174,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
   )
 }
 
-function Radar({ profile }: { profile: Profile }) {
+export function Radar({ profile }: { profile: Profile }) {
   const C = 130
   const R = 82
   const n = profile.traits.length

@@ -9,6 +9,9 @@ import { useEffect, useLayoutEffect, useRef, type PointerEvent, type RefObject }
 /** True when the main pointer is a finger, so hints should talk about taps rather than hovering */
 export const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
 
+/** True on a phone: a finger on a screen small enough that the Long Play fills it (same breakpoint as the CSS) */
+export const PHONE = COARSE && matchMedia('(max-width: 699px), (max-height: 559px)').matches
+
 /** Runs `clear` when a mouse or pen leaves, but not after a tap */
 export function leaveUnlessTouch(clear: () => void) {
   return (e: PointerEvent) => {

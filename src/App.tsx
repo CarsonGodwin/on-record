@@ -13,6 +13,7 @@ type State =
   | { status: 'ready'; result: LoadResult; isSample: boolean }
 
 const FEATURES = [
+  ['The Long Play', 'the whole record, track by track'],
   ['The Record', 'every day pressed into vinyl'],
   ['Eras', 'who ruled which months'],
   ['The Race', 'your artists, racing'],

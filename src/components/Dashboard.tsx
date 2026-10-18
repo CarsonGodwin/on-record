@@ -17,6 +17,7 @@ import {
 } from '../data/insights'
 import { filterByYear, funStats, getYears, newArtistsIn, platforms, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
 import { formatHour, formatNumber } from '../lib/format'
+import { COARSE, PHONE } from '../lib/pointer'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import type { LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
@@ -27,6 +28,8 @@ import { Clock, ClockTable } from './Clock'
 import { Constellation, ConstellationTable } from './Constellation'
 import { Hero } from './Hero'
 import { LinerNotes } from './LinerNotes'
+import { LongPlay } from './LongPlay'
+import type { PlaybackData } from './LongPlayTracks'
 import { LoveHate, LoveHateTable } from './LoveHate'
 import { PosterStudio } from './PosterStudio'
 import { Pulse } from './Pulse'
@@ -65,6 +68,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const [year, setYear] = useState<number | null>(null)
   const [posterDesign, setPosterDesign] = useState<PosterDesign>('record')
   const [current, setCurrent] = useState<string | null>(null)
+  const [playing, setPlaying] = useState(false)
   // Once a finger has scrubbed the record, its how-to stays hidden until new data comes in
   const [scrubLearned, setScrubLearned] = useState(false)
   const topbarRef = useRef<HTMLElement>(null)
@@ -144,6 +148,109 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     }),
     [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, profile, fun, rec],
   )
+
+  // The Long Play plays the same chapters back, one slide each, so it draws from all of the above
+  const topSong = useMemo(() => (playing ? topItems(plays, 'track', 'plays', 1)[0] : undefined), [playing, plays])
+  const playback = useMemo<PlaybackData>(
+    () => ({
+      year,
+      period: year === null ? span : String(year),
+      summary,
+      model: record,
+      slotColors,
+      colors,
+      legend,
+      bins,
+      totals,
+      eras,
+      race,
+      hours,
+      parts,
+      days,
+      songs,
+      graph: posterData.graph,
+      pulse: pulseLines,
+      firstHeard,
+      topArtists,
+      topSong,
+      fun,
+      rec,
+      profile,
+      poster: posterData,
+    }),
+    [year, span, summary, record, slotColors, colors, legend, bins, totals, eras, race, hours, parts, days, songs, posterData, pulseLines, firstHeard, topArtists, topSong, fun, rec, profile],
+  )
+
+  /*
+   * The story gets its own history entry, so the back gesture (an edge swipe on
+   * iPhone, the back button on Android) closes it instead of leaving the site.
+   * The entry carries a token for this opening, since history.state outlives a
+   * reload and a stale entry must not count as the story's.
+   * Opened by a tap, phones that allow it also go fullscreen (the browser only
+   * grants that from a gesture); iPhone Safari doesn't, so there the story just
+   * fills the window. Leaving fullscreen, as Escape or Android's back does, closes it.
+   */
+  const storyEntry = useRef<string | null>(null)
+  const storyFullscreen = useRef(false)
+
+  function openStory(fromGesture: boolean) {
+    storyEntry.current = `${Date.now()}-${Math.random()}`
+    history.pushState({ longPlay: storyEntry.current }, '')
+    setPlaying(true)
+    const root = document.documentElement
+    if (fromGesture && COARSE && document.fullscreenEnabled && !document.fullscreenElement) {
+      root
+        .requestFullscreen?.({ navigationUI: 'hide' })
+        .then(() => (storyFullscreen.current = true))
+        .catch(() => {})
+    }
+  }
+
+  function closeStory() {
+    setPlaying(false)
+    storyFullscreen.current = false
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    const ours = storyEntry.current !== null && history.state?.longPlay === storyEntry.current
+    storyEntry.current = null
+    if (ours) history.back()
+  }
+
+  useEffect(() => {
+    // Going back to where the story was opened shouldn't scroll the page anywhere
+    const restoration = history.scrollRestoration
+    history.scrollRestoration = 'manual'
+    const onPop = () => {
+      if (storyEntry.current !== null && history.state?.longPlay === storyEntry.current) return
+      storyEntry.current = null
+      storyFullscreen.current = false
+      setPlaying(false)
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    }
+    const onFullscreen = () => {
+      if (!document.fullscreenElement && storyFullscreen.current) closeStory()
+    }
+    window.addEventListener('popstate', onPop)
+    document.addEventListener('fullscreenchange', onFullscreen)
+    return () => {
+      history.scrollRestoration = restoration
+      window.removeEventListener('popstate', onPop)
+      document.removeEventListener('fullscreenchange', onFullscreen)
+    }
+  }, [])
+
+  // On a phone the story is the way in: it opens as soon as the data is ready
+  const autoOpened = useRef(false)
+  useEffect(() => {
+    if (!PHONE || autoOpened.current) return
+    autoOpened.current = true
+    openStory(false)
+  }, [])
+
+  /** Leaves the story for a chapter on the page, once the page can scroll again */
+  function jumpTo(id: string) {
+    closeStory()
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 60)
+  }
 
   /** Jumps to the poster studio with a design picked */
   function makePoster(design: PosterDesign) {
@@ -238,6 +345,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           topArtist={topArtists[0]}
           hours={hours}
           newArtists={newArtists}
+          onPlay={() => openStory(true)}
           onPoster={() => makePoster(posterDesign)}
         />
 
@@ -380,6 +488,19 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         </footer>
       </main>
 
+      {playing && (
+        <LongPlay
+          data={playback}
+          tracks={hasMusic ? TRACKS : TRACKS.filter((t) => t.id === 'charts' || t.id === 'notes' || t.id === 'poster')}
+          sides={SIDES}
+          onJump={jumpTo}
+          onClose={closeStory}
+          onPoster={() => {
+            setPosterDesign('record')
+            jumpTo('poster')
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -3862,3 +3862,926 @@ a.button {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* =================================================================
+   The Long Play: the record played back, a track at a time
+   ================================================================= */
+
+.lp {
+  position: fixed;
+  /* The large viewport, so on iPhone the story runs on under Safari's floating toolbar instead of the page peeking through */
+  inset: 0 0 auto;
+  height: 100lvh;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 28px;
+  background: var(--bg);
+  overscroll-behavior: none;
+  animation: lp-in 0.35s ease-out;
+}
+
+/* On a phone the story is the whole screen: nothing of the page behind it should show, even mid-drag */
+@media (max-width: 699px), (max-height: 559px) {
+  html.lp-open #root {
+    visibility: hidden;
+  }
+}
+
+@keyframes lp-in {
+  from { opacity: 0; }
+}
+
+/* Sizes inside are in container units, so a slide reads the same on a phone and in the desktop frame */
+.lp__frame {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  container-type: size;
+  background: var(--bg);
+  color: var(--text);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  outline: none;
+  cursor: pointer;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.35s;
+}
+
+/* Following a finger down, about to be put away */
+.lp__frame.is-dragging {
+  transition: none;
+  border-radius: 24px;
+}
+
+/* Wider screens: a phone-shaped frame, with arrows either side */
+@media (min-width: 700px) and (min-height: 560px) {
+  .lp {
+    align-items: center;
+    background: rgba(6, 5, 9, 0.95);
+  }
+
+  .lp__frame {
+    width: auto;
+    height: min(calc(100dvh - 48px), 920px);
+    aspect-ratio: 9 / 16;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+  }
+}
+
+.lp__step {
+  display: none;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: rgba(244, 241, 234, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.lp__step:hover:not(:disabled) {
+  background: rgba(244, 241, 234, 0.14);
+}
+
+.lp__step:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+@media (min-width: 700px) and (min-height: 560px) {
+  .lp__step {
+    display: grid;
+  }
+}
+
+/* Progress, grouped by side, then which side you're on */
+.lp__chrome {
+  flex-shrink: 0;
+  padding: calc(env(safe-area-inset-top) + 10px) 5cqw 0;
+  transition: opacity 0.25s;
+}
+
+.lp__frame.is-holding .lp__chrome {
+  opacity: 0;
+}
+
+.lp__bars {
+  display: flex;
+  gap: 8px;
+}
+
+.lp__bar-group {
+  display: flex;
+  flex-basis: 0;
+  gap: 3px;
+}
+
+.lp__bar-group > span {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(244, 241, 234, 0.18);
+}
+
+.lp__bar-group > span.is-done,
+.lp__fill {
+  background: var(--text);
+}
+
+.lp__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
+}
+
+.lp__head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.lp__side {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+
+.lp__side-label {
+  font-family: var(--mono);
+  font-size: max(11px, 3cqw);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.lp__side-title {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: max(17px, 5cqw);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.lp__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lp__icon:hover {
+  background: rgba(244, 241, 234, 0.1);
+}
+
+/* A slide: the track's number and name, its chart, then the words */
+.lp__slide {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 3cqw 6cqw calc(env(safe-area-inset-bottom) + 5cqw);
+}
+
+.lp__track {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 4cqw;
+  margin-bottom: 5cqw;
+  animation: lp-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lp__num {
+  font-size: max(48px, 16cqw);
+  font-weight: 800;
+  line-height: 0.8;
+  letter-spacing: -0.06em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(244, 241, 234, 0.32);
+}
+
+.lp__track h2 {
+  font-size: max(28px, 9cqw);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.lp__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5cqw;
+}
+
+.lp__chart {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5cqw;
+  animation: lp-rise 0.7s 0.08s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lp__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.lp__words {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqw;
+  animation: lp-rise 0.7s 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lp__takeaway {
+  margin: 0;
+  font-size: max(17px, 4.9cqw);
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.lp__takeaway em {
+  font-size: 1.16em;
+}
+
+.lp__lede {
+  margin: 0;
+  font-size: max(14px, 3.8cqw);
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.lp__foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin-top: 4cqw;
+}
+
+.lp__hint {
+  margin: 0;
+  font-size: max(13px, 3.6cqw);
+  color: var(--faint);
+}
+
+.lp__empty {
+  margin: auto 0;
+  color: var(--muted);
+}
+
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes lp-show {
+  from { opacity: 0; }
+}
+
+@keyframes lp-wipe {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+.lp__wipe {
+  animation: lp-wipe 1.5s 0.2s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Chart text, in the SVGs' own units */
+.lp__axis {
+  fill: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.lp__axis--start {
+  text-anchor: start;
+}
+
+.lp__grid {
+  stroke: var(--line);
+}
+
+.lp__grid--mid {
+  stroke: var(--line-strong);
+  stroke-dasharray: 3 4;
+}
+
+/* The record: the sleeve's blank one, and A1's, pressed while you watch */
+.lp__platter {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.lp__disc {
+  position: relative;
+}
+
+.lp__disc canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.lp__spin {
+  position: absolute;
+  inset: 0;
+  animation: lp-spin 40s linear infinite;
+}
+
+.lp__frame.is-paused .lp__spin {
+  animation-play-state: paused;
+}
+
+@keyframes lp-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The light on the vinyl stays put while the record turns under it */
+.lp__sheen {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from -60deg, transparent 0 2%, rgba(255, 255, 255, 0.1) 9%, transparent 17% 50%, rgba(255, 255, 255, 0.1) 59%, transparent 67%);
+  mix-blend-mode: screen;
+}
+
+.lp__arm {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The arm follows the pressing frame by frame, so it shouldn't lag behind */
+.lp__arm .tonearm__arm {
+  transition-duration: 0.12s;
+  transition-timing-function: linear;
+}
+
+.lp__readout {
+  flex-shrink: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: max(12px, 3.4cqw);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The sleeve: the blank record over the tracklist, like the back of an album */
+.lp__sleeve {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5cqw;
+}
+
+.lp__sleeve-copy {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5cqw;
+  animation: lp-rise 0.7s 0.12s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lp__tracklist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4cqw 5cqw;
+}
+
+.lp__tracklist-side {
+  margin: 0 0 1.4cqw;
+  font-family: var(--mono);
+  font-size: max(10px, 2.8cqw);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+
+.lp__tracklist-side span {
+  margin-left: 4px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.45em;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.lp__tracklist ol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8cqw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp__tracklist li {
+  display: flex;
+  gap: 2.4cqw;
+  font-size: max(14px, 3.9cqw);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lp__tracklist li span {
+  padding-top: 0.12em;
+  font-family: var(--mono);
+  font-size: 0.82em;
+  font-weight: 500;
+  color: var(--faint);
+}
+
+/* A2 Eras */
+.lp__stream {
+  stroke: var(--bg);
+  stroke-width: 1;
+}
+
+.lp__stream-label {
+  fill: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(11, 10, 15, 0.55);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.lp__eras {
+  display: flex;
+  flex-direction: column;
+  gap: 2.6cqw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp__eras li {
+  display: flex;
+  flex-direction: column;
+  padding-left: 3cqw;
+  border-left: 3px solid var(--c);
+}
+
+.lp__eras b {
+  font-size: max(15px, 4.3cqw);
+  line-height: 1.2;
+}
+
+.lp__eras span {
+  font-family: var(--mono);
+  font-size: max(11px, 3.1cqw);
+  color: var(--muted);
+}
+
+/* A3 The Race */
+.lp__race-date {
+  margin: 0;
+  text-align: right;
+  font-size: max(30px, 10cqw);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp__race {
+  --row: max(42px, 11.5cqw);
+  position: relative;
+  height: calc(var(--rows) * var(--row));
+}
+
+.lp__race-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--row);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+  column-gap: 8px;
+  transition: transform 0.35s ease, opacity 0.35s;
+}
+
+.lp__race-name {
+  grid-row: 1;
+  overflow: hidden;
+  line-height: 1.25;
+  font-size: max(13px, 3.9cqw);
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lp__race-ms {
+  grid-row: 1;
+  grid-column: 2;
+  font-family: var(--mono);
+  font-size: max(11px, 3.2cqw);
+  color: var(--muted);
+  text-align: right;
+}
+
+.lp__race-bar {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  height: max(8px, 2.4cqw);
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--c);
+}
+
+/* B1 Around the Clock */
+.lp__clock {
+  max-width: min(100%, 44cqh);
+  margin: 0 auto;
+}
+
+.lp__ring {
+  fill: none;
+  stroke: var(--line);
+}
+
+.lp__wedge {
+  fill: var(--accent);
+  opacity: 0.45;
+  transform-origin: 150px 150px;
+  animation: lp-grow 0.5s calc(0.2s + var(--i) * 25ms) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lp__wedge.is-peak {
+  opacity: 1;
+}
+
+@keyframes lp-grow {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+.lp__clock-peak {
+  fill: var(--text);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.lp__parts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3cqw 5cqw;
+  margin: 0;
+}
+
+.lp__parts div {
+  min-width: 0;
+}
+
+.lp__parts dt {
+  font-family: var(--mono);
+  font-size: max(10px, 2.8cqw);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--faint);
+}
+
+.lp__parts dd {
+  overflow: hidden;
+  margin: 0;
+  font-size: max(14px, 4cqw);
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* B3 Love / Hate */
+.lp__dot {
+  fill: rgba(244, 241, 234, 0.3);
+  animation: lp-show 0.4s calc(0.2s + var(--i) * 15ms) both;
+}
+
+.lp__pick-num {
+  fill: #0b0a0f;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.lp__picks {
+  display: flex;
+  flex-direction: column;
+  gap: 2.6cqw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp__picks li {
+  display: flex;
+  align-items: center;
+  gap: 3cqw;
+}
+
+.lp__picks .cover {
+  flex-shrink: 0;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--c);
+}
+
+.lp__picks div,
+.lp__topsong div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lp__picks span,
+.lp__topsong span {
+  font-family: var(--mono);
+  font-size: max(10px, 2.8cqw);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--c, var(--accent));
+}
+
+.lp__picks b,
+.lp__topsong b {
+  overflow: hidden;
+  font-size: max(15px, 4.3cqw);
+  line-height: 1.15;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lp__picks small,
+.lp__topsong small {
+  font-size: max(12px, 3.3cqw);
+  color: var(--muted);
+}
+
+/* C1 Constellation */
+.lp__sky {
+  max-height: 100%;
+}
+
+.lp__link {
+  stroke: var(--text);
+  stroke-opacity: 0.22;
+}
+
+.lp__link.is-on {
+  stroke: var(--accent);
+  stroke-opacity: 0.95;
+}
+
+.lp__star {
+  animation: lp-show 0.6s calc(0.2s + var(--i) * 60ms) both;
+}
+
+.lp__star-label {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+/* C2 Pulse */
+.lp__ridge {
+  animation: lp-rise 0.6s calc(0.2s + var(--i) * 70ms) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lp__ridge-fill {
+  fill: var(--bg);
+}
+
+.lp__ridge-line {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 1.6;
+}
+
+.lp__ridge-label {
+  animation: lp-show 0.6s calc(0.4s + var(--i) * 70ms) both;
+  fill: var(--c);
+  font-size: 11px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+/* C3 The Charts */
+.lp__chartlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2.8cqw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp__chartlist li {
+  display: flex;
+  align-items: center;
+  gap: 3.4cqw;
+  animation: lp-rise 0.5s calc(0.15s + var(--i) * 70ms) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lp__rank {
+  width: 0.9em;
+  font-size: max(30px, 9cqw);
+  font-weight: 800;
+  line-height: 0.8;
+  letter-spacing: -0.05em;
+  text-align: right;
+  color: transparent;
+  -webkit-text-stroke: 1.2px rgba(244, 241, 234, 0.4);
+}
+
+.lp__chartlist .cover,
+.lp__topsong .cover {
+  flex-shrink: 0;
+  border-radius: 5px;
+}
+
+.lp__chartlist div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 8px;
+}
+
+.lp__chartlist b {
+  overflow: hidden;
+  font-size: max(15px, 4.4cqw);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lp__chartlist span {
+  font-family: var(--mono);
+  font-size: max(11px, 3.1cqw);
+  color: var(--muted);
+}
+
+.lp__chartlist i {
+  grid-column: 1 / -1;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--c);
+}
+
+.lp__topsong {
+  display: flex;
+  align-items: center;
+  gap: 3.4cqw;
+  padding-top: 4cqw;
+  border-top: 1px solid var(--line);
+}
+
+/* Short phones: the top song makes way for the top five */
+@container (max-height: 700px) {
+  .lp__topsong {
+    display: none;
+  }
+}
+
+/* D1 Liner Notes */
+.lp__holo {
+  max-width: none;
+  box-shadow: none;
+}
+
+.lp__holo .holo__inner {
+  padding: 4cqw 5cqw;
+}
+
+.lp__holo .holo__title {
+  font-size: max(22px, 7cqw);
+}
+
+.lp__holo .radar {
+  max-width: min(62cqw, 30cqh);
+}
+
+.lp__notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3cqw;
+  margin: 0;
+}
+
+.lp__notes dt {
+  font-family: var(--mono);
+  font-size: max(9px, 2.6cqw);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+.lp__notes dd {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.lp__notes b {
+  font-size: max(15px, 4.4cqw);
+  line-height: 1.15;
+}
+
+.lp__notes span {
+  overflow: hidden;
+  font-size: max(11px, 3cqw);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+/* D2 The Poster */
+.lp__chart--poster {
+  align-items: center;
+}
+
+.lp__poster {
+  display: block;
+  border-radius: 6px;
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.9);
+}
+
+.lp__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lp__actions .button {
+  flex: 1;
+  justify-content: center;
+}
+
+.lp__actions .button--big {
+  flex-basis: 100%;
+}
