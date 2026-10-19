@@ -20,7 +20,7 @@ interface Props {
   artists: string[]
   firstHeard: Map<string, number>
   colors: Map<string, string>
-  onPoster: () => void
+  onPoster?: () => void
 }
 
 const noop = () => {}
@@ -152,24 +152,41 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
             </g>
           )
         })}
-        {/* No margin for names on a phone: each line is named where it starts, on the flat stretch before you found them */}
+        {/* No margin for names on a phone: each line is named on a flat stretch of its own, the one before you found them
+            or the one after you stopped, and only falls back to the left edge when it has neither. Every name sits on a
+            dark chip in its line's color, so the ridges crossing it never cut through the letters */}
         {narrow &&
           artists.map((artist, row) => {
             const values = series.get(artist)!
             const peak = Math.max(...values, 1)
-            const enters = Math.max(0, values.findIndex((v) => v > peak * 0.04))
+            const active = values.map((v) => v > peak * 0.04)
+            const enters = Math.max(0, active.indexOf(true))
+            const leaves = Math.max(enters, active.lastIndexOf(true))
             const label = artist.length > 20 ? `${artist.slice(0, 19)}…` : artist
-            const fits = x(enters) - left > label.length * 6.4 + 10
+            const textW = label.length * 6.4
+            const base = baseline(row)
+            let tx: number
+            let anchor: 'start' | 'end' = 'start'
+            if (x(enters) - left > textW + 10) {
+              tx = x(enters) - 6
+              anchor = 'end'
+            } else if (left + innerW - x(leaves) > textW + 10) {
+              tx = x(leaves) + 6
+            } else {
+              tx = left + 4
+            }
+            const chipX = (anchor === 'end' ? tx - textW : tx) - 4
             return (
-              <text
+              <g
                 key={artist}
-                x={fits ? x(enters) - 6 : left + 2}
-                y={baseline(row) - 4}
-                textAnchor={fits ? 'end' : 'start'}
                 className={shown?.row === row ? 'pulse__tag is-on' : 'pulse__tag'}
+                style={{ ['--c' as string]: colorFor(colors, artist) }}
               >
-                {label}
-              </text>
+                <rect x={chipX} y={base - 16} width={textW + 8} height={14} rx={3} />
+                <text x={tx} y={base - 5.5} textAnchor={anchor}>
+                  {label}
+                </text>
+              </g>
             )
           })}
         {shown && (
@@ -246,9 +263,11 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
               ? 'Tap a line for its hours.'
               : 'Hover a line for its hours, click to keep it.'}
         </span>
-        <button type="button" className="button button--ghost button--small" onClick={onPoster}>
-          Make it a poster →
-        </button>
+        {onPoster && (
+          <button type="button" className="button button--ghost button--small" onClick={onPoster}>
+            Make it a poster →
+          </button>
+        )}
       </div>
     </div>
   )

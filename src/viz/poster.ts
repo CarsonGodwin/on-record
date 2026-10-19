@@ -5,7 +5,6 @@ import { formatDate, formatDuration, formatNumber } from '../lib/format'
 import { mulberry32 } from '../lib/random'
 import { starSize, type Layout } from './constellation'
 import { renderDeepPoster } from './posterDeep'
-import { renderStoryPoster } from './posterStory'
 import {
   DISPLAY,
   MINUTES,
@@ -13,6 +12,7 @@ import {
   SERIF,
   TAU,
   drawRecord,
+  drawGuideLabels,
   fitText,
   mix,
   quietestMinute,
@@ -27,9 +27,15 @@ import {
  * so the small preview and the full-size download are the same picture.
  */
 
-export type PosterDesign = 'record' | 'deep' | 'story' | 'sleeve' | 'annotated' | 'macro' | 'constellation' | 'pulse'
+export type PosterDesign = 'record' | 'deep' | 'sleeve' | 'annotated' | 'macro' | 'constellation' | 'pulse'
 export type PosterSize = 'post' | 'story' | 'print'
-export type PosterPaper = 'midnight' | 'cream'
+/** Midnight and cream carry glows and grain; the solid two are flat color, like the deep dive's */
+export type PosterPaper = 'midnight' | 'cream' | 'black' | 'solid-cream'
+
+/** The designs that offer the solid backgrounds too (the deep dive is always solid) */
+export const SOLID_PAPER_DESIGNS: PosterDesign[] = ['sleeve', 'annotated']
+
+export const isDarkPaper = (paper: PosterPaper) => paper === 'midnight' || paper === 'black'
 
 /** Print stays under iOS Safari's ~16.7 megapixel canvas limit */
 export const POSTER_SIZES: Record<PosterSize, { label: string; ratio: string; width: number; height: number; note: string }> = {
@@ -41,7 +47,6 @@ export const POSTER_SIZES: Record<PosterSize, { label: string; ratio: string; wi
 /** Designs drawn for particular sizes; the rest fit any */
 export const POSTER_DESIGN_SIZES: Partial<Record<PosterDesign, PosterSize[]>> = {
   deep: ['post'],
-  story: ['story'],
 }
 
 export interface PosterData {
@@ -61,7 +66,6 @@ export interface PosterData {
   stats: { hours: number; streams: number; artists: number; peak: string }
   /** How the skip rate climbs or falls the more times a song has been played */
   wearOut: WearOut
-  listener: string
   /** Standout days and runs, for the designs that point them out on the record */
   moments: PosterMoment[]
 }
@@ -121,20 +125,24 @@ interface Paper {
   rule: string
   glow: number
   grain: string
+  dark: boolean
+  /** Flat color: no glows, no grain */
+  solid: boolean
 }
 
 const PAPERS: Record<PosterPaper, Paper> = {
-  midnight: { bg: '#0b0a0f', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.58)', rule: 'rgba(244, 241, 234, 0.2)', glow: 0.32, grain: '255,255,255' },
-  cream: { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.6)', rule: 'rgba(23, 20, 29, 0.22)', glow: 0.14, grain: '23,20,29' },
+  midnight: { bg: '#0b0a0f', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.58)', rule: 'rgba(244, 241, 234, 0.2)', glow: 0.32, grain: '255,255,255', dark: true, solid: false },
+  cream: { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.6)', rule: 'rgba(23, 20, 29, 0.22)', glow: 0.14, grain: '23,20,29', dark: false, solid: false },
+  black: { bg: '#0e0d12', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.58)', rule: 'rgba(244, 241, 234, 0.2)', glow: 0, grain: '255,255,255', dark: true, solid: true },
+  'solid-cream': { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.6)', rule: 'rgba(23, 20, 29, 0.22)', glow: 0, grain: '23,20,29', dark: false, solid: true },
 }
 
 const CAPTIONS: Record<PosterDesign, string> = {
-  record: 'One groove per day, from the label out. Midnight at the top, clockwise.',
+  record: 'Each groove represents a day, from the label out. Midnight at the top, clockwise.',
   deep: '',
-  story: '',
-  sleeve: 'One groove per day, from the label out. Midnight at the top, clockwise.',
-  annotated: 'Fig. 1. One groove per day, label to rim. Midnight at the top, clockwise.',
-  macro: 'One groove per day. Midnight at the top, clockwise.',
+  sleeve: 'Each groove represents a day, from the label out. Midnight at the top, clockwise.',
+  annotated: 'Fig. 1. Each groove represents a day, label to rim. Midnight at the top, clockwise.',
+  macro: 'Each groove represents a day. Midnight at the top, clockwise.',
   constellation: 'Stars are artists, sized by hours. Lines join artists played back to back.',
   pulse: 'One line per artist, in the order you found them, each scaled to its own peak.',
 }
@@ -148,7 +156,6 @@ export interface PosterOptions {
 export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number, data: PosterData, o: PosterOptions) {
   // These two lay themselves out for one size each (see POSTER_DESIGN_SIZES)
   if (o.design === 'deep') return renderDeepPoster(ctx, W, H, data, o.paper)
-  if (o.design === 'story') return renderStoryPoster(ctx, W, H, data, o.paper)
 
   const p = PAPERS[o.paper]
   const u = W / 100
@@ -159,11 +166,13 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
   const rows = ratio > 1.6 ? 4 : ratio > 1.4 ? 3 : 2
   const rowH = 4.3 * u
 
-  // Paper and a couple of soft color glows from your top artists
+  // Paper and a couple of soft color glows from your top artists. The annotated figure, the record and
+  // the solid backgrounds sit on flat paper.
+  const flat = p.solid || o.design === 'annotated' || o.design === 'record'
   ctx.save()
   ctx.fillStyle = p.bg
   ctx.fillRect(0, 0, W, H)
-  const glows: [number, number, string][] = [
+  const glows: [number, number, string][] = flat ? [] : [
     [W * 0.05, H * 0.08, accent],
     [W * 0.95, H * 0.55, data.tracklist[1]?.color ?? '#0ca2bc'],
   ]
@@ -223,8 +232,6 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
     const x = (W - s) / 2
     const y = artTop + (artH - s) / 2
     placeRecord(ctx, data, x, y, s, u, p, accent)
-    const r = s * 0.455
-    sticker(ctx, x + s / 2 + r * 0.78, y + s / 2 - r * 0.86, 8 * u, data.listener, accent)
   } else if (o.design === 'sleeve') {
     sleeveArt(ctx, data, o, box, u, p, accent)
   } else if (o.design === 'annotated') {
@@ -234,7 +241,6 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
     const cx = W / 2
     const cy = artTop + artH / 2
     starChart(ctx, data, cx, cy, R, u, p)
-    sticker(ctx, cx + R * 0.8, cy - R * 0.84, 8 * u, data.listener, accent)
   } else {
     pulseArt(ctx, data, pad, artTop + 1.5 * u, artW, artH - 3 * u, u, p, accent, rows >= 3)
   }
@@ -248,12 +254,12 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
     ctx.fillText(o.title, pad - 0.3 * u, titleY)
     spacing(ctx, '0px')
     ctx.font = `italic ${4.6 * u}px ${SERIF}`
-    ctx.fillStyle = o.paper === 'cream' ? darken(accent) : accent
+    ctx.fillStyle = p.dark ? accent : darken(accent)
     ctx.fillText(data.subtitle, pad, subtitleY)
   }
 
   footer(ctx, data, { listHeadY, listTop, statsY, captionY }, rows, rowH, W, pad, u, p, o.design)
-  grain(ctx, W, H, p)
+  if (o.design !== 'record' && !p.solid) grain(ctx, W, H, p)
   ctx.restore()
 }
 
@@ -332,11 +338,9 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
   const x = cx - s / 2
   const y = cy - s / 2
   placeRecord(ctx, data, x, y, s, u, p, accent)
-  const day = data.moments.find((m) => m.kind === 'day')
-  if (day) highlightDay(ctx, model, x, y, s, day.ring, accent, u)
 
   // The sleeve, casting a soft shadow onto the record
-  const light = o.paper === 'midnight'
+  const light = p.dark
   const cover = light ? '#f4f1ea' : '#17141d'
   const coverInk = light ? '#17141d' : '#f4f1ea'
   ctx.save()
@@ -350,18 +354,15 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
   ctx.fillStyle = accent
   ctx.fillRect(sx, sy, S, S * 0.018)
 
-  // Cover type. The sticker takes one top corner (or the bottom one when the record comes out the top), so the kicker sits in the other
+  // Cover type
   const cp = S * 0.075
   const inner = S - 2 * cp
-  const stickerR = Math.min(8 * u, S * 0.15)
-  const stickerAt: [number, number] =
-    dir === 'left' ? [sx + stickerR * 0.25, sy + stickerR * 0.25] : dir === 'up' ? [sx + S - stickerR * 0.25, sy + S - stickerR * 0.25] : [sx + S - stickerR * 0.25, sy + stickerR * 0.25]
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = coverInk
   ctx.font = `600 ${S * 0.026}px ${MONO}`
   spacing(ctx, '0.2em')
-  ctx.textAlign = dir === 'left' ? 'right' : 'left'
-  ctx.fillText(`SIDE A  ·  33⅓ RPM  ·  ${data.recordTitle}`, dir === 'left' ? sx + S - cp : sx + cp, sy + cp + S * 0.026)
+  ctx.textAlign = 'left'
+  ctx.fillText(`SIDE A  ·  33⅓ RPM  ·  ${data.recordTitle}`, sx + cp, sy + cp + S * 0.026)
   spacing(ctx, '0px')
   ctx.fillStyle = withAlpha(coverInk, 0.25)
   ctx.fillRect(sx + cp, sy + cp + S * 0.05, inner, Math.max(1, 0.1 * u))
@@ -369,26 +370,7 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
   ctx.fillStyle = light ? darken(accent) : accent
   fitText(ctx, data.subtitle, sx + cp, sy + cp + S * 0.16, inner, S * 0.075, `italic {px}px ${SERIF}`)
 
-  // Bottom up: the highlighted day's key (the stats are in the footer already), then the title
-  const keyY = sy + S - cp
-  let titleBase = keyY
-  if (day) {
-    const dotR = S * 0.012
-    const keyW = dir === 'up' ? inner - stickerR * 1.2 : inner
-    ctx.fillStyle = '#ffffff'
-    ctx.strokeStyle = accent
-    ctx.lineWidth = dotR * 0.6
-    ctx.beginPath()
-    ctx.arc(sx + cp + dotR, keyY - dotR * 0.9, dotR, 0, TAU)
-    ctx.fill()
-    ctx.stroke()
-    ctx.fillStyle = coverInk
-    ctx.font = `600 ${S * 0.024}px ${MONO}`
-    spacing(ctx, '0.16em')
-    ctx.fillText(ellipsize(ctx, `${day.label}  ·  ${day.detail.toUpperCase()}  ·  ${day.value.toUpperCase()}`, keyW - dotR * 3), sx + cp + dotR * 3, keyY)
-    spacing(ctx, '0px')
-    titleBase = keyY - S * 0.075
-  }
+  const titleBase = sy + S - cp
 
   // The title, broken onto two lines when that lets it run bigger
   const lines = splitTitle(o.title)
@@ -399,8 +381,6 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
   ctx.fillStyle = coverInk
   lines.forEach((line, i) => ctx.fillText(line, sx + cp - px * 0.03, titleBase - (lines.length - 1 - i) * px * 0.92))
   spacing(ctx, '0px')
-
-  sticker(ctx, stickerAt[0], stickerAt[1], stickerR, data.listener, accent)
 }
 
 /** The record as a numbered figure, with callouts for your standout days in the margins */
@@ -570,11 +550,13 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
 
   // Drawn at poster width and scaled up, so hairlines and small type keep their poster size
   const k = size / W
-  ctx.save()
-  ctx.translate(cx, cy)
-  ctx.scale(k, k)
-  ctx.translate(-W / 2, -W / 2)
-  drawRecord(ctx, model, {
+  const recordSpace = () => {
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.scale(k, k)
+    ctx.translate(-W / 2, -W / 2)
+  }
+  const recordOptions = {
     size: W,
     colors: data.recordColors,
     focus: null,
@@ -587,7 +569,11 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
     // Month tags run just inside the edge of the visible quarter
     guideMinute: best * 360 + 315,
     zoom: k,
-  })
+    // They go on after the highlighted day and session, so those lines run under the tags
+    noGuideLabels: true,
+  }
+  recordSpace()
+  drawRecord(ctx, model, recordOptions)
   ctx.restore()
 
   // Repaint the label so only our type is on it
@@ -605,38 +591,71 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   const day = data.moments.find((m) => m.kind === 'day')
   const session = data.moments.find((m) => m.kind === 'session')
   if (day) highlightDay(ctx, model, origin.x, origin.y, size, day.ring, accent, u)
-  const tags: { x0: number; x1: number; y0: number; y1: number }[] = []
-  for (const m of [day, session]) {
-    if (!m) continue
-    const inQuarter = (min: number) => Math.floor(min / 360) === best
+  type Rect = { x0: number; x1: number; y0: number; y1: number }
+  const hits = (a: Rect, b: Rect, gap: number) => a.x0 < b.x1 + gap && a.x1 > b.x0 - gap && a.y0 < b.y1 + gap && a.y1 > b.y0 - gap
+  const inQuarter = (min: number) => Math.floor(min / 360) === best
+  const dotR = 0.6 * u
+  const th = 3 * u
+  ctx.font = `600 ${1.35 * u}px ${MONO}`
+  spacing(ctx, '0.14em')
+  const pins = [day, session].flatMap((m) => {
+    if (!m) return []
     const preferred = m.from !== undefined && m.to !== undefined ? (m.from + m.to) / 2 : busiestMinute(model, m.ring)
     const pt = groovePoint(model, origin.x, origin.y, size, m.ring, inQuarter(preferred) ? preferred : best * 360 + 180)
     const fromCenter = Math.hypot(pt.x - cx, pt.y - cy)
-    if (pt.x < pad || pt.x > W - pad || pt.y < pad + 4 * u || pt.y > H - pad - 4 * u || fromCenter < lr + 4 * u) continue
-
+    if (pt.x < pad || pt.x > W - pad || pt.y < pad + 4 * u || pt.y > H - pad - 4 * u || fromCenter < lr + 4 * u) return []
     const text = `${m.label}  ·  ${m.detail.toUpperCase()}  ·  ${m.value.toUpperCase()}`
-    ctx.font = `600 ${1.35 * u}px ${MONO}`
-    spacing(ctx, '0.14em')
     const tw = Math.min(ctx.measureText(text).width, W - 2 * pad - 2.4 * u)
-    const th = 3 * u
-    const above = pt.y > H / 2
-    const ty = above ? pt.y - 6 * u - th : pt.y + 6 * u
-    const tx = Math.min(Math.max(pt.x - tw / 2 - 1.2 * u, pad), W - pad - tw - 2.4 * u)
-    const box = { x0: tx, x1: tx + tw + 2.4 * u, y0: ty, y1: ty + th }
-    if (tags.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 + u && box.y1 > b.y0 - u)) {
-      spacing(ctx, '0px')
-      continue
-    }
-    tags.push(box)
+    const dot = { x0: pt.x - dotR, x1: pt.x + dotR, y0: pt.y - dotR, y1: pt.y + dotR }
+    return [{ m, pt, text, tw, dot }]
+  })
 
-    if (m.kind === 'session' && m.from !== undefined && m.to !== undefined) {
-      const r = g.inner + (m.ring + 0.5) * g.ring
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = Math.max(g.ring * 1.6, 0.25 * u)
-      ctx.beginPath()
-      ctx.arc(cx, cy, r, (m.from / MINUTES) * TAU - Math.PI / 2, Math.max((m.to / MINUTES) * TAU - Math.PI / 2, (m.from / MINUTES) * TAU - Math.PI / 2 + 0.01))
-      ctx.stroke()
+  // Every dot is fixed, so each tag and its leader keep clear of the dots and of the tags placed before it,
+  // stepping farther out or flipping sides until they fit
+  const taken: Rect[] = pins.map((t) => t.dot)
+  const tags = pins.flatMap((t) => {
+    const { pt, tw } = t
+    const tx = Math.min(Math.max(pt.x - tw / 2 - 1.2 * u, pad), W - pad - tw - 2.4 * u)
+    const prefersAbove = pt.y > H / 2
+    for (const above of [prefersAbove, !prefersAbove]) {
+      for (const gap of [6, 10, 14, 18]) {
+        const ty = above ? pt.y - gap * u - th : pt.y + gap * u
+        if (ty < pad || ty + th > H - pad) continue
+        const box = { x0: tx, x1: tx + tw + 2.4 * u, y0: ty, y1: ty + th }
+        const leader = above
+          ? { x0: pt.x - 0.2 * u, x1: pt.x + 0.2 * u, y0: box.y1, y1: pt.y - dotR }
+          : { x0: pt.x - 0.2 * u, x1: pt.x + 0.2 * u, y0: pt.y + dotR, y1: box.y0 }
+        const others = taken.filter((r) => r !== t.dot)
+        if (others.some((r) => hits(box, r, u)) || others.some((r) => hits(leader, r, 0.4 * u))) continue
+        taken.push(box, leader)
+        return [{ ...t, box, above }]
+      }
     }
+    return []
+  })
+
+  // The session's stretch of groove, then the month tags over both lines, then the pins and their tags
+  for (const { m } of tags) {
+    if (m.kind !== 'session' || m.from === undefined || m.to === undefined) continue
+    const r = g.inner + (m.ring + 0.5) * g.ring
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = Math.max(g.ring * 1.6, 0.25 * u)
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, (m.from / MINUTES) * TAU - Math.PI / 2, Math.max((m.to / MINUTES) * TAU - Math.PI / 2, (m.from / MINUTES) * TAU - Math.PI / 2 + 0.01))
+    ctx.stroke()
+  }
+  // In record space, where the poster is scaled up by k
+  const guideAvoid = [
+    ...(day ? [{ ring: day.ring, halfWidth: Math.max(g.ring * 2.4, 0.3 * u) / 2 / k }] : []),
+    ...tags.flatMap(({ m }) => (m.kind === 'session' ? [{ ring: m.ring, halfWidth: Math.max(g.ring * 1.6, 0.25 * u) / 2 / k, from: m.from, to: m.to }] : [])),
+  ]
+  recordSpace()
+  const toRecord = (r: Rect) => ({ x0: (r.x0 - cx) / k + W / 2, y0: (r.y0 - cy) / k + W / 2, x1: (r.x1 - cx) / k + W / 2, y1: (r.y1 - cy) / k + W / 2 })
+  drawGuideLabels(ctx, model.days, { ...recordOptions, guideAvoid, guideBlocked: taken.filter((r) => !pins.some((t) => t.dot === r && !tags.some((d) => d.dot === r))).map(toRecord) })
+  ctx.restore()
+  ctx.font = `600 ${1.35 * u}px ${MONO}`
+  spacing(ctx, '0.14em')
+  for (const { pt, box, above } of tags) {
     ctx.strokeStyle = '#ffffff'
     ctx.lineWidth = Math.max(1, 0.14 * u)
     ctx.beginPath()
@@ -647,18 +666,20 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
     ctx.strokeStyle = accent
     ctx.lineWidth = 0.2 * u
     ctx.beginPath()
-    ctx.arc(pt.x, pt.y, 0.6 * u, 0, TAU)
+    ctx.arc(pt.x, pt.y, dotR, 0, TAU)
     ctx.fill()
     ctx.stroke()
+  }
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  for (const { text, tw, box } of tags) {
     ctx.fillStyle = 'rgba(11, 10, 15, 0.88)'
     roundRect(ctx, box.x0, box.y0, box.x1 - box.x0, th, th / 2)
     ctx.fill()
     ctx.fillStyle = '#f4f1ea'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(ellipsize(ctx, text, tw), tx + 1.2 * u, ty + th / 2 + 0.1 * u)
-    spacing(ctx, '0px')
+    ctx.fillText(ellipsize(ctx, text, tw), box.x0 + 1.2 * u, box.y0 + th / 2 + 0.1 * u)
   }
+  spacing(ctx, '0px')
 
   // Type on the label, tucked into the corner
   const right = cx > 0
@@ -686,9 +707,9 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   at += stack[2]
   fitText(ctx, data.subtitle, tx, at, tw, 4 * u, `italic {px}px ${SERIF}`)
   at += stack[3]
-  ctx.font = `600 ${1.35 * u}px ${MONO}`
   spacing(ctx, '0.14em')
-  ctx.fillText(ellipsize(ctx, `${formatNumber(data.stats.hours)} HRS  ·  ${formatNumber(data.stats.artists)} ARTISTS`, tw), tx, at)
+  measureFit(ctx, `${formatNumber(data.stats.hours)} HRS  ·  ${formatNumber(data.stats.artists)} ARTISTS`, tw, 1.35 * u, `600 {px}px ${MONO}`)
+  ctx.fillText(`${formatNumber(data.stats.hours)} HRS  ·  ${formatNumber(data.stats.artists)} ARTISTS`, tx, at)
   spacing(ctx, '0px')
 
   // A key to the colors in the far corner, mostly over bare paper past the rim
@@ -1003,43 +1024,6 @@ function pulseArt(
   })
 }
 
-/** A round "listener type" sticker, slapped on at an angle like a price tag on a sleeve */
-function sticker(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, listener: string, color: string) {
-  const words = listener.replace(/^the\s+/i, '').toUpperCase().split(/\s+/)
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.rotate(-0.2)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
-  ctx.shadowBlur = r * 0.25
-  ctx.shadowOffsetY = r * 0.06
-  ctx.fillStyle = color
-  ctx.beginPath()
-  ctx.arc(0, 0, r, 0, TAU)
-  ctx.fill()
-  ctx.shadowColor = 'transparent'
-  ctx.strokeStyle = 'rgba(11, 10, 15, 0.35)'
-  ctx.lineWidth = r * 0.025
-  ctx.beginPath()
-  ctx.arc(0, 0, r * 0.86, 0, TAU)
-  ctx.stroke()
-
-  ctx.fillStyle = '#0b0a0f'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.font = `600 ${r * 0.12}px ${MONO}`
-  spacing(ctx, '0.18em')
-  ctx.fillText('LISTENER TYPE', 0, -r * 0.5)
-  spacing(ctx, '0px')
-  ctx.font = `italic ${r * 0.26}px ${SERIF}`
-  ctx.fillText('the', 0, -r * 0.27)
-  const lineH = r * 0.3
-  const startY = -((words.length - 1) * lineH) / 2 + r * 0.1
-  words.forEach((word, i) => {
-    fitText(ctx, word, 0, startY + i * lineH, r * 1.45, r * 0.3, `800 {px}px ${DISPLAY}`)
-  })
-  ctx.restore()
-}
-
 // ---------- Footer ----------
 
 function footer(
@@ -1103,7 +1087,7 @@ function footer(
   ctx.textAlign = 'left'
   ctx.fillStyle = p.ink
   spacing(ctx, '0.12em')
-  const stats = `${formatNumber(data.stats.hours)} HOURS  ·  ${formatNumber(data.stats.streams)} STREAMS  ·  ${formatNumber(data.stats.artists)} ARTISTS  ·  PEAK ${data.stats.peak.toUpperCase()}`
+  const stats = `${formatNumber(data.stats.hours)} HOURS  ·  ${formatNumber(data.stats.streams)} STREAMS  ·  ${formatNumber(data.stats.artists)} ARTISTS  ·  PEAK TIME ${data.stats.peak.toUpperCase()}`
   measureFit(ctx, stats, W - 2 * pad, 1.7 * u, `600 {px}px ${MONO}`)
   ctx.fillText(stats, pad, at.statsY)
   spacing(ctx, '0px')

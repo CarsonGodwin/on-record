@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { SongStat } from '../data/insights'
 import { formatDuration, formatNumber, formatPercent } from '../lib/format'
 import { usePageScroll, useWidth } from '../lib/hooks'
@@ -31,6 +31,17 @@ export function LoveHate({ songs, skipRate }: Props) {
   const [pinned, setPinned] = useState<{ i: number; x: number; pageY: number } | null>(null)
   const scrollY = usePageScroll(pinned !== null)
   const narrow = width < 600
+
+  // The pinned tip rides along with page scroll, so drop it once the chart is out of view
+  useEffect(() => {
+    const el = ref.current
+    if (!pinned || !el) return
+    const io = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) setPinned(null)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [pinned])
 
   const minPlays = Math.min(...songs.map((s) => s.plays))
   const maxPlays = Math.max(...songs.map((s) => s.plays))

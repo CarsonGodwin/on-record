@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mylisteningrecord.com/sitemap.xml

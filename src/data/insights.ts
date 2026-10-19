@@ -1,9 +1,10 @@
 import type { Play } from '../types'
-import { COUNTED_PLAY_MS, dayNumber, fromDayNumber, isSkip, startDate, trackKey } from './stats'
+import { formatDate, formatDuration, formatHour, formatNumber, formatTime } from '../lib/format'
+import { COUNTED_PLAY_MS, dayNumber, fromDayNumber, isSkip, startDate, trackKey, type FunStats, type Summary } from './stats'
 
 /*
  * The more opinionated aggregations behind the visualizations: time bins,
- * eras, the artist race, sessions, the artist graph and the listener profile.
+ * eras, the artist race, sessions, the artist graph and the liner notes takes.
  * Like stats.ts, everything uses local time and when a play started.
  */
 
@@ -219,6 +220,9 @@ export function hourProfile(plays: Play[]): HourSlot[] {
 export interface Daypart {
   label: string
   hours: string
+  /** Hour the part starts, and the hour after it ends */
+  from: number
+  to: number
   artist: string | null
   ms: number
 }
@@ -241,7 +245,7 @@ export function dayparts(plays: Play[]): Daypart[] {
   }
   return DAYPARTS.map((d, i) => {
     const [top] = topEntries(maps[i], 1)
-    return { label: d.label, hours: d.hours, artist: top?.[0] ?? null, ms: top?.[1] ?? 0 }
+    return { label: d.label, hours: d.hours, from: d.from, to: d.to, artist: top?.[0] ?? null, ms: top?.[1] ?? 0 }
   })
 }
 
@@ -538,79 +542,170 @@ export function records(plays: Play[], sessionList: Session[]): Records {
   }
 }
 
-// ---------- Listener profile ----------
+// ---------- Liner notes headline ----------
 
-export interface Trait {
-  label: string
-  /** 0–1 */
-  value: number
-  detail: string
+export interface Take {
+  /** The line itself, said plainly */
+  text: string
+  /** What it rests on, in small print */
+  proof: string
+  /** 0–1, how unusual it is */
+  score: number
 }
 
-export interface Profile {
-  title: string
-  traits: Trait[]
-}
+/**
+ * The most telling things in the data, as one-liners that could only be
+ * about you, most unusual first. Each candidate scores 0–1 on how far it
+ * sits from the ordinary, so a contradiction or an obsession beats a total.
+ */
+export function takes(plays: Play[], summary: Summary, rec: Records, fun: FunStats, hours: HourSlot[], isAllTime: boolean): Take[] {
+  const clamp = (v: number) => Math.max(0, Math.min(1, v))
+  const pct = (f: number) => `${Math.round(f * 100)}%`
+  const out: Take[] = []
 
-/** Five habits, each placed on a 0–1 scale, plus a name for the combination */
-export function listenerProfile(plays: Play[], hours: HourSlot[], skipRate: number, shuffleRate: number): Profile {
-  const total = sum(hours.map((h) => h.ms)) || 1
-  const night = sum(hours.filter((h) => h.hour >= 21 || h.hour < 5).map((h) => h.ms)) / total
-
-  const artistMs = new Map<string, number>()
-  let musicMs = 0
+  const artists = new Map<string, { ms: number; starts: number; skips: number }>()
   for (const p of plays) {
     if (p.kind !== 'track') continue
-    musicMs += p.msPlayed
-    artistMs.set(p.artist, (artistMs.get(p.artist) ?? 0) + p.msPlayed)
+    let a = artists.get(p.artist)
+    if (!a) {
+      a = { ms: 0, starts: 0, skips: 0 }
+      artists.set(p.artist, a)
+    }
+    a.ms += p.msPlayed
+    a.starts++
+    if (isSkip(p)) a.skips++
   }
-  const top5 = sum(topEntries(artistMs, 5).map(([, ms]) => ms)) / (musicMs || 1)
-  const artistsPer100h = artistMs.size / Math.max(musicMs / 3_600_000 / 100, 0.01)
 
-  const clamp = (v: number) => Math.max(0, Math.min(1, v))
-  const traits: Trait[] = [
-    {
-      label: 'Night owl',
-      value: clamp(night / 0.5),
-      detail: `${Math.round(night * 100)}% of your listening happens between 9 PM and 5 AM`,
-    },
-    {
-      label: 'Loyalty',
-      value: clamp((top5 - 0.05) / 0.55),
-      detail: `Your top 5 artists are ${Math.round(top5 * 100)}% of your music`,
-    },
-    {
-      label: 'Discovery',
-      value: clamp(Math.log10(Math.max(artistsPer100h, 1)) / Math.log10(150)),
-      detail: `${Math.round(artistsPer100h)} different artists per 100 hours of music`,
-    },
-    {
-      label: 'Patience',
-      value: clamp(1 - skipRate / 0.5),
-      detail: `You skip ${Math.round(skipRate * 100)}% of songs`,
-    },
-    {
-      label: 'Chaos',
-      value: clamp(shuffleRate),
-      detail: `Shuffle is on for ${Math.round(shuffleRate * 100)}% of songs`,
-    },
-  ]
+  // A heavy skipper with one artist they let play out
+  if (summary.skipRate >= 0.15) {
+    let spared: [string, { starts: number; skips: number }] | null = null
+    for (const entry of artists) {
+      const [, a] = entry
+      if (a.starts < 20) continue
+      const rate = a.skips / a.starts
+      const best = spared ? spared[1].skips / spared[1].starts : Infinity
+      if (rate < best || (rate === best && a.starts > spared![1].starts)) spared = entry
+    }
+    // Only a contrast if they get skipped at half the usual rate or less
+    if (spared && spared[1].skips / spared[1].starts <= summary.skipRate / 2) {
+      const [name, a] = spared
+      const rate = a.skips / a.starts
+      out.push({
+        text:
+          a.skips === 0
+            ? `Skips ${pct(summary.skipRate)} of everything. Never skipped ${name}, not once.`
+            : `Skips ${pct(summary.skipRate)} of everything, but only ${pct(rate)} of ${name}.`,
+        proof: `${formatNumber(a.starts)} plays of ${name}, ${formatNumber(a.skips)} skipped`,
+        score: clamp((summary.skipRate - rate) / 0.35) * 0.95,
+      })
+    }
+  }
 
-  const peak = hours.reduce((best, h) => (h.ms > best.ms ? h : best), hours[0]).hour
-  const adjective =
-    traits[0].value >= 0.7 ? 'Nocturnal' : peak < 12 && peak >= 5 ? 'Early-Rising' : peak < 17 && peak >= 12 ? 'Sunlit' : 'Twilight'
+  if (rec.evergreen && rec.evergreen.activeMonths >= 6) {
+    const e = rec.evergreen
+    out.push({
+      text: `Played “${e.title}” in ${e.months} of the ${e.activeMonths} months you listened.`,
+      proof: `${e.artist}. No song turned up in more months`,
+      score: clamp((e.months / e.activeMonths - 0.35) / 0.5),
+    })
+  }
 
-  const nouns: [string, number][] = [
-    ['Loyalist', traits[1].value],
-    ['Explorer', traits[2].value],
-    ['Completionist', traits[3].value * 0.9],
-    ['Skipper', 1 - traits[3].value],
-    ['Shuffler', traits[4].value * 0.85],
-    ['Purist', (1 - traits[4].value) * 0.85],
-  ]
-  const noun = nouns.reduce((best, n) => (n[1] > best[1] ? n : best))[0]
+  if (fun.onRepeat && fun.onRepeat.count >= 6) {
+    const r = fun.onRepeat
+    out.push({
+      text: `Played “${r.title}” ${r.count} times in one day.`,
+      proof: `${r.artist}, ${formatDate(r.date)}`,
+      score: clamp((r.count - 5) / 20),
+    })
+  }
 
-  return { title: `The ${adjective} ${noun}`, traits }
+  const total = sum(hours.map((h) => h.ms)) || 1
+  const night = sum(hours.filter((h) => h.hour >= 21 || h.hour < 5).map((h) => h.ms)) / total
+  const morning = sum(hours.filter((h) => h.hour >= 5 && h.hour < 10).map((h) => h.ms)) / total
+  const peak = hours.reduce((best, h) => (h.ms > best.ms ? h : best), hours[0])
+  if (night >= 0.3) {
+    out.push({
+      text: `${pct(night)} of it was played after 9 PM.`,
+      proof: `Between 9 PM and 5 AM. Busiest hour: ${formatHour(peak.hour)}`,
+      score: clamp((night - 0.25) / 0.35),
+    })
+  } else if (morning >= 0.25) {
+    const early = hours.filter((h) => h.hour >= 5 && h.hour < 10).reduce((best, h) => (h.ms > best.ms ? h : best))
+    out.push({
+      text: `Already listening by ${formatHour(early.hour)}, most days.`,
+      proof: `${pct(morning)} of your listening happens between 5 and 10 AM`,
+      score: clamp((morning - 0.2) / 0.3) * 0.8,
+    })
+  }
+
+  const [top] = topEntries(new Map([...artists].map(([name, a]) => [name, a.ms])), 1)
+  if (top && summary.musicMs > 0) {
+    const share = top[1] / summary.musicMs
+    if (share >= 0.12) {
+      // "One in every N" only reads true while N rounds honestly; past that, count in tens
+      const often =
+        share >= 0.95
+          ? 'Nearly every minute'
+          : share >= 0.4
+            ? `${Math.round(share * 10)} of every 10 minutes`
+            : `One in every ${Math.round(1 / share)} minutes`
+      out.push({
+        text: `${often} was ${top[0]}.`,
+        proof: `${formatDuration(top[1])} of ${top[0]}, ${pct(share)} of your music`,
+        score: clamp((share - 0.1) / 0.3),
+      })
+    } else if (share < 0.06 && summary.artists >= 300) {
+      out.push({
+        text: `${formatNumber(summary.artists)} artists, and not one of them more than ${pct(share) === '0%' ? '1%' : pct(share)} of it.`,
+        proof: `Your top artist, ${top[0]}, is ${pct(share)} of your music`,
+        score: clamp((0.07 - share) / 0.05) * 0.8,
+      })
+    }
+  }
+
+  if (rec.marathon && rec.marathon.ms >= 5 * 3_600_000) {
+    const m = rec.marathon
+    out.push({
+      text: `Once listened for ${formatDuration(m.ms)} without stopping.`,
+      proof: `From ${formatTime(m.start)} on ${formatDate(m.start)}, ${formatNumber(m.plays)} plays`,
+      score: clamp((m.ms / 3_600_000 - 4) / 8),
+    })
+  }
+
+  if (fun.longestStreak && fun.longestStreak.days >= 30) {
+    const s = fun.longestStreak
+    out.push({
+      text: `Played music ${formatNumber(s.days)} days in a row.`,
+      proof: `${formatDate(s.start)} to ${formatDate(s.end)}`,
+      score: clamp((s.days - 20) / 200),
+    })
+  }
+
+  if (isAllTime && rec.forgotten && rec.forgotten.ms >= 20 * 3_600_000) {
+    const f = rec.forgotten
+    out.push({
+      text: `Spent ${formatDuration(f.ms)} with ${f.artist}. Then stopped.`,
+      proof: `Nothing since ${formatDate(f.lastPlayed)}`,
+      score: 0.55,
+    })
+  }
+
+  if (summary.shuffleRate >= 0.85 || (summary.shuffleRate <= 0.1 && summary.musicMs > 0)) {
+    const on = summary.shuffleRate >= 0.85
+    out.push({
+      text: on ? `Lets shuffle pick ${pct(summary.shuffleRate)} of the time.` : `Shuffle? Only ${pct(summary.shuffleRate)} of the time. You pick the order.`,
+      proof: `Shuffle was on for ${pct(summary.shuffleRate)} of songs`,
+      score: 0.4,
+    })
+  }
+
+  out.push({
+    text: `${formatNumber(summary.totalMs / 3_600_000)} hours, ${formatNumber(summary.artists)} artists.`,
+    proof: `${formatNumber(summary.streams)} plays of 30 seconds or more`,
+    score: 0,
+  })
+
+  return out.sort((a, b) => b.score - a.score)
 }
 
 // ---------- Helpers ----------

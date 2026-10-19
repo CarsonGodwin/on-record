@@ -139,6 +139,12 @@ export interface DrawOptions {
   guides: Guide[]
   /** Where to put the guide labels, in minutes after midnight */
   guideMinute: number
+  /** Leave the guide tags off, for a caller that draws over the record and then adds them with `drawGuideLabels` */
+  noGuideLabels?: boolean
+  /** Lines drawn over the record that the guide tags should step off: a groove, half the line's width, and the stretch of the day it covers (all of it when left out) */
+  guideAvoid?: { ring: number; halfWidth: number; from?: number; to?: number }[]
+  /** Boxes drawn over the record afterwards, which no guide tag should sit under */
+  guideBlocked?: { x0: number; y0: number; x1: number; y1: number }[]
   /** On-screen magnification already applied to the context: hairlines and small text are divided by it so they stay screen-sized */
   zoom?: number
   /** The part of the drawing that's on screen, in drawing coordinates: grooves outside it are skipped, which keeps deep zooms quick */
@@ -262,7 +268,7 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
   ctx.arc(c, c, g.disc, 0, TAU)
   ctx.stroke()
 
-  drawGuideLabels(ctx, g, o)
+  if (!o.noGuideLabels) drawGuideLabels(ctx, model.days, o)
 
   // Label
   const lr = g.label
@@ -306,34 +312,49 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
 }
 
 /** Little tags on the guide rings, thinned out when they'd crowd each other */
-function drawGuideLabels(ctx: CanvasRenderingContext2D, g: ReturnType<typeof recordGeometry>, o: DrawOptions) {
+export function drawGuideLabels(ctx: CanvasRenderingContext2D, days: number, o: DrawOptions) {
   if (o.guides.length === 0) return
+  const g = recordGeometry(o.size, days)
   const font = Math.max(9, o.size * 0.017) / (o.zoom ?? 1)
   const a = (o.guideMinute / MINUTES) * TAU - Math.PI / 2
   ctx.font = `600 ${font}px ${MONO}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  // Labels sit along one radius, so how much room each needs depends on the angle: wide text crowds sideways-pointing radii
-  const room = (label: string) => {
-    const w = ctx.measureText(label).width + font * 0.8
-    return Math.abs(Math.cos(a)) * w + Math.abs(Math.sin(a)) * font * 1.4 + font * 0.3
-  }
-  let lastR = -Infinity
-  let lastRoom = 0
+  // Each tag's box has to clear the center label, the rim, every tag already placed and any highlighted lines
+  const gap = font * 0.3
+  const placed: { x0: number; y0: number; x1: number; y1: number }[] = []
+  const minute = ((o.guideMinute % MINUTES) + MINUTES) % MINUTES
+  const lines = (o.guideAvoid ?? []).filter((l) => l.from === undefined || l.to === undefined || (minute >= l.from - 30 && minute <= l.to + 30))
   for (const guide of o.guides) {
-    const r = g.inner + guide.ring * g.ring
-    const need = room(guide.label)
-    if (r - lastR < (need + lastRoom) / 2) continue
-    lastR = r
-    lastRoom = need
-    const x = g.center + r * Math.cos(a)
-    const y = g.center + r * Math.sin(a)
-    const w = ctx.measureText(guide.label).width + font * 0.8
+    const hw = (ctx.measureText(guide.label).width + font * 0.8) / 2
+    const hh = font * 0.7
+    // A tag sitting on a highlighted line slides along the radius until it's just clear of it
+    const reach = hw * Math.abs(Math.cos(a)) + hh * Math.abs(Math.sin(a))
+    let r = g.inner + guide.ring * g.ring
+    for (let pass = 0; pass < 2; pass++) {
+      for (const l of lines) {
+        const lr = g.inner + (l.ring + 0.5) * g.ring
+        const clear = reach + l.halfWidth + gap
+        if (Math.abs(r - lr) < clear) r = lr + (r >= lr ? clear : -clear)
+      }
+    }
+    const cx = g.center + r * Math.cos(a)
+    const cy = g.center + r * Math.sin(a)
+    const box = { x0: cx - hw, y0: cy - hh, x1: cx + hw, y1: cy + hh }
+    // Nearest and farthest points of the box from the center of the record
+    const nx = Math.max(box.x0 - g.center, 0, g.center - box.x1)
+    const ny = Math.max(box.y0 - g.center, 0, g.center - box.y1)
+    const fx = Math.max(Math.abs(box.x0 - g.center), Math.abs(box.x1 - g.center))
+    const fy = Math.max(Math.abs(box.y0 - g.center), Math.abs(box.y1 - g.center))
+    if (Math.hypot(nx, ny) < g.label + gap || Math.hypot(fx, fy) > g.disc - gap) continue
+    const blocked = [...placed, ...(o.guideBlocked ?? [])]
+    if (blocked.some((b) => box.x0 < b.x1 + gap && box.x1 > b.x0 - gap && box.y0 < b.y1 + gap && box.y1 > b.y0 - gap)) continue
+    placed.push(box)
     ctx.fillStyle = 'rgba(11, 10, 15, 0.85)'
-    roundRect(ctx, x - w / 2, y - font * 0.7, w, font * 1.4, font * 0.7)
+    roundRect(ctx, box.x0, box.y0, hw * 2, hh * 2, hh)
     ctx.fill()
     ctx.fillStyle = 'rgba(244, 241, 234, 0.85)'
-    ctx.fillText(guide.label, x, y + font * 0.05)
+    ctx.fillText(guide.label, cx, cy + font * 0.05)
   }
 }
 

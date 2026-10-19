@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Offstage, OnStage } from '../lib/stage'
 
 /** Small shared building blocks used across the dashboard. */
 
@@ -87,8 +88,11 @@ interface ChapterProps {
 /** One section of the dashboard, styled like a track on a record */
 export function Chapter({ id, num, title, lede, actions, table, children }: ChapterProps) {
   const [showTable, setShowTable] = useState(false)
+  // Offstage chapters stay mounted and laid out at full width, so they keep their state and show up ready
+  const stage = useContext(OnStage)
+  const offstage = stage !== null && stage !== id
   return (
-    <section id={id} className="chapter" aria-labelledby={`${id}-title`}>
+    <section id={id} className={offstage ? 'chapter is-offstage' : 'chapter'} aria-labelledby={`${id}-title`} aria-hidden={offstage || undefined}>
       <header className="chapter__head">
         <span className="chapter__num" aria-hidden="true">
           {num}
@@ -108,7 +112,7 @@ export function Chapter({ id, num, title, lede, actions, table, children }: Chap
           </div>
         )}
       </header>
-      {showTable && table ? <div className="table-wrap">{table()}</div> : children}
+      <Offstage value={offstage}>{showTable && table ? <div className="table-wrap">{table()}</div> : children}</Offstage>
     </section>
   )
 }
@@ -137,10 +141,13 @@ interface TipProps {
 
 /** A tooltip that follows the pointer. Rendered at the body so no container can clip it. */
 export function FloatTip({ x, y, onDismiss, className, children }: TipProps) {
+  // It lives at the body, so it has to leave with its chapter by itself (a pinned tip comes back when the chapter does)
+  const offstage = useContext(Offstage)
   useEffect(() => {
     window.addEventListener('scroll', onDismiss, { passive: true, once: true })
     return () => window.removeEventListener('scroll', onDismiss)
   }, [onDismiss])
+  if (offstage) return null
   const left = Math.max(130, Math.min(window.innerWidth - 130, x))
   const below = y < 140
   return createPortal(

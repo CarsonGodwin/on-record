@@ -55,7 +55,7 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
         </p>
         <div className="hero__actions">
           <button type="button" className="button button--big" onClick={onPlay}>
-            <span className="button__icon">▶</span> Play it back
+            <span className="button__icon">▶</span> Take me through it
           </button>
           <button type="button" className="button button--big button--ghost" onClick={onPoster}>
             Make your poster
