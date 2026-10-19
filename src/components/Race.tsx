@@ -3,7 +3,9 @@ import type { Bins, RaceData } from '../data/insights'
 import { formatDate, formatHours, formatMonthShort } from '../lib/format'
 import { prefersReducedMotion, useSeen, useWidth } from '../lib/hooks'
 import { colorFor } from '../lib/palette'
+import { raceFrameMs } from '../viz/raceVideo'
 import { Cover } from './Cover'
+import { RaceExport } from './RaceExport'
 
 /*
  * "The Race": cumulative listening per artist, replayed week by week (or
@@ -21,12 +23,12 @@ interface Props {
 
 export function Race({ bins, race, colors }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const boardRef = useRef<HTMLDivElement>(null)
   const seen = useSeen(ref, 0.35)
   const width = useWidth(ref, 900)
   const rowH = width < 600 ? 38 : 46
   const frames = race.frames
-  // The whole race takes about 25 seconds, whatever the range
-  const frameMs = Math.max(60, Math.min(450, 25_000 / Math.max(frames, 1)))
+  const frameMs = raceFrameMs(frames)
 
   // Reduced motion: skip straight to the final standings
   const [t, setT] = useState(() => (prefersReducedMotion() ? frames - 1 : 0))
@@ -73,7 +75,7 @@ export function Race({ bins, race, colors }: Props) {
 
   return (
     <div className="race" ref={ref}>
-      <div className="race__board" style={{ height: rowH * TOP }} aria-hidden="true">
+      <div className="race__board" ref={boardRef} style={{ height: rowH * TOP }} aria-hidden="true">
         {values.map(({ name, ms }) => {
           const r = rank.get(name)!
           const visible = r < TOP && ms > 0
@@ -159,6 +161,8 @@ export function Race({ bins, race, colors }: Props) {
           style={{ ['--progress' as string]: `${(t / Math.max(frames - 1, 1)) * 100}%` }}
         />
       </div>
+
+      <RaceExport bins={bins} race={race} colors={colors} board={boardRef} />
     </div>
   )
 }

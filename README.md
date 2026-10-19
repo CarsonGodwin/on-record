@@ -10,9 +10,10 @@ Everything runs in your browser. There's no server, and your data is never uploa
 
 | | |
 |---|---|
+| **The Long Play** | A guided walk through the whole record, one track at a time, that phones open on. Drop the needle and watch your days press into the record, then try each chapter's real chart with a tip for what to play with. The way on waits at the bottom of each track, and at the end the whole page opens up. |
 | **The Record** | Every day of listening as a vinyl record: one groove per day, arcs placed by time of day. Tap a groove (or use the slider) and the deck beside it unrolls that day into a 24-hour strip; the tonearm follows. On a phone, hold and drag on the record to skim it. |
 | **Eras** | Streamgraph of your top artists, with the stretches one artist led your listening called out as eras. |
-| **The Race** | Bar chart race of cumulative hours per artist. |
+| **The Race** | Bar chart race of cumulative hours per artist. Turn it into a 9:16 story video, made on your device and ready for Instagram. |
 | **Around the Clock** | 24-hour radial chart, your artist for each part of the day, and a weekday × hour dot matrix. |
 | **Every Day** | Calendar heatmap, one square per day. |
 | **Love / Hate** | Most-played songs by plays vs. skip rate: the keepers, the instant skips, and the ones you can't quit but can't finish. |
@@ -20,7 +21,7 @@ Everything runs in your browser. There's no server, and your data is never uploa
 | **Pulse** | An *Unknown Pleasures*-style ridgeline of your top artists, in the order you found them. |
 | **The Charts** | Top artists, songs, albums and podcasts with generative covers. |
 | **Liner Notes** | A listener-type card, records (streaks, marathons, obsessions, the artist you went quiet on) and habits. |
-| **The Poster** | A shareable PNG in three designs (Record, Constellation star chart, Pulse), three sizes (4:5 post, 9:16 story, 2:3 print) and two papers. On phones it goes straight to the share sheet. |
+| **The Poster** | A shareable PNG in four designs: Deep dive (the record fully annotated, with small charts underneath), The Record, Sleeve (an album cover with a tracklist) and Annotated (a labelled figure). Three sizes (4:5 post, 9:16 story, 2:3 print), on black or cream. Deep dive is 4:5 only, and can come out several times bigger for reading up close. On phones it goes straight to the share sheet. |
 
 Every view follows the year picker at the top.
 
@@ -30,7 +31,7 @@ Every view follows the year picker at the top.
 2. Confirm the email, then wait for the download link (up to 30 days).
 3. Drop the `.zip` onto the record sleeve.
 
-No data yet? Use **Spin the demo record**.
+No data yet? Use **Try the demo**.
 
 ## Development
 
@@ -38,6 +39,8 @@ No data yet? Use **Spin the demo record**.
 npm install
 npm run dev
 npm test        # tests in tests/{data,viz,lib} (Vitest)
+npm run lint    # oxlint
+npm run build   # type-check, then build to dist/
 ```
 
 ## Deploying
@@ -58,10 +61,16 @@ src/
   data/insights.ts      Time bins, eras, race frames, sessions, artist graph, listener profile
   viz/record.ts         The vinyl drawing, shared by the chart and the poster
   viz/constellation.ts  The artist-graph layout, shared by the chart and the poster
-  viz/poster.ts         Poster rendering (all three designs)
+  viz/pressing.ts       The record pressed a groove at a time, for The Long Play's needle drop
+  viz/poster.ts         Poster rendering, and the Record, Sleeve and Annotated designs
+  viz/posterDeep.ts     The Deep dive poster
+  viz/posterShared.ts   Drawing helpers shared by the posters and the race video
+  viz/raceVideo.ts      The Race as a 9:16 video, encoded on-device
   lib/palette.ts        Chart colors (validated for colorblind separation on the dark surface)
   lib/dropFiles.ts      Drag-and-drop, including dropped folders
-  components/           One file per visualization, plus Dashboard, PosterStudio and the landing sleeve
+  lib/stage.ts          Which chapter The Long Play has on stage
+  components/           One file per visualization, plus Dashboard, PosterStudio, the landing sleeve,
+                        and The Long Play (Tour, NeedleDrop)
 ```
 
 ## License

@@ -68,3 +68,15 @@ export function equivalents(ms: number): { days: number; flights: number; marath
     marathons: (hours * 60) / 1181,
   }
 }
+
+const monthYear = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'long' })
+
+/** "March 2024" */
+export function formatMonthYear(d: number | Date): string {
+  return monthYear.format(d)
+}
+
+/** "Jan – Jul 2024", or "Nov 2023 – Feb 2024" across a new year */
+export function formatMonthRange(from: number | Date, to: number | Date): string {
+  return monthYearShort.formatRange(from, to)
+}

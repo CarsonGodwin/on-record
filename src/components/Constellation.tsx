@@ -17,7 +17,7 @@ interface Props {
   nodes: GraphNode[]
   links: GraphLink[]
   colors: Map<string, string>
-  onPoster: () => void
+  onPoster?: () => void
 }
 
 const STARLIGHT = '#d9d4ff'
@@ -268,9 +268,11 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
           </span>
         )}
         </div>
-        <button type="button" className="button button--ghost button--small" onClick={onPoster}>
-          Make it a poster →
-        </button>
+        {onPoster && (
+          <button type="button" className="button button--ghost button--small" onClick={onPoster}>
+            Make it a poster →
+          </button>
+        )}
       </div>
     </div>
   )

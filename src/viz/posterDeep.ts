@@ -1,8 +1,8 @@
 import { WEAR_MAX, fromDayNumber } from '../data/stats'
 import { formatDate, formatNumber } from '../lib/format'
-import type { PosterData } from './poster'
+import { isDarkPaper, type PosterData, type PosterPaper } from './poster'
 import { DISPLAY, MINUTES, SLOT_OTHER, TAU, drawRecord, mix, quietestMinute, recordGeometry, type RecordModel } from './record'
-import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap, type StoryPaper } from './posterStory'
+import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from './posterShared'
 
 /*
  * The Deep dive poster (4:5): dense and made to be read up close, like a post on r/dataisbeautiful.
@@ -17,10 +17,10 @@ interface Callout {
   anchors: [number, number][]
 }
 
-export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: number, data: PosterData, paper: StoryPaper) {
+export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: number, data: PosterData, paper: PosterPaper) {
   const u = W / 100
   const pad = 5 * u
-  const dark = paper === 'midnight'
+  const dark = isDarkPaper(paper)
   const bg = dark ? '#0e0d12' : '#efe8da'
   const ink = dark ? '#f4f1ea' : '#17141d'
   const soft = dark ? 'rgba(244, 241, 234, 0.64)' : 'rgba(23, 20, 29, 0.64)'
@@ -553,7 +553,10 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillStyle = soft
   ctx.font = font(500, 1.25 * u)
   ctx.textAlign = 'left'
-  ctx.fillText(`Data: my Spotify Extended Streaming History, ${formatDate(firstDate)} – ${formatDate(lastDate)}. Made with On Record.`, pad, H - 1.8 * u)
+  ctx.fillText(`Data: my Spotify Extended Streaming History, ${formatDate(firstDate)} – ${formatDate(lastDate)}.`, pad, H - 1.8 * u)
+  ctx.textAlign = 'right'
+  ctx.fillText('Made using mylisteningrecord.com', W - pad, H - 1.8 * u)
+  ctx.textAlign = 'left'
   ctx.restore()
 }
 

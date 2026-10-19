@@ -1,20 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { formatMonthShort } from '../../src/lib/format'
-import { circularMean, clock, driftScale, findEraRuns, monthly, spreadEras, type Month } from '../../src/viz/posterStory'
+import { clock, driftScale, monthly } from '../../src/viz/posterShared'
 import { SLOT_OTHER, SLOT_PODCAST, buildRecord, MINUTES } from '../../src/viz/record'
 import { at, play, sorted } from '../helpers'
 
 const HOUR = 3_600_000
-
-/** A month with the given minutes per top-10 slot, e.g. `month({ 0: 100 })` */
-function month(slots: Record<number, number> = {}): Month {
-  const filled = Array(SLOT_OTHER).fill(0)
-  for (const [slot, minutes] of Object.entries(slots)) filled[Number(slot)] = minutes
-  return { ring0: 0, ring1: 1, label: '', minute: null, slots: filled, total: 0, year: 2024, month: 0 }
-}
-
-/** One month per entry, each led by the given slot with 100 minutes */
-const led = (...slots: number[]) => slots.map((slot) => month({ [slot]: 100 }))
 
 const distance = (a: number, b: number) => {
   const d = Math.abs(a - b) % MINUTES
@@ -106,96 +96,6 @@ describe('monthly', () => {
     expect(smoothed[1].minute!).toBeLessThan(8.5 * 60)
     // February's own weight is double, so it stays closer to itself than to March
     expect(distance(smoothed[1].minute!, 2.5 * 60)).toBeLessThan(distance(smoothed[1].minute!, 8.5 * 60))
-  })
-})
-
-describe('findEraRuns', () => {
-  it('finds nothing in an empty or silent history', () => {
-    expect(findEraRuns([], 3)).toEqual([])
-    expect(findEraRuns([month(), month(), month()], 3)).toEqual([])
-  })
-
-  it('makes one era when one artist leads throughout', () => {
-    expect(findEraRuns(led(0, 0, 0, 0), 3)).toEqual([{ slot: 0, first: 0, last: 3 }])
-  })
-
-  it('splits where the leader changes', () => {
-    expect(findEraRuns(led(0, 0, 1, 1, 1, 1), 3)).toEqual([
-      { slot: 0, first: 0, last: 1 },
-      { slot: 1, first: 2, last: 5 },
-    ])
-  })
-
-  it('drops a run of a single month', () => {
-    const months = [...led(0, 0, 0, 0), month({ 1: 150 })]
-    expect(findEraRuns(months, 3)).toEqual([{ slot: 0, first: 0, last: 3 }])
-  })
-
-  it('joins runs of the same artist split by a one-month interruption', () => {
-    // Slot 1 leads only the middle month, where slot 0 is quiet
-    const months = [month({ 0: 100 }), month(), month({ 1: 50 }), month(), month({ 0: 100 })]
-    expect(findEraRuns(months, 3)).toEqual([{ slot: 0, first: 0, last: 4 }])
-  })
-
-  it('keeps the longest runs, in time order', () => {
-    const months = led(0, 0, 1, 1, 1, 1, 2, 2, 2)
-    expect(findEraRuns(months, 9)).toEqual([
-      { slot: 0, first: 0, last: 1 },
-      { slot: 1, first: 2, last: 5 },
-      { slot: 2, first: 6, last: 8 },
-    ])
-    expect(findEraRuns(months, 2)).toEqual([
-      { slot: 1, first: 2, last: 5 },
-      { slot: 2, first: 6, last: 8 },
-    ])
-  })
-})
-
-describe('spreadEras', () => {
-  const months = led(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2)
-
-  it('takes the longest era from each equal slice of the history', () => {
-    expect(spreadEras(months, 3)).toEqual([
-      { slot: 0, first: 0, last: 3 },
-      { slot: 1, first: 4, last: 7 },
-      { slot: 2, first: 8, last: 11 },
-    ])
-    expect(spreadEras(months, 2).map((e) => e.slot)).toEqual([0, 2])
-  })
-
-  it('never picks the same era twice', () => {
-    expect(spreadEras(led(0, 0, 0, 0, 0, 0), 3)).toEqual([{ slot: 0, first: 0, last: 5 }])
-  })
-
-  it('returns nothing when there are no eras', () => {
-    expect(spreadEras([], 3)).toEqual([])
-    expect(spreadEras([month(), month()], 2)).toEqual([])
-  })
-})
-
-describe('circularMean', () => {
-  it('averages ordinary times', () => {
-    expect(circularMean([60, 120])).toBeCloseTo(90)
-    expect(circularMean([600])).toBeCloseTo(600)
-    expect(circularMean([720])).toBeCloseTo(720)
-  })
-
-  it('wraps around midnight instead of landing at noon', () => {
-    expect(distance(circularMean([1430, 10]), 0)).toBeLessThan(1e-6)
-    expect(distance(circularMean([1380, 60]), 0)).toBeLessThan(1e-6)
-    expect(distance(circularMean([1420, 20, 1430, 10]), 0)).toBeLessThan(1e-6)
-  })
-
-  it('always lands within a day', () => {
-    for (const set of [[1439], [1, 2], [1300, 100], [0, 0]]) {
-      const m = circularMean(set)
-      expect(m).toBeGreaterThanOrEqual(0)
-      expect(m).toBeLessThan(MINUTES)
-    }
-  })
-
-  it('is midnight for no times', () => {
-    expect(circularMean([])).toBe(0)
   })
 })
 

@@ -1,11 +1,13 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig, type Plugin } from 'vite'
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { createServer, defineConfig, type Plugin } from 'vite'
 
 /**
  * Locks the built page down so the "nothing is uploaded" promise is enforced by
  * the browser: no network requests at all, and only scripts, styles and fonts
  * from the site itself. Images allow data: (the paper grain) and blob: (poster
- * downloads). Build-only, since the dev server needs inline scripts and a socket
+ * downloads), and media allows blob: (the race video's preview). Build-only, since the dev server needs inline scripts and a socket
  * for hot reload.
  */
 const CSP = [
@@ -13,6 +15,7 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self'",
   "img-src 'self' data: blob:",
+  "media-src 'self' blob:",
   "font-src 'self' data:",
   "connect-src 'none'",
   "object-src 'none'",
@@ -52,8 +55,40 @@ function contentSecurityPolicy(): Plugin {
   }
 }
 
+/**
+ * Renders the landing page into index.html at build time, so search engines and
+ * link unfurlers that don't run JavaScript still see the headline, copy and how-to.
+ * The client replaces it on load (createRoot, not hydrate: the drop zone's wording
+ * depends on the pointer type, which the build can't know).
+ */
+function prerenderLanding(): Plugin {
+  return {
+    name: 'prerender-landing',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      async handler(html) {
+        const server = await createServer({
+          configFile: false,
+          plugins: [react()],
+          logLevel: 'error',
+          appType: 'custom',
+          server: { middlewareMode: true, hmr: false, ws: false },
+        })
+        try {
+          const { default: App } = await server.ssrLoadModule('/src/App.tsx')
+          const markup = renderToString(createElement(App))
+          return html.replace('<div id="root"></div>', `<div id="root">${markup}</div>`)
+        } finally {
+          await server.close()
+        }
+      },
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react(), contentSecurityPolicy()],
+  plugins: [react(), contentSecurityPolicy(), prerenderLanding()],
 })

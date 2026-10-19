@@ -13,6 +13,7 @@ type State =
   | { status: 'ready'; result: LoadResult; isSample: boolean }
 
 const FEATURES = [
+  ['The Long Play', 'the whole record, hands on'],
   ['The Record', 'every day pressed into vinyl'],
   ['Eras', 'who ruled which months'],
   ['The Race', 'your artists, racing'],
@@ -115,8 +116,8 @@ export default function App() {
       </main>
 
       <ul className="features" aria-label="What you get">
-        {FEATURES.map(([name, what], i) => (
-          <li key={name} style={{ ['--i' as string]: i }}>
+        {FEATURES.map(([name, what]) => (
+          <li key={name}>
             <b>{name}</b>
             <span>{what}</span>
           </li>

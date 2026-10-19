@@ -8,16 +8,17 @@ import {
   findEras,
   firstListens,
   hourProfile,
-  listenerProfile,
   makeBins,
   raceFrames,
   records,
   sessions,
   smooth,
   songStats,
+  takes,
   topEntries,
+  type Records,
 } from '../../src/data/insights'
-import { dayNumber } from '../../src/data/stats'
+import { dayNumber, type FunStats, type Summary } from '../../src/data/stats'
 import { at, play, sorted } from '../helpers'
 
 const MIN = 60_000
@@ -309,24 +310,71 @@ describe('records', () => {
   })
 })
 
-describe('listenerProfile', () => {
-  it('keeps every trait on a 0–1 scale and names the listener', () => {
-    const plays = Array.from({ length: 20 }, (_, i) => play(at(2024, 1, 1 + i, 23), { artist: 'Only' }))
-    const profile = listenerProfile(plays, hourProfile(plays), 0, 1)
-    for (const t of profile.traits) {
-      expect(t.value).toBeGreaterThanOrEqual(0)
-      expect(t.value).toBeLessThanOrEqual(1)
-    }
-    const value = (label: string) => profile.traits.find((t) => t.label === label)?.value
-    expect(value('Night owl')).toBe(1)
-    expect(value('Loyalty')).toBe(1)
-    expect(value('Chaos')).toBe(1)
-    expect(profile.title).toMatch(/^The Nocturnal /)
+describe('takes', () => {
+  const NO_RECORDS: Records = { firstPlay: null, marathon: null, avgSessionMs: 0, evergreen: null, forgotten: null }
+  const NO_FUN: FunStats = { longestStreak: null, biggestDay: null, onRepeat: null }
+  const summaryOf = (plays: ReturnType<typeof play>[], overrides: Partial<Summary> = {}): Summary => ({
+    totalMs: plays.reduce((s, p) => s + p.msPlayed, 0),
+    musicMs: plays.reduce((s, p) => s + p.msPlayed, 0),
+    podcastMs: 0,
+    streams: plays.length,
+    artists: new Set(plays.map((p) => p.artist)).size,
+    tracks: 1,
+    activeDays: 1,
+    skipRate: 0,
+    shuffleRate: 0.5,
+    offlineShare: 0,
+    ...overrides,
+  })
+  const run = (plays: ReturnType<typeof play>[], overrides: Partial<Summary> = {}, rec = NO_RECORDS, isAllTime = true) =>
+    takes(plays, summaryOf(plays, overrides), rec, NO_FUN, hourProfile(plays), isAllTime)
+  /** `a` plays of A and `b` plays of other artists, one each, all at noon so no time-of-day take fires */
+  const split = (a: number, b: number) => [
+    ...Array.from({ length: a }, (_, i) => play(at(2024, 1, 1 + (i % 28)), { artist: 'A' })),
+    ...Array.from({ length: b }, (_, i) => play(at(2024, 2, 1 + (i % 28)), { artist: `B${i}` })),
+  ]
+
+  it('sorts by score and always ends on the totals', () => {
+    const out = run(split(9, 1))
+    for (let i = 1; i < out.length; i++) expect(out[i - 1].score).toBeGreaterThanOrEqual(out[i].score)
+    expect(out[out.length - 1]).toMatchObject({ score: 0, text: expect.stringMatching(/hours, 2 artists\.$/) })
   })
 
-  it('names a daytime listener by their peak hour', () => {
-    const plays = [play(at(2024, 1, 1, 8))]
-    expect(listenerProfile(plays, hourProfile(plays), 0.1, 0.1).title).toMatch(/^The Early-Rising /)
+  it('words the top artist share so it stays true at any size', () => {
+    const line = (a: number, b: number) => run(split(a, b)).find((t) => t.text.endsWith('was A.'))?.text
+    expect(line(2, 6)).toBe('One in every 4 minutes was A.')
+    expect(line(5, 5)).toBe('5 of every 10 minutes was A.')
+    expect(line(9, 1)).toBe('9 of every 10 minutes was A.')
+    expect(line(97, 3)).toBe('Nearly every minute was A.')
+    expect(line(1, 19)).toBeUndefined()
+  })
+
+  it('contrasts a heavy skipper with the artist they never skip', () => {
+    const plays = [
+      ...Array.from({ length: 20 }, (_, i) => play(at(2024, 1, 1 + i), { artist: 'Loyal' })),
+      ...Array.from({ length: 40 }, (_, i) => play(at(2024, 2, 1 + (i % 28)), { artist: 'Other', skipped: i % 2 === 0 })),
+    ]
+    expect(run(plays, { skipRate: 0.4 }).map((t) => t.text)).toContain('Skips 40% of everything. Never skipped Loyal, not once.')
+    expect(run(plays, { skipRate: 0.1 }).some((t) => t.text.startsWith('Skips'))).toBe(false)
+  })
+
+  it('calls out late nights', () => {
+    const plays = Array.from({ length: 10 }, (_, i) => play(at(2024, 1, 1 + i, 23)))
+    expect(run(plays).map((t) => t.text)).toContain('100% of it was played after 9 PM.')
+  })
+
+  it('only mentions a dropped artist across all time', () => {
+    const rec: Records = { ...NO_RECORDS, forgotten: { artist: 'Gone', lastPlayed: at(2022, 5, 1).getTime(), ms: 30 * 3_600_000 } }
+    const plays = split(1, 1)
+    expect(run(plays, {}, rec, true).some((t) => t.text.includes('with Gone. Then stopped.'))).toBe(true)
+    expect(run(plays, {}, rec, false).some((t) => t.text.includes('Gone'))).toBe(false)
+  })
+
+  it('mentions shuffle only at the extremes', () => {
+    const plays = split(1, 1)
+    expect(run(plays, { shuffleRate: 0.5 }).some((t) => /shuffle/i.test(t.text))).toBe(false)
+    expect(run(plays, { shuffleRate: 0.9 }).map((t) => t.text)).toContain('Lets shuffle pick 90% of the time.')
+    expect(run(plays, { shuffleRate: 0.05 }).map((t) => t.text)).toContain('Shuffle? Only 5% of the time. You pick the order.')
   })
 })
 

@@ -12,10 +12,11 @@ interface Props {
   topArtist: Ranked | undefined
   hours: HourSlot[]
   newArtists: number | null
+  onPlay: () => void
   onPoster: () => void
 }
 
-export function Hero({ summary, year, span, isSample, topArtist, hours, newArtists, onPoster }: Props) {
+export function Hero({ summary, year, span, isSample, topArtist, hours, newArtists, onPlay, onPoster }: Props) {
   const ref = useRef<HTMLElement>(null)
   const seen = useSeen(ref, 0.1)
   const total = summary.totalMs / 3_600_000
@@ -53,9 +54,9 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
           <b>{formatNumber(eq.marathons)}</b> back-to-back marathons of all eight Harry Potter films.
         </p>
         <div className="hero__actions">
-          <a className="button button--big" href="#record">
-            <span className="button__icon">↓</span> Drop the needle
-          </a>
+          <button type="button" className="button button--big" onClick={onPlay}>
+            <span className="button__icon">▶</span> Take me through it
+          </button>
           <button type="button" className="button button--big button--ghost" onClick={onPoster}>
             Make your poster
           </button>
