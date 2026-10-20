@@ -79,6 +79,16 @@ describe('summarize', () => {
     })
   })
 
+  it('counts a song only once it has a play of 30s or more, like streams', () => {
+    const s = summarize([
+      play(at(2024, 1, 1, 8), { title: 'Kept' }),
+      play(at(2024, 1, 1, 9), { title: 'Skipped', skipped: true, msPlayed: 5_000 }),
+      play(at(2024, 1, 1, 10), { title: 'Skipped', skipped: true, msPlayed: 29_999 }),
+    ])
+    expect(s.streams).toBe(1)
+    expect(s.tracks).toBe(1)
+  })
+
   it('splits music from podcasts and counts rates over music plays only', () => {
     const s = summarize([
       play(at(2024, 1, 1, 8), { artist: 'A', title: 'One', shuffle: true }),
@@ -218,7 +228,7 @@ describe('weekHourGrid', () => {
 
 describe('funStats', () => {
   it('returns nulls for no plays', () => {
-    expect(funStats([])).toEqual({ longestStreak: null, biggestDay: null, onRepeat: null })
+    expect(funStats([])).toEqual({ longestStreak: null, biggestDay: null, onRepeat: null, topWeek: null })
   })
 
   it('finds the longest run of days, the biggest day and the most repeated song', () => {
@@ -236,6 +246,28 @@ describe('funStats', () => {
     expect(s.longestStreak).toEqual({ days: 3, start: at(2024, 1, 1, 0), end: at(2024, 1, 3, 0) })
     expect(s.biggestDay).toEqual({ date: at(2024, 1, 5, 0), ms: 3 * 180_000 + 5_000 })
     expect(s.onRepeat).toEqual({ title: 'Loop', artist: 'Artist', date: at(2024, 1, 5, 0), count: 3 })
+  })
+
+  it('finds the song played most within seven days in a row', () => {
+    const plays = sorted([
+      play(at(2024, 1, 1), { title: 'Week' }),
+      play(at(2024, 1, 4), { title: 'Week' }),
+      play(at(2024, 1, 7), { title: 'Week' }),
+      play(at(2024, 1, 8), { title: 'Week' }), // eight days after the first, so a new window
+      play(at(2024, 1, 9), { title: 'Week' }),
+      play(at(2024, 1, 9, 13), { title: 'Week' }),
+      play(at(2024, 2, 1, 9), { title: 'Day' }),
+      play(at(2024, 2, 1, 10), { title: 'Day' }),
+      play(at(2024, 2, 1, 11), { title: 'Day' }),
+    ])
+    expect(funStats(plays).topWeek).toEqual({
+      title: 'Week',
+      artist: 'Artist',
+      start: at(2024, 1, 4, 0),
+      end: at(2024, 1, 9, 0),
+      count: 5,
+      plays: [at(2024, 1, 4), at(2024, 1, 7), at(2024, 1, 8), at(2024, 1, 9), at(2024, 1, 9, 13)],
+    })
   })
 })
 

@@ -228,6 +228,8 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
         ink: 'rgba(244, 241, 234, 0.55)',
         guides,
         guideMinute,
+        // Small enough on screen to keep the glow on every record
+        glow: true,
         zoom: view.s,
         visible: {
           x0: (-view.x * dpr) / view.s,
@@ -329,7 +331,11 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
       <div className="deck__meta">
         {model.dayMinutes[ring] > 0 ? (
           <>
-            {formatDuration(model.dayMinutes[ring] * 60_000)} of listening · {formatNumber(day.plays)} plays
+            {/* The badge needs the room, so "of listening" makes way for it */}
+            <span className="deck__stat">
+              {formatDuration(model.dayMinutes[ring] * 60_000)}
+              {ring !== biggest && ' of listening'} · {formatNumber(day.plays)} plays
+            </span>
             {ring === biggest && <span className="deck__badge">Biggest day</span>}
           </>
         ) : (

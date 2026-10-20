@@ -126,6 +126,7 @@ function Credits({ fun, rec, summary, devices, topArtists, hours, isAllTime }: C
   }
 
   credits.push({ label: 'Total listening', value: `${formatDuration(summary.totalMs)} · ${formatNumber(summary.streams)} plays` })
+  if (summary.tracks > 0) credits.push({ label: 'Different songs', value: formatNumber(summary.tracks) })
 
   if (rec.firstPlay) {
     credits.push({

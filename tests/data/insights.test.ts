@@ -312,7 +312,7 @@ describe('records', () => {
 
 describe('takes', () => {
   const NO_RECORDS: Records = { firstPlay: null, marathon: null, avgSessionMs: 0, evergreen: null, forgotten: null }
-  const NO_FUN: FunStats = { longestStreak: null, biggestDay: null, onRepeat: null }
+  const NO_FUN: FunStats = { longestStreak: null, biggestDay: null, onRepeat: null, topWeek: null }
   const summaryOf = (plays: ReturnType<typeof play>[], overrides: Partial<Summary> = {}): Summary => ({
     totalMs: plays.reduce((s, p) => s + p.msPlayed, 0),
     musicMs: plays.reduce((s, p) => s + p.msPlayed, 0),
