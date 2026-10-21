@@ -344,7 +344,6 @@ em {
   width: 260px;
 }
 
-
 .float-tip__line {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4927,4 +4926,465 @@ html.tour-open {
   letter-spacing: 0.12em;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* =================================================================
+   Launcher (⌘K), Settings and Help
+   ================================================================= */
+
+.topbar__launch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.topbar__launch:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.topbar__launch kbd {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+/* Phones have no ⌘K hint: the dot says something is hidden */
+.topbar__launch-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+@media (min-width: 761px) {
+  .topbar__launch-dot {
+    display: none;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .topbar__launch {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .topbar__launch kbd {
+    display: none;
+  }
+}
+
+kbd {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  padding: 0.1em 0.45em;
+  border-radius: 5px;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+
+.modal {
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raise);
+  color: var(--text);
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(640px, calc(100dvh - 48px));
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+
+.modal[open] {
+  display: flex;
+  flex-direction: column;
+  animation: modal-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.modal::backdrop {
+  background: rgba(5, 4, 8, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal[open] {
+    animation: none;
+  }
+}
+
+.modal__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.modal--panel .modal__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 22px 22px;
+}
+
+.modal--launcher {
+  margin-top: max(10vh, 24px);
+}
+
+.modal__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0 12px;
+  background: var(--bg-raise);
+}
+
+.modal__head h2 {
+  font-size: 1.4rem;
+}
+
+.modal__close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal__close:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+/* The launcher */
+
+.launcher__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.launcher__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  /* 16px keeps iOS from zooming in on focus */
+  font-size: max(16px, 1.05rem);
+}
+
+.launcher__input::placeholder {
+  color: var(--faint);
+}
+
+.launcher__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+}
+
+.launcher__group {
+  margin: 10px 10px 4px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.launcher__item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.launcher__item[aria-selected='true'] {
+  background: rgba(244, 241, 234, 0.08);
+}
+
+/* A Shift selection: the run is tinted, the row the arrows are on is outlined */
+.launcher__list[aria-multiselectable='true'] .launcher__item[aria-selected='true'] {
+  border-radius: 0;
+  background: rgba(255, 39, 124, 0.14);
+}
+
+.launcher__list[aria-multiselectable='true'] .launcher__item.is-active {
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 39, 124, 0.6);
+}
+
+.modal__head h2:focus {
+  outline: none;
+}
+
+.launcher__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.launcher__hint {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.launcher__item.is-active .launcher__hint {
+  color: var(--muted);
+}
+
+.launcher__shortcut {
+  flex-shrink: 0;
+  min-width: 2.6em;
+  text-align: center;
+  color: var(--muted);
+}
+
+.launcher__action {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.launcher__title {
+  flex: 1;
+  font-size: 1.05rem;
+  outline: none;
+}
+
+.launcher__page {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 22px 18px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.launcher__page h3 {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.launcher__page ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.launcher__page li + li {
+  margin-top: 4px;
+}
+
+.launcher__page p {
+  margin: 0 0 6px;
+}
+
+.launcher__empty {
+  padding: 18px 10px;
+  color: var(--muted);
+}
+
+.launcher__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--faint);
+}
+
+.launcher__note {
+  color: var(--text);
+}
+
+/* Settings and Help */
+
+.settings__row {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.settings__row h3 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.settings__note,
+.settings__foot {
+  margin: 8px 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.settings__foot {
+  color: var(--faint);
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch__track {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  transition: background 0.2s;
+}
+
+.switch__track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.switch input:checked + .switch__track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch input:checked + .switch__track::after {
+  transform: translateX(18px);
+  background: var(--accent-ink);
+}
+
+.switch input:focus-visible + .switch__track {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.switch input:disabled ~ * {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.help__keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.help__keys dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Hiding from The Charts */
+
+.charts__hidden {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.chart-list--hideable .chart-list__row {
+  grid-template-columns: 2.4rem 40px minmax(0, 1fr) auto auto;
+}
+
+.chart-hide {
+  align-self: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.podium__spot .chart-hide {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.chart-hide:hover,
+.chart-hide:focus-visible {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+/* With a mouse, the button waits until you're on the row */
+@media (hover: hover) {
+  .chart-list__row .chart-hide,
+  .podium__spot .chart-hide {
+    opacity: 0;
+  }
+  .chart-list__row:hover .chart-hide,
+  .podium__spot:hover .chart-hide,
+  .chart-hide:focus-visible {
+    opacity: 1;
+  }
 }

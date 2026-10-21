@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   dayNumber,
   filterByYear,
+  filterPlays,
   fromDayNumber,
   funStats,
   getYears,
@@ -250,5 +251,30 @@ describe('newArtistsIn', () => {
     ])
     expect(newArtistsIn(plays, 2024)).toBe(2)
     expect(newArtistsIn(plays, 2023)).toBe(1)
+  })
+})
+
+describe('filterPlays', () => {
+  const song = play(at(2024, 1, 1), { artist: 'Kept' })
+  const hiddenSong = play(at(2024, 1, 2), { artist: 'Gone' })
+  const episode = play(at(2024, 1, 3), { kind: 'episode', artist: 'A Show' })
+  const chapter = play(at(2024, 1, 4), { kind: 'audiobook', artist: 'A Book' })
+  const all = [song, hiddenSong, episode, chapter]
+
+  it('keeps everything with no filters on', () => {
+    expect(filterPlays(all, { musicOnly: false, hidden: new Set() })).toEqual(all)
+  })
+
+  it('drops podcasts and audiobooks when music only', () => {
+    expect(filterPlays(all, { musicOnly: true, hidden: new Set() })).toEqual([song, hiddenSong])
+  })
+
+  it('drops the songs of hidden artists', () => {
+    expect(filterPlays(all, { musicOnly: true, hidden: new Set(['Gone']) })).toEqual([song])
+  })
+
+  it('only hides music, even when a show shares the name', () => {
+    const sameName = play(at(2024, 1, 5), { kind: 'episode', artist: 'Gone' })
+    expect(filterPlays([hiddenSong, sameName], { musicOnly: false, hidden: new Set(['Gone']) })).toEqual([sameName])
   })
 })

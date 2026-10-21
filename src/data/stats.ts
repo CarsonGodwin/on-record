@@ -39,6 +39,19 @@ export function filterByYear(plays: Play[], year: number | null): Play[] {
   return year === null ? plays : plays.filter((p) => startDate(p).getFullYear() === year)
 }
 
+export interface PlayFilter {
+  /** Leaves out podcast episodes and audiobook chapters */
+  musicOnly: boolean
+  /** Artists whose songs are left out. Only music is hidden, so a show that shares a name stays. */
+  hidden: ReadonlySet<string>
+}
+
+/** Applied before everything else, so the whole page (colors, posters, the race video) leaves them out */
+export function filterPlays(plays: Play[], { musicOnly, hidden }: PlayFilter): Play[] {
+  if (!musicOnly && hidden.size === 0) return plays
+  return plays.filter((p) => (p.kind === 'track' ? !hidden.has(p.artist) : !musicOnly))
+}
+
 // ---------- Summary ----------
 
 export interface Summary {
