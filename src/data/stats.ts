@@ -61,6 +61,7 @@ export interface Summary {
   /** Plays of 30s or more */
   streams: number
   artists: number
+  /** Different songs with a play of 30s or more, the same rule as `streams` */
   tracks: number
   activeDays: number
   /** Share of music plays that were skipped, 0–1 */
@@ -96,7 +97,7 @@ export function summarize(plays: Play[]): Summary {
       if (isSkip(p)) skips++
       if (p.shuffle) shuffles++
       artists.add(p.artist)
-      tracks.add(trackKey(p))
+      if (p.msPlayed >= COUNTED_PLAY_MS) tracks.add(trackKey(p))
     } else if (p.kind === 'episode') {
       podcastMs += p.msPlayed
     }
@@ -271,12 +272,15 @@ export interface FunStats {
   longestStreak: { days: number; start: Date; end: Date } | null
   biggestDay: { date: Date; ms: number } | null
   onRepeat: { title: string; artist: string; date: Date; count: number } | null
+  /** The song played most within any seven days in a row, with when each of those plays started */
+  topWeek: { title: string; artist: string; start: Date; end: Date; count: number; plays: Date[] } | null
 }
 
 export function funStats(plays: Play[]): FunStats {
   const msByDay = new Map<number, number>()
   const repeats = new Map<string, number>()
   let onRepeat: FunStats['onRepeat'] = null
+  const songPlays = new Map<string, Play[]>()
 
   for (const p of plays) {
     const day = dayNumber(startDate(p))
@@ -288,6 +292,26 @@ export function funStats(plays: Play[]): FunStats {
     repeats.set(key, count)
     if (!onRepeat || count > onRepeat.count) {
       onRepeat = { title: p.title, artist: p.artist, date: fromDayNumber(day), count }
+    }
+    const list = songPlays.get(trackKey(p))
+    if (list) list.push(p)
+    else songPlays.set(trackKey(p), [p])
+  }
+
+  // Slide a seven-day window along each song's plays, in the order they started
+  let topWeek: FunStats['topWeek'] = null
+  for (const list of songPlays.values()) {
+    if (topWeek && list.length <= topWeek.count) continue
+    list.sort((a, b) => a.endTime - a.msPlayed - (b.endTime - b.msPlayed))
+    const days = list.map((p) => dayNumber(startDate(p)))
+    let lo = 0
+    for (let hi = 0; hi < list.length; hi++) {
+      while (days[hi] - days[lo] >= 7) lo++
+      const count = hi - lo + 1
+      if (!topWeek || count > topWeek.count) {
+        const window = list.slice(lo, hi + 1)
+        topWeek = { title: list[hi].title, artist: list[hi].artist, start: fromDayNumber(days[lo]), end: fromDayNumber(days[hi]), count, plays: window.map(startDate) }
+      }
     }
   }
 
@@ -307,7 +331,7 @@ export function funStats(plays: Play[]): FunStats {
     }
   }
 
-  return { longestStreak, biggestDay, onRepeat }
+  return { longestStreak, biggestDay, onRepeat, topWeek }
 }
 
 /** Artists whose first-ever counted play happened in `year` */

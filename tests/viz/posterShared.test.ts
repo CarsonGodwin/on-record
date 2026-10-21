@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatMonthShort } from '../../src/lib/format'
-import { clock, driftScale, monthly } from '../../src/viz/posterShared'
+import { clock, driftScale, monthly, renderBlob, type BlobCanvas, type RenderedImage } from '../../src/viz/posterShared'
 import { SLOT_OTHER, SLOT_PODCAST, buildRecord, MINUTES } from '../../src/viz/record'
 import { at, play, sorted } from '../helpers'
 
@@ -125,5 +125,83 @@ describe('clock', () => {
 
   it('wraps the end of the day to midnight', () => {
     expect(clock(1440)).toBe('12 am')
+  })
+})
+
+describe('renderBlob', () => {
+  type Outcome = 'ok' | 'no context' | 'throws' | 'lost while drawing' | 'lost unseen' | 'lost while encoding' | 'no blob'
+
+  /** Canvases that each behave as told, in order, remembering the size they were drawn at and whether they were freed */
+  function canvases(outcomes: Outcome[]) {
+    const made: { drawnAt: [number, number] | null; freed: boolean }[] = []
+    let next = 0
+    const create = (): BlobCanvas => {
+      const outcome = outcomes[next++]
+      const record: (typeof made)[number] = { drawnAt: null, freed: false }
+      made.push(record)
+      let lost = false
+      const ctx = {
+        // 'lost unseen' is a browser that can't say its canvas was lost, so only the blank pixels give it away
+        isContextLost: outcome === 'lost unseen' ? undefined : () => lost,
+        getImageData: () => ({ data: [0, 0, 0, lost ? 0 : 255] }),
+      } as unknown as CanvasRenderingContext2D
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => (outcome === 'no context' ? null : ctx),
+        toBlob(callback: BlobCallback) {
+          if (outcome === 'lost while encoding') lost = true
+          callback(outcome === 'no blob' ? null : new Blob([`${this.width}x${this.height}`]))
+        },
+      }
+      const draw = (w: number, h: number) => {
+        record.drawnAt = [w, h]
+        if (outcome === 'throws') throw new Error('out of memory')
+        if (outcome === 'lost while drawing' || outcome === 'lost unseen') lost = true
+      }
+      // Watch for the canvas being emptied once it's done with
+      return new Proxy(canvas, {
+        set(target, key, value) {
+          if (key === 'width' && value === 0 && record.drawnAt) record.freed = true
+          return Reflect.set(target, key, value)
+        },
+        get(target, key) {
+          return key === 'draw' ? draw : Reflect.get(target, key)
+        },
+      }) as BlobCanvas
+    }
+    let current: BlobCanvas | null = null
+    const tracked = () => (current = create())
+    const draw = (_: CanvasRenderingContext2D, w: number, h: number) => (current as unknown as { draw: (w: number, h: number) => void }).draw(w, h)
+    return { made, create: tracked, draw }
+  }
+
+  /** The image's contents and size, which the stand-in canvases write as "WxH" */
+  const contents = async (image: RenderedImage | null) => (image ? { text: await image.blob.text(), width: image.width, height: image.height } : null)
+
+  it('draws at the first scale when it works, rounding the size', async () => {
+    const c = canvases(['ok'])
+    expect(await contents(await renderBlob(2160, 2700, [0.333, 0.5], c.draw, c.create))).toEqual({ text: '719x899', width: 719, height: 899 })
+    expect(c.made).toEqual([{ drawnAt: [719, 899], freed: true }])
+  })
+
+  it('steps down past every way a canvas can fail, and says what size it settled on', async () => {
+    const fails: Outcome[] = ['no context', 'throws', 'lost while drawing', 'lost unseen', 'lost while encoding', 'no blob']
+    const c = canvases([...fails, 'ok'])
+    const image = await renderBlob(1000, 1000, [1, 0.9, 0.8, 0.7, 0.6, 0.55, 0.5], c.draw, c.create)
+    expect(await contents(image)).toEqual({ text: '500x500', width: 500, height: 500 })
+    expect(c.made).toHaveLength(7)
+    // Each one that got drawn on was emptied afterwards
+    expect(c.made.filter((m) => m.drawnAt).every((m) => m.freed)).toBe(true)
+  })
+
+  it('gives up with null when no scale works', async () => {
+    const c = canvases(['lost while drawing', 'no blob'])
+    expect(await renderBlob(1000, 1000, [1, 0.5], c.draw, c.create)).toBeNull()
+  })
+
+  it('throws the error rather than null when a scale threw and none worked, so a bug in draw shows', async () => {
+    const c = canvases(['throws', 'no context'])
+    await expect(renderBlob(1000, 1000, [1, 0.5], c.draw, c.create)).rejects.toThrow('out of memory')
   })
 })

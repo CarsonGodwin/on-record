@@ -175,7 +175,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       graph: { ...graph, layout: layoutConstellation(graph.nodes, graph.links) },
       colors,
       pulse: { artists: pulseArtists, series: artistSeries(totals, pulseArtists, bins.size === 'month' ? 1 : 2) },
-      stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, peak: formatHour(peak.hour) },
+      stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, songs: summary.tracks, peak: formatHour(peak.hour) },
       wearOut: wear,
       moments: posterMoments(record, fun, rec),
     }),
@@ -621,6 +621,13 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 ))}
               </ul>
             </details>
+            <p className="colophon">
+              On Record is open source.{' '}
+              <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
+                Star it, report a bug or support it on GitHub
+              </a>
+              .
+            </p>
             <p className="disclaimer">
               On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
               trademark of Spotify AB.
