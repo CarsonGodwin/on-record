@@ -3799,6 +3799,16 @@ th {
   color: var(--text);
 }
 
+.colophon {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.colophon + .disclaimer {
+  margin-top: 8px;
+}
+
 .disclaimer {
   margin-top: 28px;
   color: var(--muted);
