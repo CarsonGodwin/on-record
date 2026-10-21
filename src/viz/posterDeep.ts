@@ -9,6 +9,9 @@ import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from 
  * The record is the centrepiece, fully annotated, with small charts that unpack it underneath.
  */
 
+/** Lines of callout detail that fit in a callout's block */
+const DETAIL_LINES = 3
+
 interface Callout {
   label: string
   value: string
@@ -48,13 +51,34 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillStyle = ink
   ctx.font = font(800, 4.2 * u)
   let y = wrap(ctx, title, pad, 9 * u, W - 2 * pad, 4.9 * u)
+
+  // The headline numbers, big, in a row under the title
+  const figures = [
+    { value: data.stats.hours, label: 'hours listened' },
+    { value: data.stats.streams, label: 'plays' },
+    { value: data.stats.songs, label: 'different songs' },
+    { value: data.stats.artists, label: 'artists' },
+  ]
+  const figW = (W - 2 * pad) / figures.length
+  const figTop = y + 2.6 * u
+  figures.forEach((f, i) => {
+    const x = pad + i * figW
+    ctx.fillStyle = ink
+    ctx.font = font(800, 4 * u)
+    ctx.fillText(formatNumber(f.value), x, figTop + 3.6 * u)
+    ctx.fillStyle = soft
+    ctx.font = font(600, 1.5 * u)
+    ctx.fillText(f.label, x, figTop + 5.9 * u)
+  })
+  y = figTop + 5.9 * u
+
   ctx.fillStyle = soft
   ctx.font = font(500, 1.7 * u)
   y = wrap(
     ctx,
-    `${formatNumber(data.stats.hours)} hours, ${formatNumber(data.stats.streams)} plays, ${formatNumber(data.stats.artists)} artists. Each ring is one day, from the centre (${formatDate(firstDate)}) to the edge (${formatDate(lastDate)}). Each coloured mark is a play, placed at the time of day it happened, midnight at the top. The white line follows the time of day I usually listened.`,
+    `Each ring is one day, from the centre (${formatDate(firstDate)}) to the edge (${formatDate(lastDate)}). Each coloured mark is a play, placed at the time of day it happened, midnight at the top.`,
     pad,
-    y + 3.4 * u,
+    y + 3 * u,
     W - 2 * pad,
     2.35 * u,
   )
@@ -62,8 +86,8 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillRect(pad, y + 2 * u, W - 2 * pad, Math.max(1, 0.1 * u))
 
   // ---------- The record ----------
-  const mainTop = y + 3 * u
-  const mainBottom = mainTop + 60 * u
+  const mainTop = y + 2.6 * u
+  const mainBottom = mainTop + 58.5 * u
   const Rd = 25.5 * u
   const cx = W / 2
   const cy = (mainTop + mainBottom) / 2
@@ -201,6 +225,8 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       callouts.push({ label: 'Longest session', value: m.value, detail: `${m.detail}, from ${clock(m.from)}`, anchors: [polar(ringR(m.ring + 0.5), (m.from + m.to) / 2)] })
     } else if (m.kind === 'first') {
       callouts.push({ label: 'First play', value: m.value, detail: m.detail, anchors: [polar(ringR(m.ring + 0.5), m.from ?? 0)] })
+    } else if (m.kind === 'week' && m.plays) {
+      callouts.push({ label: 'Most played in a week', value: m.value, detail: m.detail, anchors: m.plays.map((p) => polar(ringR(p.ring + 0.5), p.minute)) })
     }
   }
   const quiet = goneQuiet(model)
@@ -255,7 +281,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
 
   // ---------- Legend ----------
   let lx = pad
-  let ly = mainBottom + 3.5 * u
+  let ly = mainBottom + 2.8 * u
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
   const legend = [
@@ -288,11 +314,11 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   }
 
   // ---------- Three small charts ----------
-  const panelTop = ly + 4.6 * u
+  const panelTop = ly + 3.8 * u
   const gap = 3.5 * u
   const pw = (W - 2 * pad - 2 * gap) / 3
-  const chartTop = panelTop + 4.6 * u
-  const chartH = 10.5 * u
+  const chartTop = panelTop + 4.4 * u
+  const chartH = 9 * u
   const panel = (i: number, heading: string, sub: string) => {
     const x = pad + i * (pw + gap)
     ctx.textAlign = 'left'
@@ -520,7 +546,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   }
 
   // ---------- Your #1, year by year (month by month for a single year) ----------
-  const stripTop = chartTop + chartH + 3.4 * u
+  const stripTop = chartTop + chartH + 2.4 * u
   ctx.fillStyle = faint
   ctx.fillRect(pad, stripTop - 1.6 * u, W - 2 * pad, Math.max(1, 0.1 * u))
   const periods = multiYear ? monthly(model, 'year', true) : months
@@ -613,12 +639,25 @@ function placeCallouts(
     const detail = Math.max(...wrapLines(ctx, c.detail, width).map((l) => ctx.measureText(l).width))
     return Math.min(width, Math.max(label, value, detail))
   }
+  // The detail gets as many lines as fit under the value before the block ends; more are cut short
+  const detailLines = (c: Callout, width: number) => {
+    ctx.font = o.font(500, 1.35 * u)
+    const lines = wrapLines(ctx, c.detail, width)
+    return lines.length <= DETAIL_LINES ? lines : [...lines.slice(0, DETAIL_LINES - 1), clip(ctx, lines.slice(DETAIL_LINES - 1).join(' '), width)]
+  }
+  const fits = (c: Callout, width: number) => {
+    ctx.font = o.font(600, 1.45 * u)
+    if (2.2 * u + ctx.measureText(c.label).width > width) return false
+    ctx.font = o.font(500, 1.35 * u)
+    return wrapLines(ctx, c.detail, width).length <= DETAIL_LINES
+  }
   const endOf = (c: Callout, slot: (typeof slots)[number]): [number, number] => [
     slot.left ? o.pad + textWidth(c, slot.width) + 0.8 * u : slot.edge - 0.8 * u,
     slot.top + 2.4 * u,
   ]
 
-  // Cost of each callout in each slot: its nearest anchor's leader length, and a heavy penalty for crossing the label
+  // Cost of each callout in each slot: its nearest anchor's leader length, a heavy penalty for crossing the label,
+  // and a lighter one for a slot too narrow for its words
   const crossesLabel = (a: [number, number], b: [number, number]) => {
     const [dx, dy] = [b[0] - a[0], b[1] - a[1]]
     const t = Math.max(0, Math.min(1, ((o.cx - a[0]) * dx + (o.cy - a[1]) * dy) / (dx * dx + dy * dy || 1)))
@@ -636,7 +675,7 @@ function placeCallouts(
           pick = a
         }
       }
-      return { cost, anchor: pick, end }
+      return { cost: cost + (fits(c, slot.width) ? 0 : 100 * u), anchor: pick, end }
     }),
   )
   // Try every assignment of callouts to distinct slots (at most 8P5) and keep the cheapest
@@ -708,13 +747,12 @@ function placeCallouts(
     ctx.textAlign = 'left'
     ctx.fillStyle = o.soft
     ctx.font = o.font(600, 1.45 * u)
-    ctx.fillText(p.c.label, x + 2.2 * u, p.slot.top + 1.4 * u)
+    ctx.fillText(clip(ctx, p.c.label, p.slot.width - 2.2 * u), x + 2.2 * u, p.slot.top + 1.4 * u)
     ctx.fillStyle = o.ink
     ctx.font = valueFont(p.c, p.slot.width)
     ctx.fillText(clip(ctx, p.c.value, p.slot.width), x, p.slot.top + 4.3 * u)
     ctx.fillStyle = o.soft
-    ctx.font = o.font(500, 1.35 * u)
-    wrap(ctx, p.c.detail, x, p.slot.top + 6.3 * u, p.slot.width, 1.8 * u)
+    detailLines(p.c, p.slot.width).forEach((line, j) => ctx.fillText(line, x, p.slot.top + (6.3 + j * 1.8) * u))
   })
   return {
     markers: placed.map((p) => p.anchor),

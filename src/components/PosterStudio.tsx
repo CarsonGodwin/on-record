@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWidth } from '../lib/hooks'
 import { COARSE } from '../lib/pointer'
 import { POSTER_DESIGN_SIZES, POSTER_SIZES, SOLID_PAPER_DESIGNS, isDarkPaper, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
+import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
 import { Segmented } from './ui'
 
 /*
@@ -29,6 +30,9 @@ const TITLE = 'On Record'
 /** Deep dive can also come out this many times bigger, so a single day's groove gets real pixels */
 const ULTRA_SCALES = [4, 3, 2]
 
+/** The full-size poster, then smaller fallbacks for phones whose canvas gives out on a big record */
+const FULL_SCALES = [1, 0.75, 0.5]
+
 const PAPERS: { value: PosterPaper; label: string; swatch: string }[] = [
   { value: 'midnight', label: 'Black gradient', swatch: '#0b0a0f' },
   { value: 'cream', label: 'Cream gradient', swatch: '#efe8da' },
@@ -53,6 +57,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const [size, setSize] = useState<PosterSize>('post')
   const [paper, setPaper] = useState<PosterPaper>('midnight')
   const [fontsReady, setFontsReady] = useState(false)
+  // Bumped when the browser hands back a preview canvas it had dropped, so the poster is drawn again
+  const [restored, setRestored] = useState(0)
   const [busy, setBusy] = useState<'download' | 'ultra' | 'share' | null>(null)
   const [canShare] = useState(supportsFileShare)
   // Safari only opens the share sheet straight after a tap, so on phones the full-size image is made ahead of time
@@ -61,6 +67,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const [pressImage, setPressImage] = useState<{ key: string; data: PosterData; url: string } | null>(null)
   // Ultra HD takes too long to render inside one tap, so on phones it's made first and shared with a second tap
   const [ultra, setUltra] = useState<{ key: string; data: PosterData; blob: Blob } | null>(null)
+  // When the last image made for these options came out smaller than its size promises (`made`), or not at all (null)
+  const [shortfall, setShortfall] = useState<{ key: string; data: PosterData; made: { width: number; height: number } | null } | null>(null)
   const mobile = COARSE && canShare
 
   // Some designs are drawn for one size only, so the size picker narrows to what they support
@@ -74,6 +82,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const papers = SOLID_PAPER_DESIGNS.includes(design) ? [...PAPERS, ...SOLID_PAPERS] : PAPERS
   const activePaper = papers.some((p) => p.value === paper) ? paper : isDarkPaper(paper) ? 'midnight' : 'cream'
   const fileName = `on-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
+  const optionsKey = `${design}|${activeSize}|${activePaper}`
 
   useEffect(() => {
     let live = true
@@ -88,6 +97,16 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     }
   }, [])
 
+  // Phones can drop a canvas's pixels when the GPU runs short; draw the poster again once it's handed back.
+  // (Cancelling 'contextlost' would tell a 2D canvas not to come back, so that event is left alone.)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const back = () => setRestored((n) => n + 1)
+    canvas.addEventListener('contextrestored', back)
+    return () => canvas.removeEventListener('contextrestored', back)
+  }, [])
+
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
@@ -96,30 +115,28 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     canvas.width = Math.round(cssW * dpr)
     canvas.height = Math.round(cssH * dpr)
     renderPoster(ctx, canvas.width, canvas.height, data, { design, paper: activePaper, title: TITLE })
-  }, [data, design, activePaper, cssW, cssH, fontsReady])
+  }, [data, design, activePaper, cssW, cssH, fontsReady, restored])
 
   const fullSize = useCallback(
-    async (scales: number[] = [1]): Promise<Blob | null> => {
+    async (scales: number[] = FULL_SCALES): Promise<Blob | null> => {
       await document.fonts.ready
-      // Browsers cap canvas size (phones far lower than desktops), so step down until one fits
-      for (const scale of scales) {
-        const canvas = document.createElement('canvas')
-        canvas.width = spec.width * scale
-        canvas.height = spec.height * scale
-        const ctx = canvas.getContext('2d')
-        if (!ctx) continue
-        renderPoster(ctx, canvas.width, canvas.height, data, { design, paper: activePaper, title: TITLE })
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
-        // Free the pixels now rather than whenever the GC gets to it
-        canvas.width = canvas.height = 0
-        if (blob) return blob
+      let image: RenderedImage | null = null
+      try {
+        image = await renderBlob(spec.width, spec.height, scales, (ctx, w, h) => renderPoster(ctx, w, h, data, { design, paper: activePaper, title: TITLE }))
+      } catch (err) {
+        console.error(err)
       }
-      return null
+      // A big render can cost the preview its pixels too, in browsers that never say so
+      const preview = canvasRef.current?.getContext('2d')
+      if (preview && isLost(preview)) setRestored((n) => n + 1)
+      // Ultra HD only promises "up to" its size, so it only owns up to not working at all
+      const regular = scales === FULL_SCALES
+      if (!image) setShortfall({ key: optionsKey, data, made: null })
+      else if (regular) setShortfall(image.width < spec.width ? { key: optionsKey, data, made: { width: image.width, height: image.height } } : null)
+      return image?.blob ?? null
     },
-    [spec, data, design, activePaper],
+    [spec, data, design, activePaper, optionsKey],
   )
-
-  const optionsKey = `${design}|${activeSize}|${activePaper}`
 
   useEffect(() => {
     if (!(canShare || COARSE) || !fontsReady) return
@@ -145,6 +162,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const pressReady = pressImage && pressImage.key === optionsKey && pressImage.data === data ? pressImage.url : null
   const ultraReady = ultra && ultra.key === optionsKey && ultra.data === data ? ultra.blob : null
   const ultraName = fileName.replace(/\.png$/, '-ultra.png')
+  const short = shortfall && shortfall.key === optionsKey && shortfall.data === data ? shortfall : null
 
   function save(blob: Blob, name = fileName) {
     const url = URL.createObjectURL(blob)
@@ -277,6 +295,13 @@ export function PosterStudio({ data, design, onDesign }: Props) {
               </button>
             )}
           </div>
+        )}
+        {short && (
+          <p className="studio__notice" role="status">
+            {short.made
+              ? `This device could only make it ${short.made.width} × ${short.made.height} px, not the full ${spec.width} × ${spec.height}. A computer can make it full size.`
+              : 'This device couldn’t make the image. Try again, or make it on a computer.'}
+          </p>
         )}
         {hasUltra && (
           <div className="studio__ultra">

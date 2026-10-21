@@ -9,7 +9,7 @@ import { at, play, sorted } from '../helpers'
 // January 10 to 20, 2024: ring 0 is the 10th
 const model = buildRecord(sorted([play(at(2024, 1, 10, 9)), play(at(2024, 1, 20, 21))]), [], null)
 
-const noFun: FunStats = { longestStreak: null, biggestDay: null, onRepeat: null }
+const noFun: FunStats = { longestStreak: null, biggestDay: null, onRepeat: null, topWeek: null }
 const noRecords: Records = { firstPlay: null, marathon: null, avgSessionMs: 0, evergreen: null, forgotten: null }
 
 describe('posterMoments', () => {
@@ -66,5 +66,13 @@ describe('posterMoments', () => {
       { ...noRecords, firstPlay: { title: 'T', artist: 'A', date: after.getTime() } },
     )
     expect(moments).toEqual([])
+  })
+
+  it('marks each play of the week’s top song, but only once it repeats', () => {
+    const topWeek = (count: number) => ({ ...noFun, topWeek: { title: 'Loop', artist: 'Band', start: at(2024, 1, 12, 0), end: at(2024, 1, 14, 0), count, plays: [at(2024, 1, 12, 8), at(2024, 1, 14, 22, 30)].slice(0, count) } })
+    expect(posterMoments(model, topWeek(1), noRecords)).toEqual([])
+    const [w] = posterMoments(model, topWeek(2), noRecords)
+    expect(w).toMatchObject({ kind: 'week', value: 'Loop', ring: 2, ringEnd: 4, plays: [{ ring: 2, minute: 480 }, { ring: 4, minute: 1350 }] })
+    expect(w.detail).toBe(`Band · 2 plays the week of ${formatDate(at(2024, 1, 12))}`)
   })
 })

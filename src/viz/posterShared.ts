@@ -147,3 +147,65 @@ export function clip(ctx: CanvasRenderingContext2D, text: string, maxW: number):
   while (s.length > 1 && ctx.measureText(`${s}…`).width > maxW) s = s.slice(0, -1)
   return `${s.trimEnd()}…`
 }
+
+/** The bits of a canvas `renderBlob` needs, so tests can stand in for one */
+export interface BlobCanvas {
+  width: number
+  height: number
+  getContext(type: '2d'): CanvasRenderingContext2D | null
+  toBlob(callback: BlobCallback, type?: string): void
+}
+
+/** A rendered PNG and the size it came out at */
+export interface RenderedImage {
+  blob: Blob
+  width: number
+  height: number
+}
+
+/**
+ * Draws a width × height image as a PNG at the first scale that works. Browsers cap canvas size and GPU
+ * memory (phones far lower than desktops), so a scale whose canvas won't open, throws, or is lost mid-draw
+ * falls through to the next one. Null when none of them work, unless one threw: then that error is thrown,
+ * so a bug in `draw` doesn't pass for a device that ran out of room.
+ *
+ * `draw` must paint an opaque background, since a see-through corner is how a lost canvas is caught in
+ * browsers that can't say so.
+ */
+export async function renderBlob(
+  width: number,
+  height: number,
+  scales: number[],
+  draw: (ctx: CanvasRenderingContext2D, width: number, height: number) => void,
+  createCanvas: () => BlobCanvas = () => document.createElement('canvas'),
+): Promise<RenderedImage | null> {
+  let error: unknown
+  for (const scale of scales) {
+    const canvas = createCanvas()
+    canvas.width = Math.round(width * scale)
+    canvas.height = Math.round(height * scale)
+    const made = { width: canvas.width, height: canvas.height }
+    const ctx = canvas.getContext('2d')
+    let blob: Blob | null = null
+    if (ctx) {
+      try {
+        draw(ctx, canvas.width, canvas.height)
+        // A canvas lost mid-draw comes back blank, so don't hand that out as the image
+        if (!isLost(ctx)) blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+        if (ctx.isContextLost?.()) blob = null
+      } catch (err) {
+        error ??= err
+      }
+    }
+    // Free the pixels now rather than whenever the GC gets to it
+    canvas.width = canvas.height = 0
+    if (blob) return { blob, ...made }
+  }
+  if (error !== undefined) throw error
+  return null
+}
+
+/** Whether a canvas has lost its pixels. Not every browser can say, so a see-through corner counts too */
+export function isLost(ctx: CanvasRenderingContext2D): boolean {
+  return ctx.isContextLost?.() || ctx.getImageData(0, 0, 1, 1).data[3] === 0
+}

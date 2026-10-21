@@ -1,13 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
+  ARCS_PER_STROKE,
+  DIMMED,
+  GLOW_MAX,
   MINUTES,
   SLOT_OTHER,
   SLOT_PODCAST,
   buildRecord,
+  drawRecord,
   quietestMinute,
   recordGeometry,
   recordGuides,
   visibleWindow,
+  type DrawOptions,
+  type RecordModel,
 } from '../../src/viz/record'
 import { formatMonthShort } from '../../src/lib/format'
 import { at, play, sorted } from '../helpers'
@@ -143,5 +149,159 @@ describe('quietestMinute', () => {
     // Anywhere in 6 pm to 6 am, away from the busy daytime
     expect(quiet >= 18 * 60 + 60 || quiet <= 6 * 60 - 60).toBe(true)
     expect(quiet % 30).toBe(0)
+  })
+})
+
+describe('drawRecord', () => {
+  /** Every play stroke drawRecord makes: its color, how many arcs went into the path, and the glow and opacity it had */
+  interface Stroke {
+    style: string
+    arcs: number
+    blur: number
+    alpha: number
+  }
+
+  interface Recording {
+    strokes: Stroke[]
+    /** The opacity of each layer laid down with drawImage */
+    laid: number[]
+  }
+
+  /** A stand-in 2D context that records strokes and layers laid down into `out`, and ignores everything else */
+  function recorder(out: Recording, canvas: object = { width: 1000, height: 1000 }) {
+    let arcs = 0
+    const state: Record<string, unknown> = { globalAlpha: 1, shadowBlur: 0, strokeStyle: '', canvas }
+    const calls: Record<string, (...args: unknown[]) => unknown> = {
+      beginPath: () => (arcs = 0),
+      arc: () => arcs++,
+      stroke: () => out.strokes.push({ style: String(state.strokeStyle), arcs, blur: Number(state.shadowBlur), alpha: Number(state.globalAlpha) }),
+      drawImage: () => out.laid.push(Number(state.globalAlpha)),
+      measureText: () => ({ width: 10 }),
+    }
+    return new Proxy(state, {
+      get: (target, key: string) => (key in calls ? calls[key] : key in target ? target[key] : () => ({ addColorStop() {} })),
+      set: (target, key: string, value) => ((target[key] = value), true),
+    }) as unknown as CanvasRenderingContext2D
+  }
+
+  // drawRecord keeps its scratch layer between draws, so the layer records into whichever draw is current
+  const onLayer: Recording = { strokes: [], laid: [] }
+  class FakeOffscreenCanvas {
+    width: number
+    height: number
+    constructor(width: number, height: number) {
+      this.width = width
+      this.height = height
+    }
+    getContext() {
+      return recorder(onLayer, this)
+    }
+  }
+  beforeAll(() => vi.stubGlobal('OffscreenCanvas', FakeOffscreenCanvas))
+  afterAll(() => vi.unstubAllGlobals())
+
+  /** A record of `count` short plays spread over 100 days, all in one slot */
+  function model(count: number, slot: number): RecordModel {
+    const from = Float32Array.from({ length: count }, (_, k) => (k * 7) % (MINUTES - 10))
+    return {
+      firstDay: 0,
+      days: 100,
+      count,
+      ring: Int32Array.from({ length: count }, (_, k) => k % 100),
+      from,
+      to: from.map((m) => m + 5),
+      slot: new Uint8Array(count).fill(slot),
+      play: Int32Array.from({ length: count }, (_, k) => k),
+      dayMinutes: new Float64Array(100),
+    }
+  }
+
+  const options = (o: Partial<DrawOptions> = {}): DrawOptions => ({
+    size: 1000,
+    colors: Array.from({ length: SLOT_PODCAST + 1 }, (_, i) => `slot${i}`),
+    focus: null,
+    title: '',
+    subtitle: '',
+    labelColor: '#ff277c',
+    sheen: false,
+    ink: 'transparent',
+    guides: [],
+    guideMinute: 0,
+    noGuideLabels: true,
+    ...o,
+  })
+
+  /** The play strokes (the ones in a slot color) made on the canvas and on the scratch layer, and the layers laid down */
+  const render = (m: RecordModel, o?: Partial<DrawOptions>) => {
+    const main: Recording = { strokes: [], laid: [] }
+    onLayer.strokes = []
+    onLayer.laid = []
+    drawRecord(recorder(main), m, options(o))
+    const plays = (strokes: Stroke[]) => strokes.filter((s) => s.style.startsWith('slot'))
+    return { strokes: plays(main.strokes), layer: plays(onLayer.strokes), laid: main.laid }
+  }
+  const draw = (m: RecordModel, o?: Partial<DrawOptions>) => render(m, o).strokes
+
+  it('glows the top artists on a record of up to GLOW_MAX plays', () => {
+    const strokes = draw(model(GLOW_MAX, 0))
+    const top = strokes.filter((s) => s.style === 'slot0')
+    expect(top).toHaveLength(1)
+    expect(top[0].blur).toBeGreaterThan(0)
+    // Everyone else and podcasts never glow
+    const rest = strokes.filter((s) => s.style === `slot${SLOT_OTHER}` || s.style === `slot${SLOT_PODCAST}`)
+    expect(rest.map((s) => s.blur)).toEqual([0, 0])
+  })
+
+  it('leaves the glow off on a bigger record, unless asked for', () => {
+    const big = model(GLOW_MAX + 1, 0)
+    expect(draw(big).every((s) => s.blur === 0)).toBe(true)
+    expect(draw(big, { glow: true }).find((s) => s.style === 'slot0')?.blur).toBeGreaterThan(0)
+    expect(draw(model(10, 0), { glow: false }).every((s) => s.blur === 0)).toBe(true)
+  })
+
+  it('splits a big slot into strokes of at most ARCS_PER_STROKE arcs, and loses none', () => {
+    const count = Math.round(ARCS_PER_STROKE * 2.5)
+    const strokes = draw(model(count, SLOT_OTHER)).filter((s) => s.style === `slot${SLOT_OTHER}`)
+    expect(strokes.map((s) => s.arcs)).toEqual([ARCS_PER_STROKE, ARCS_PER_STROKE, count - 2 * ARCS_PER_STROKE])
+  })
+
+  it('keeps a glowing slot in one stroke, in focus or not, so its glow does not show seams', () => {
+    const count = ARCS_PER_STROKE * 2
+    const glowing = draw(model(count, 0), { glow: true }).filter((s) => s.style === 'slot0')
+    expect(glowing.map((s) => s.arcs)).toEqual([count])
+    const dimmed = render(model(count, 0), { glow: true, focus: 1 })
+    expect(dimmed.strokes.filter((s) => s.style === 'slot0').map((s) => [s.arcs, s.alpha])).toEqual([[count, DIMMED]])
+    expect(dimmed.laid).toEqual([])
+  })
+
+  it('draws a big see-through slot solid and in pieces on a layer, then lays it down see-through in one go', () => {
+    const count = ARCS_PER_STROKE * 2 + 10
+    const { strokes, layer, laid } = render(model(count, SLOT_OTHER), { focus: 0 })
+    expect(layer.map((s) => [s.style, s.arcs, s.alpha])).toEqual([
+      [`slot${SLOT_OTHER}`, ARCS_PER_STROKE, 1],
+      [`slot${SLOT_OTHER}`, ARCS_PER_STROKE, 1],
+      [`slot${SLOT_OTHER}`, 10, 1],
+    ])
+    expect(laid).toEqual([DIMMED])
+    expect(strokes.filter((s) => s.style === `slot${SLOT_OTHER}`)).toEqual([])
+  })
+
+  it('strokes a small see-through slot straight onto the canvas', () => {
+    const { strokes, layer, laid } = render(model(100, SLOT_OTHER), { focus: 0 })
+    expect(strokes.filter((s) => s.style === `slot${SLOT_OTHER}`)).toEqual([{ style: `slot${SLOT_OTHER}`, arcs: 100, blur: 0, alpha: DIMMED }])
+    expect(layer).toEqual([])
+    expect(laid).toEqual([])
+  })
+
+  it('splits every slot it draws, on a big record shared between them', () => {
+    // Half the plays to the top artist, half to everyone else, with the top artist in focus
+    const m = model(GLOW_MAX + ARCS_PER_STROKE * 2, SLOT_OTHER)
+    m.slot.fill(0, 0, m.count / 2)
+    const { strokes, layer, laid } = render(m, { focus: 0 })
+    expect(strokes.filter((s) => s.style === 'slot0').every((s) => s.arcs <= ARCS_PER_STROKE && s.alpha === 1)).toBe(true)
+    expect(layer.length).toBeGreaterThan(1)
+    expect(layer.every((s) => s.style === `slot${SLOT_OTHER}` && s.arcs <= ARCS_PER_STROKE)).toBe(true)
+    expect(laid).toEqual([DIMMED])
+    expect([...strokes, ...layer].reduce((sum, s) => sum + s.arcs, 0)).toBe(m.count)
   })
 })

@@ -141,7 +141,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       graph: { ...graph, layout: layoutConstellation(graph.nodes, graph.links) },
       colors,
       pulse: { artists: pulseArtists, series: artistSeries(totals, pulseArtists, bins.size === 'month' ? 1 : 2) },
-      stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, peak: formatHour(peak.hour) },
+      stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, songs: summary.tracks, peak: formatHour(peak.hour) },
       wearOut: wear,
       moments: posterMoments(record, fun, rec),
     }),

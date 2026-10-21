@@ -63,7 +63,7 @@ export interface PosterData {
   graph: { nodes: GraphNode[]; links: GraphLink[]; layout: Layout }
   colors: Map<string, string>
   pulse: { artists: string[]; series: Map<string, number[]> }
-  stats: { hours: number; streams: number; artists: number; peak: string }
+  stats: { hours: number; streams: number; artists: number; songs: number; peak: string }
   /** How the skip rate climbs or falls the more times a song has been played */
   wearOut: WearOut
   /** Standout days and runs, for the designs that point them out on the record */
@@ -71,7 +71,7 @@ export interface PosterData {
 }
 
 export interface PosterMoment {
-  kind: 'day' | 'streak' | 'session' | 'first'
+  kind: 'day' | 'streak' | 'session' | 'first' | 'week'
   /** "LONGEST DAY" */
   label: string
   /** "9.2 hrs" */
@@ -84,6 +84,8 @@ export interface PosterMoment {
   /** Minutes after midnight; a session runs on to `to`. Left out for a whole day */
   from?: number
   to?: number
+  /** Each play it's made of, as a groove and minutes after midnight */
+  plays?: { ring: number; minute: number }[]
 }
 
 /** Picks out the moments worth calling out, as grooves and times on the record */
@@ -114,6 +116,18 @@ export function posterMoments(model: RecordModel, fun: FunStats, rec: Records): 
   if (rec.firstPlay) {
     const d = new Date(rec.firstPlay.date)
     out.push({ kind: 'first', label: 'FIRST SPIN', value: rec.firstPlay.title, detail: rec.firstPlay.artist, ring: ringOf(d), from: minuteOf(d) })
+  }
+  if (fun.topWeek && fun.topWeek.count > 1) {
+    const { title, artist, start, end, count, plays } = fun.topWeek
+    out.push({
+      kind: 'week',
+      label: 'MOST PLAYED IN A WEEK',
+      value: title,
+      detail: `${artist} · ${formatNumber(count)} plays the week of ${formatDate(start)}`,
+      ring: ringOf(start),
+      ringEnd: ringOf(end),
+      plays: plays.map((d) => ({ ring: ringOf(d), minute: minuteOf(d) })),
+    })
   }
   return out.filter((m) => m.ring >= 0 && m.ring < model.days)
 }
@@ -396,7 +410,8 @@ function annotatedArt(ctx: CanvasRenderingContext2D, data: PosterData, box: Box,
   // Streaks run across many grooves, so they're bracketed along a quiet radius, just past the month labels
   const streakMinute = (quietestMinute(model) + 75) % MINUTES
 
-  const marks = data.moments.slice(0, 4).map((m, i) => {
+  // The week's top song is only pointed out on the deep dive
+  const marks = data.moments.filter((m) => m.kind !== 'week').slice(0, 4).map((m, i) => {
     let ring = m.ring
     let minute = m.from ?? busiestMinute(model, m.ring)
     if (m.kind === 'streak') {

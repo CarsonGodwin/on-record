@@ -22,6 +22,45 @@ export const DISPLAY = '"Bricolage Grotesque Variable", system-ui, sans-serif'
 export const MONO = '"JetBrains Mono Variable", ui-monospace, monospace'
 export const SERIF = '"Instrument Serif", Georgia, serif'
 
+/** Above this many plays the glow is left off by default: blurring a path that size can exhaust a phone's GPU and lose the canvas */
+export const GLOW_MAX = 60_000
+/** Arcs per stroke. Phones' GPU canvases can give up on one path with hundreds of thousands of arcs, so it's drawn in pieces */
+export const ARCS_PER_STROKE = 4_000
+/** How see-through the slots out of focus are */
+export const DIMMED = 0.08
+
+type Context2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+
+let scratch: Context2D | null = null
+
+/** A cleared canvas the size of the one `ctx` draws on, kept between draws. Null where there's none to be had */
+function scratchLayer(ctx: CanvasRenderingContext2D): Context2D | null {
+  scratch ??=
+    typeof OffscreenCanvas !== 'undefined'
+      ? new OffscreenCanvas(1, 1).getContext('2d')
+      : typeof document !== 'undefined'
+        ? document.createElement('canvas').getContext('2d')
+        : null
+  if (!scratch) return null
+  const { width, height } = ctx.canvas
+  if (scratch.canvas.width !== width || scratch.canvas.height !== height) {
+    // Resizing clears it
+    scratch.canvas.width = width
+    scratch.canvas.height = height
+  } else {
+    scratch.setTransform(1, 0, 0, 1, 0, 0)
+    scratch.clearRect(0, 0, width, height)
+  }
+  return scratch
+}
+
+/** Whether a slot has more than `n` arcs */
+function slotOver(model: RecordModel, slot: number, n: number): boolean {
+  let count = 0
+  for (let k = 0; k < model.count; k++) if (model.slot[k] === slot && ++count > n) return true
+  return false
+}
+
 /** Every play split at midnight into per-day arcs, in flat arrays so 100k+ plays stay quick */
 export interface RecordModel {
   firstDay: number
@@ -149,6 +188,8 @@ export interface DrawOptions {
   zoom?: number
   /** The part of the drawing that's on screen, in drawing coordinates: grooves outside it are skipped, which keeps deep zooms quick */
   visible?: { x0: number; y0: number; x1: number; y1: number }
+  /** Let the top artists glow. Defaults to on for records of up to GLOW_MAX plays */
+  glow?: boolean
 }
 
 export interface Visible {
@@ -227,14 +268,13 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
 
   // The data, one stroke per color
   ctx.lineCap = 'butt'
-  ctx.lineWidth = Math.max(g.ring * 0.95, o.size / 1100 / z)
-  for (const slot of DRAW_ORDER) {
-    ctx.globalAlpha = o.focus === null || o.focus === slot ? 1 : 0.08
-    ctx.strokeStyle = o.colors[slot]
-    // Top artists glow a little, like ink under blacklight
-    ctx.shadowColor = slot < SLOT_OTHER ? o.colors[slot] : 'transparent'
-    ctx.shadowBlur = slot < SLOT_OTHER ? o.size * 0.007 : 0
-    ctx.beginPath()
+  const lineWidth = Math.max(g.ring * 0.95, o.size / 1100 / z)
+  ctx.lineWidth = lineWidth
+  const glow = o.glow ?? model.count <= GLOW_MAX
+  /** Strokes a slot's arcs onto `target`, `perStroke` of them at a time */
+  const strokeSlot = (target: Context2D, slot: number, perStroke: number) => {
+    target.beginPath()
+    let arcs = 0
     for (let k = 0; k < model.count; k++) {
       if (model.slot[k] !== slot) continue
       const r = g.inner + (model.ring[k] + 0.5) * g.ring
@@ -245,10 +285,44 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
       if (!((from < view.to && to > view.from) || from < view.to - MINUTES)) continue
       const a0 = (model.from[k] / MINUTES) * TAU - Math.PI / 2
       const a1 = Math.max((model.to[k] / MINUTES) * TAU - Math.PI / 2, a0 + 0.002)
-      ctx.moveTo(c + r * Math.cos(a0), c + r * Math.sin(a0))
-      ctx.arc(c, c, r, a0, a1)
+      target.moveTo(c + r * Math.cos(a0), c + r * Math.sin(a0))
+      target.arc(c, c, r, a0, a1)
+      if (++arcs === perStroke) {
+        target.stroke()
+        target.beginPath()
+        arcs = 0
+      }
     }
-    ctx.stroke()
+    target.stroke()
+  }
+  for (const slot of DRAW_ORDER) {
+    const dimmed = o.focus !== null && o.focus !== slot
+    // Top artists glow a little, like ink under blacklight
+    const glows = glow && slot < SLOT_OTHER
+    // Separate see-through strokes would double up where they overlap, showing as seams. So a big
+    // see-through slot is drawn solid, in pieces, on a scratch layer, then laid down see-through in one go
+    const layer = dimmed && !glows && slotOver(model, slot, ARCS_PER_STROKE) ? scratchLayer(ctx) : null
+    if (layer) {
+      layer.setTransform(ctx.getTransform())
+      layer.lineCap = 'butt'
+      layer.lineWidth = lineWidth
+      layer.strokeStyle = o.colors[slot]
+      strokeSlot(layer, slot, ARCS_PER_STROKE)
+      ctx.save()
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.globalAlpha = DIMMED
+      ctx.shadowColor = 'transparent'
+      ctx.shadowBlur = 0
+      ctx.drawImage(layer.canvas, 0, 0)
+      ctx.restore()
+      continue
+    }
+    ctx.globalAlpha = dimmed ? DIMMED : 1
+    ctx.strokeStyle = o.colors[slot]
+    ctx.shadowColor = glows ? o.colors[slot] : 'transparent'
+    ctx.shadowBlur = glows ? o.size * 0.007 : 0
+    // A glow's pieces would seam the same way, so a glowing slot stays whole, as does a small see-through one
+    strokeSlot(ctx, slot, glows || dimmed ? Infinity : ARCS_PER_STROKE)
   }
   ctx.globalAlpha = 1
   ctx.shadowBlur = 0

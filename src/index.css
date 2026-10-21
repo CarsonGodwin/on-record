@@ -1827,7 +1827,14 @@ th {
   font-size: 0.92rem;
 }
 
+.deck__stat {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .deck__badge {
+  flex-shrink: 0;
   padding: 2px 9px;
   border-radius: 999px;
   background: var(--accent);
@@ -3916,6 +3923,12 @@ th {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.studio__notice {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .studio__ultra {
