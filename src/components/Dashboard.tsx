@@ -502,6 +502,13 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 ))}
               </ul>
             </details>
+            <p className="colophon">
+              On Record is open source.{' '}
+              <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
+                Star it, report a bug or support it on GitHub
+              </a>
+              .
+            </p>
             <p className="disclaimer">
               On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
               trademark of Spotify AB.
