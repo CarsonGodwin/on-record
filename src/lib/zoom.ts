@@ -21,6 +21,8 @@ export interface PanZoom {
   view: View
   max: number
   zoomBy: (factor: number) => void
+  /** Eases to `scale`, keeping the content under (px, py) in place */
+  zoomTo: (scale: number, px: number, py: number) => void
   reset: () => void
 }
 
@@ -92,6 +94,10 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
 
   const zoomBy = useCallback(
     (factor: number) => animateTo(zoomAt(factor, bounds.current.width / 2, bounds.current.height / 2)),
+    [animateTo, zoomAt],
+  )
+  const zoomTo = useCallback(
+    (scale: number, px: number, py: number) => animateTo(zoomAt(scale / viewRef.current.s, px, py)),
     [animateTo, zoomAt],
   )
   const reset = useCallback(() => animateTo(IDENTITY), [animateTo])
@@ -226,5 +232,5 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
     }
   }, [ref, setView, zoomAt, busy])
 
-  return { view, max, zoomBy, reset }
+  return { view, max, zoomBy, zoomTo, reset }
 }

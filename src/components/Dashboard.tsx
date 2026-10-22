@@ -335,6 +335,29 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     return () => root.classList.remove('cards-open')
   }, [cards])
 
+  /*
+   * Leaving the page loses the export (nothing is kept), so on the deck the back gesture
+   * (an edge swipe on iPhone, the back button on Android) steps back a card instead, and
+   * from the first card goes back to the start page rather than off the site.
+   */
+  const backTo = useRef({ stops: tourStops, step: cardStep, onReset })
+  useLayoutEffect(() => {
+    backTo.current = { stops: tourStops, step: cardStep, onReset }
+  })
+  useEffect(() => {
+    if (!cards) return
+    history.pushState({ onRecordCards: true }, '')
+    const onPop = () => {
+      const { stops, step, onReset: reset } = backTo.current
+      if (step === 0) return reset()
+      history.pushState({ onRecordCards: true }, '')
+      setDealt('prev')
+      setCardAt(stops[step - 1])
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [cards])
+
   // Arrow keys deal cards too, except where a slider or the day details want them
   useEffect(() => {
     if (!cards) return
@@ -472,19 +495,21 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   return (
     <div className={['dash', touring && 'is-touring', cards && 'is-cards', updating && 'is-updating'].filter(Boolean).join(' ')}>
       <header className="topbar" ref={topbarRef}>
-        <a className="brand" href="#top" aria-label="On Record, back to the top">
+        <a
+          className="brand"
+          href="#top"
+          aria-label={cards ? 'On Record, back to the first track' : 'On Record, back to the top'}
+          onClick={(e) => {
+            if (!cards) return
+            e.preventDefault()
+            setCardStep(0)
+          }}
+        >
           <span className="brand__name">On Record</span>
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
-        <TrackMenu
-          tracks={TRACKS}
-          sides={SIDES}
-          current={cards ? onStage : current}
-          onPoster={() => makePoster(posterDesign)}
-          onReset={onReset}
-          onJump={cards ? jumpTo : undefined}
-        />
+        {!cards && <TrackMenu tracks={TRACKS} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />}
         <Segmented
           className="topbar__years"
           label="Time period"
@@ -543,7 +568,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
       <InCards value={cards}>
       <OnStage value={onStage}>
-        <main className="dash__main" data-dealt={cards ? dealt : undefined} {...swipeHandlers}>
+        {/* Turning a phone swaps the deck and the page, which lay their charts out differently: start them over */}
+        <main key={cards ? 'cards' : 'page'} className="dash__main" data-dealt={cards ? dealt : undefined} {...swipeHandlers}>
           {!cards && <Hero
             summary={summary}
             year={year}
@@ -560,7 +586,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
           <Side label="Side A" title={SIDES.A} />
 
-          <Chapter id="record" hint="One ring per day. Drag the needle to play one back." num="A1" title="The Record" lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
+          <Chapter id="record" hint="Each ring is a day. Drag the needle." num="A1" title="The Record" lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
             <Vinyl
               key={viewKey}
               plays={plays}
@@ -722,7 +748,18 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       </OnStage>
       </InCards>
 
-      {cards && <CardNav tracks={tourTracks} step={cardStep} onStep={setCardStep} />}
+      {cards && (
+        <CardNav
+          tracks={TRACKS}
+          sides={SIDES}
+          deck={tourTracks}
+          step={cardStep}
+          onStep={setCardStep}
+          onJump={jumpTo}
+          onPoster={() => makePoster(posterDesign)}
+          onReset={onReset}
+        />
+      )}
 
       <Launcher
         mode={launcher}

@@ -21,9 +21,11 @@ interface Props {
   onReset: () => void
   /** On the phone's deck of cards there's nothing to scroll to: picking a track deals its card instead */
   onJump?: (id: string) => void
+  /** Opens upwards, for the bar at the bottom of the deck */
+  up?: boolean
 }
 
-export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump }: Props) {
+export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump, up }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const track = tracks.find((t) => t.id === current)
@@ -45,7 +47,7 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump }:
   }, [open])
 
   return (
-    <div className="trackmenu" ref={ref}>
+    <div className={up ? 'trackmenu trackmenu--up' : 'trackmenu'} ref={ref}>
       <button type="button" className="trackmenu__button" aria-expanded={open} aria-controls="trackmenu-sheet" onClick={() => setOpen(!open)}>
         {track ? (
           <>

@@ -5433,6 +5433,16 @@ html.cards-open body {
   text-wrap: balance;
 }
 
+/* Small buttons on a card speak in sentence case, like the rest of it */
+.dash.is-cards .chip-button {
+  padding: 8px 14px;
+  font-family: var(--display);
+  font-size: 0.86rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .dash.is-cards .chapter__actions .chip-button {
   padding: 6px 12px;
 }
@@ -5459,74 +5469,91 @@ html.cards-open body {
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
 }
 
-/* The bar at the bottom: back, where you are, and the next track by name */
+/* The top bar keeps the name, the year and search; the track you're on moves down to the thumb */
+.dash.is-cards .topbar {
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  padding-bottom: 8px;
+}
+
+.dash.is-cards .topbar .brand__name {
+  display: inline;
+}
+
+.dash.is-cards .topbar .topbar__select {
+  margin-left: auto;
+}
+
+/* The bar at the bottom: back, the track you're on (tap for the list), and on */
 .cardnav {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
 
-.cardnav button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 48px;
+.cardnav__step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 46px;
+  padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: transparent;
   color: var(--text);
-  font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
-.cardnav button:disabled {
+.cardnav__step svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cardnav__step:disabled {
   opacity: 0.3;
   cursor: default;
 }
 
-.cardnav button:active:not(:disabled) {
+.cardnav__step:active:not(:disabled) {
   background: var(--surface-2);
 }
 
-.cardnav__prev {
-  flex: none;
-  width: 48px;
-}
-
-.cardnav__count {
+.cardnav .trackmenu {
+  display: flex;
   flex: 1;
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
+  justify-content: center;
+  min-width: 0;
 }
 
-.cardnav__next {
-  flex: none;
-  gap: 8px;
-  max-width: 64%;
-  padding: 0 12px 0 18px;
-  border-color: transparent;
-  background: var(--surface-2) !important;
-  font-weight: 700;
+.cardnav .trackmenu__button {
+  justify-content: center;
+  width: 100%;
+  height: 46px;
+  font-size: 0.98rem;
 }
 
-.cardnav__num {
-  color: var(--accent);
-  font-family: var(--mono);
-  font-size: 0.8rem;
+.trackmenu--up .trackmenu__sheet {
+  top: auto;
+  bottom: var(--cardnav-h, 64px);
+  max-height: calc(100dvh - var(--cardnav-h, 64px) - var(--topbar-h, 56px));
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 0;
+  animation-name: sheet-up;
 }
 
-.cardnav__title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5536,6 +5563,213 @@ html.cards-open body {
 }
 
 /* ---------- Card: A1 The Record ---------- */
+
+/* Readout on top (where a thumb on the record can't cover it), the record as big as fits, the key under it */
+.vinyl--card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  height: 100%;
+}
+
+.vinyl__readout {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vinyl__day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vinyl__date {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.vinyl__date strong {
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.vinyl__date span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.vinyl__date em {
+  margin-left: 6px;
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 650;
+}
+
+.vinyl__steps {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.vinyl__step {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vinyl__step svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vinyl__step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.vinyl__step:active:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.vinyl__now {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.vinyl__time {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.vinyl__track {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vinyl__track strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.vinyl--card .strip svg {
+  touch-action: none;
+}
+
+.dash.is-cards .vinyl--card .vinyl__stage {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dash.is-cards .vinyl--card .vinyl__platter {
+  margin: 0;
+  touch-action: none;
+}
+
+.vinyl__unzoom {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  background: var(--bg-raise);
+}
+
+/* The key: every colour on the record in a couple of lines, tap one to light up only their grooves */
+.legend--card {
+  flex: none;
+  gap: 0 12px;
+}
+
+.legend--card .legend__item {
+  gap: 6px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+.legend--card .legend__item[aria-pressed='true'] {
+  background: none;
+  color: var(--text);
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 4px;
+}
+
+.legend--card:has([aria-pressed='true']) .legend__item:not([aria-pressed='true']) {
+  color: var(--faint);
+}
+
+.legend--card .legend__dot {
+  width: 8px;
+  height: 8px;
+}
+
+.legend-fit {
+  position: relative;
+  flex: none;
+}
+
+/* Measured, never seen: the whole key laid out at the card's width */
+.legend-fit__measure {
+  position: absolute;
+  inset: 0 0 auto;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.legend__more {
+  color: var(--muted);
+  text-decoration: underline 1px var(--line-strong);
+  text-underline-offset: 4px;
+}
+
+/* The whole key, over the bottom of the record */
+.legend-fit__all {
+  position: absolute;
+  inset: auto 0 calc(100% + 6px);
+  z-index: 2;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--bg-raise);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  animation: sheet-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 
 /* ---------- end card: A1 The Record ---------- */
