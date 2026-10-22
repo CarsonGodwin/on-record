@@ -632,7 +632,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             <Clock hours={hours} parts={parts} grid={grid} />
           </Chapter>
 
-          <Chapter id="days" hint="Pick a year, then a day, to see what you played." num="B2" title="Every Day" lede="A square for every day. The brighter it glows, the longer you listened. Tap a day to see what you played.">
+          <Chapter id="days" hint="Tap a day to see everything you played." num="B2" title="Every Day" lede="A square for every day. The brighter it glows, the longer you listened. Tap a day to see what you played.">
             <Calendar days={days} years={year === null ? years : [year]} plays={plays} firstHeard={firstHeard} colors={colors} />
           </Chapter>
 

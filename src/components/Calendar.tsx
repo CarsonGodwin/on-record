@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useContext, useMemo, useRef, useState, type ChangeEvent, type PointerEvent } from 'react'
 import type { DayTotal } from '../data/insights'
 import type { Play } from '../types'
 import { dayNumber, fromDayNumber } from '../data/stats'
@@ -6,13 +6,15 @@ import { formatDuration, formatLongDate, formatMonthShort, formatMonthYear, form
 import { useWidth } from '../lib/hooks'
 import { HEAT, heatStep, quantileThresholds } from '../lib/palette'
 import { isHover, leaveUnlessTouch } from '../lib/pointer'
+import { InCards } from '../lib/stage'
 import { DayPanel } from './DayPanel'
-import { FloatTip } from './ui'
+import { FloatTip, Segmented } from './ui'
 
 /*
- * "Every Day": one square per day. Wide screens get a GitHub-style strip per
- * year; phones get a one-month calendar widget with a month picker.
- * Clicking a day opens its details under that year (or under the widget).
+ * "Every Day": one square per day, a year at a time. Wide screens get a
+ * GitHub-style strip for the year you pick; phones get a calendar: pick a
+ * year, then a month, then a day, or jump straight to a date. Clicking a day
+ * opens everything you played that day (on a phone's card, over the calendar).
  */
 
 const CELL = 14
@@ -36,7 +38,12 @@ interface Hover {
   y: number
 }
 
+/** A month as one number, so months compare and step like days do */
+const monthKey = (d: Date) => d.getFullYear() * 12 + d.getMonth()
+const monthDate = (key: number) => new Date(Math.floor(key / 12), key % 12, 1)
+
 export function Calendar({ days, years, plays, firstHeard, colors }: Props) {
+  const inCards = useContext(InCards)
   const ref = useRef<HTMLDivElement>(null)
   const width = useWidth(ref, 900)
   const thresholds = useMemo(() => quantileThresholds([...days.values()].map((d) => d.ms)), [days])
@@ -54,6 +61,48 @@ export function Calendar({ days, years, plays, firstHeard, colors }: Props) {
   const selected = picked !== null && days.has(picked) ? picked : null
   const listened = useMemo(() => [...days.keys()].sort((a, b) => a - b), [days])
   const at = selected === null ? -1 : listened.indexOf(selected)
+
+  // The year on show: the one you chose, else the latest. Picking a day elsewhere (the panel's
+  // arrows crossing New Year, the biggest-day button) brings its year along.
+  const [chosenYear, setChosenYear] = useState<number | null>(null)
+  const [shownDay, setShownDay] = useState(selected)
+  if (selected !== shownDay) {
+    setShownDay(selected)
+    if (selected !== null) setChosenYear(fromDayNumber(selected).getFullYear())
+  }
+  const year = chosenYear !== null && years.includes(chosenYear) ? chosenYear : years[years.length - 1]
+
+  const panel = selected !== null && (
+    <DayPanel
+      day={selected}
+      plays={plays}
+      firstHeard={firstHeard}
+      colors={colors}
+      prev={at > 0 ? listened[at - 1] : null}
+      next={at >= 0 && at < listened.length - 1 ? listened[at + 1] : null}
+      onSelect={setPicked}
+      onClose={() => setPicked(null)}
+    />
+  )
+
+  if (inCards || width < 640) {
+    return (
+      <div className={inCards ? 'calendar calendar--card' : 'calendar'} ref={ref}>
+        <DayWidget
+          days={days}
+          years={years}
+          listened={listened}
+          thresholds={thresholds}
+          biggest={biggest}
+          selected={selected}
+          year={year}
+          onYear={setChosenYear}
+          onPick={setPicked}
+        />
+        {panel}
+      </div>
+    )
+  }
 
   /** Props for one day's square: color, highlight and the hover/click handlers */
   const cell = (day: number) => {
@@ -73,82 +122,55 @@ export function Calendar({ days, years, plays, firstHeard, colors }: Props) {
     }
   }
 
-  const legend = (
-    <div className="scale-legend">
-      <span aria-hidden="true">Less</span>
-      {HEAT.map((c) => (
-        <i key={c} style={{ background: c }} aria-hidden="true" />
-      ))}
-      <span aria-hidden="true">More</span>
-      {biggest !== null && (
-        <button type="button" className="scale-legend__note scale-legend__button" onClick={() => setPicked(biggest)}>
-          <i className="is-max-swatch" /> Your biggest day
-        </button>
-      )}
-    </div>
-  )
-
-  if (width < 640) {
-    return (
-      <div className="calendar" ref={ref}>
-        <MonthWidget days={days} years={years} listened={listened} thresholds={thresholds} biggest={biggest} selected={selected} onPick={setPicked} />
-        {selected !== null && (
-          <DayPanel
-            day={selected}
-            plays={plays}
-            firstHeard={firstHeard}
-            colors={colors}
-            prev={at > 0 ? listened[at - 1] : null}
-            next={at >= 0 && at < listened.length - 1 ? listened[at + 1] : null}
-            onSelect={setPicked}
-            onClose={() => setPicked(null)}
-          />
-        )}
-      </div>
-    )
+  const first = dayNumber(new Date(year, 0, 1))
+  const last = dayNumber(new Date(year, 11, 31))
+  let yearMs = 0
+  let active = 0
+  for (let d = first; d <= last; d++) {
+    const v = days.get(d)
+    if (v) {
+      yearMs += v.ms
+      active++
+    }
   }
 
   return (
     <div className="calendar" ref={ref}>
-      {years.map((year) => {
-        const first = dayNumber(new Date(year, 0, 1))
-        const last = dayNumber(new Date(year, 11, 31))
-        let yearMs = 0
-        let active = 0
-        for (let d = first; d <= last; d++) {
-          const v = days.get(d)
-          if (v) {
-            yearMs += v.ms
-            active++
-          }
-        }
+      <div className="calendar__year">
+        <div className="calendar__head">
+          {years.length > 1 ? (
+            <Segmented
+              label="Year"
+              value={year}
+              onChange={(y) => {
+                setChosenYear(y)
+                if (selected !== null && fromDayNumber(selected).getFullYear() !== y) setPicked(null)
+              }}
+              options={years.map((y) => ({ value: y, label: String(y) }))}
+            />
+          ) : (
+            <span className="calendar__label">{year}</span>
+          )}
+          <span className="muted">
+            {formatNumber(yearMs / 3_600_000)} hrs, {active} days with music
+          </span>
+        </div>
+        <YearStrip year={year} cell={cell} onLeave={leaveUnlessTouch(clearHover)} />
+        {selected !== null && selected >= first && selected <= last && panel}
+      </div>
 
-        return (
-          <div key={year} className="calendar__year">
-            <div className="calendar__head">
-              <span className="calendar__label">{year}</span>
-              <span className="muted">
-                {formatNumber(yearMs / 3_600_000)} hrs · {active} days with music
-              </span>
-            </div>
-            <YearStrip year={year} cell={cell} onLeave={leaveUnlessTouch(clearHover)} />
-            {selected !== null && selected >= first && selected <= last && (
-              <DayPanel
-                day={selected}
-                plays={plays}
-                firstHeard={firstHeard}
-                colors={colors}
-                prev={at > 0 ? listened[at - 1] : null}
-                next={at >= 0 && at < listened.length - 1 ? listened[at + 1] : null}
-                onSelect={setPicked}
-                onClose={() => setPicked(null)}
-              />
-            )}
-          </div>
-        )
-      })}
-
-      {legend}
+      <div className="scale-legend">
+        <span aria-hidden="true">Less</span>
+        {HEAT.map((c) => (
+          <i key={c} style={{ background: c }} aria-hidden="true" />
+        ))}
+        <span aria-hidden="true">More</span>
+        {biggest !== null && (
+          <button type="button" className="scale-legend__note scale-legend__button" onClick={() => setPicked(biggest)}>
+            <i className="is-max-swatch" /> Your biggest day
+          </button>
+        )}
+      </div>
 
       {hover && (
         <FloatTip x={hover.x} y={hover.y} onDismiss={clearHover} className="float-tip--fixed">
@@ -218,9 +240,8 @@ function YearStrip({ year, cell, onLeave }: { year: number; cell: CellProps; onL
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
-/** A month as one number, so months compare and step like days do */
-const monthKey = (d: Date) => d.getFullYear() * 12 + d.getMonth()
-const monthDate = (key: number) => new Date(Math.floor(key / 12), key % 12, 1)
+/** "2024-03-04" for a date input, in local time */
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 interface WidgetProps {
   days: Map<number, DayTotal>
@@ -230,33 +251,18 @@ interface WidgetProps {
   thresholds: number[]
   biggest: number | null
   selected: number | null
+  year: number
+  onYear: (year: number) => void
   onPick: (day: number | null) => void
 }
 
 /**
- * The phone calendar: opens on every month at a glance, so you explore down
- * into a month (stepped with the arrows or a swipe) and then a day, and tap
- * the month's title to come back up.
+ * The phone calendar, everything on one screen: the year, its twelve months
+ * shaded by how much you listened, and the month you're in as an ordinary
+ * calendar. Any day is three taps away, or one with Find a date.
  */
-function MonthWidget({ days, years, listened, thresholds, biggest, selected, onPick }: WidgetProps) {
-  const first = listened.length ? monthKey(fromDayNumber(listened[0])) : monthKey(new Date(years[0] ?? 2000, 0, 1))
-  const last = listened.length ? monthKey(fromDayNumber(listened[listened.length - 1])) : first
-  const [view, setView] = useState(selected === null ? null : monthKey(fromDayNumber(selected)))
-  // Starts on the overview of months, unless a day is already open
-  const [picking, setPicking] = useState(selected === null)
-  // Whatever picks a day (a tap, the day panel's arrows, the biggest-day button) brings its month into view
-  const [shownDay, setShownDay] = useState(selected)
-  if (selected !== shownDay) {
-    setShownDay(selected)
-    if (selected !== null) {
-      setView(monthKey(fromDayNumber(selected)))
-      setPicking(false)
-    }
-  }
-  // Opens on your latest month; a view left over from another year filter falls back to it too
-  const month = view !== null && view >= first && view <= last ? view : last
-
-  // Totals per month, for the header and the picker's shading
+function DayWidget({ days, years, listened, thresholds, biggest, selected, year, onYear, onPick }: WidgetProps) {
+  // Totals per month, for the month chips and the header
   const months = useMemo(() => {
     const totals = new Map<number, { ms: number; days: number }>()
     for (const [day, v] of days) {
@@ -270,137 +276,148 @@ function MonthWidget({ days, years, listened, thresholds, biggest, selected, onP
   }, [days])
   const monthThresholds = useMemo(() => quantileThresholds([...months.values()].map((t) => t.ms)), [months])
 
+  // The month on show: the one you picked in this year, else the picked day's, else the year's busiest
+  const [chosenMonth, setChosenMonth] = useState<number | null>(null)
+  const [shownDay, setShownDay] = useState(selected)
+  if (selected !== shownDay) {
+    setShownDay(selected)
+    if (selected !== null) setChosenMonth(monthKey(fromDayNumber(selected)))
+  }
+  const busiest = useMemo(() => {
+    let best: number | null = null
+    for (let m = 0; m < 12; m++) {
+      const key = year * 12 + m
+      if (months.has(key) && (best === null || months.get(key)!.ms > months.get(best)!.ms)) best = key
+    }
+    return best ?? year * 12
+  }, [months, year])
+  const month = chosenMonth !== null && Math.floor(chosenMonth / 12) === year ? chosenMonth : busiest
+
   const go = (key: number) => {
-    setView(key)
-    setPicking(false)
-    if (selected !== null && monthKey(fromDayNumber(selected)) !== key) onPick(null)
+    setChosenMonth(key)
+    onYear(Math.floor(key / 12))
   }
 
-  // A sideways swipe on the grid steps a month
-  const swipe = useRef<number | null>(null)
-  const onPointerDown = (e: PointerEvent) => {
-    swipe.current = e.clientX
-  }
-  const onPointerUp = (e: PointerEvent) => {
-    if (swipe.current === null) return
-    const dx = e.clientX - swipe.current
-    swipe.current = null
-    if (dx > 50 && month > first) go(month - 1)
-    else if (dx < -50 && month < last) go(month + 1)
-  }
+  const firstYear = years[0]
+  const lastYear = years[years.length - 1]
+  const yearIndex = years.indexOf(year)
 
   const start = monthDate(month)
   const firstDay = dayNumber(start)
   const length = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()
   const offset = (start.getDay() + 6) % 7
   const total = months.get(month)
-  const pickerYears = years.filter((y) => y * 12 + 11 >= first && y * 12 <= last)
-  const span = pickerYears.length > 1 ? `${pickerYears[0]} – ${pickerYears[pickerYears.length - 1]}` : `${pickerYears[0] ?? ''}`
-  let spanMs = 0
-  for (const t of months.values()) spanMs += t.ms
+
+  const findDate = (e: ChangeEvent<HTMLInputElement>) => {
+    const [y, m, d] = e.target.value.split('-').map(Number)
+    if (!y || !m || !d) return
+    const day = dayNumber(new Date(y, m - 1, d))
+    go(y * 12 + m - 1)
+    onPick(days.has(day) ? day : null)
+  }
 
   return (
-    <div className="mcal">
-      {picking ? (
-        <div className="mcal__head">
-          <div className="mcal__title is-static">
-            <span className="mcal__month">{span}</span>
-            <span className="mcal__sum">
-              {formatDuration(spanMs)} · {formatNumber(listened.length)} days with music
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="mcal__head">
-          <button type="button" className="mcal__step" disabled={month <= first} onClick={() => go(month - 1)} aria-label="Previous month">
-            ←
-          </button>
-          <button type="button" className="mcal__title" onClick={() => setPicking(true)} aria-label={`${formatMonthYear(start)}, back to all months`}>
-            <span className="mcal__up">↑ All months</span>
-            <span className="mcal__month">{formatMonthYear(start)}</span>
-            <span className="mcal__sum">{total ? `${formatDuration(total.ms)} · ${total.days} days with music` : 'No listening'}</span>
-          </button>
-          <button type="button" className="mcal__step" disabled={month >= last} onClick={() => go(month + 1)} aria-label="Next month">
-            →
-          </button>
-        </div>
-      )}
+    <div className="daycal">
+      <div className="daycal__years">
+        <button type="button" className="daycal__step" disabled={yearIndex <= 0} onClick={() => onYear(years[yearIndex - 1])} aria-label="Previous year">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <span className="daycal__year" aria-live="polite">
+          {year}
+        </span>
+        <button type="button" className="daycal__step" disabled={yearIndex >= years.length - 1} onClick={() => onYear(years[yearIndex + 1])} aria-label="Next year">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        {/* The phone's own date wheel, under a button that says what it's for. 16px keeps iOS from zooming in. */}
+        <label className="daycal__find">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6" />
+            <path d="M15 15l5 5" />
+          </svg>
+          Find a date
+          <input
+            type="date"
+            min={listened.length ? isoDay(fromDayNumber(listened[0])) : `${firstYear}-01-01`}
+            max={listened.length ? isoDay(fromDayNumber(listened[listened.length - 1])) : `${lastYear}-12-31`}
+            value={selected !== null ? isoDay(fromDayNumber(selected)) : ''}
+            onChange={findDate}
+            aria-label="Find a date"
+          />
+        </label>
+      </div>
 
-      {picking ? (
-        <div className="mcal__picker">
-          {pickerYears.map((y) => (
-            <div key={y} className="mcal__year">
-              <span className="mcal__year-label">{y}</span>
-              <div className="mcal__year-months">
-                {Array.from({ length: 12 }, (_, m) => {
-                  const key = y * 12 + m
-                  const t = months.get(key)
-                  const fill = t ? heatStep(t.ms, monthThresholds) : undefined
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      className={['mcal__pick', key === view && 'is-current', fill && HEAT.indexOf(fill) >= 4 && 'is-bright'].filter(Boolean).join(' ')}
-                      style={fill ? { background: fill } : undefined}
-                      disabled={!t}
-                      onClick={() => go(key)}
-                      aria-label={`${formatMonthYear(monthDate(key))}${t ? `, ${formatDuration(t.ms)}` : ''}`}
-                    >
-                      {formatMonthShort(m)}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="mcal__grid" onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => (swipe.current = null)}>
-          {WEEKDAYS.map((d, i) => (
-            <span key={i} className="mcal__weekday" aria-hidden="true">
-              {d}
-            </span>
-          ))}
-          {Array.from({ length: offset }, (_, i) => (
-            <span key={`pad${i}`} />
-          ))}
-          {Array.from({ length }, (_, k) => {
-            const day = firstDay + k
-            const v = days.get(day)
-            const fill = v ? heatStep(v.ms, thresholds) : undefined
-            const classes = [
-              'mcal__day',
-              !v && 'is-empty',
-              fill && HEAT.indexOf(fill) >= 4 && 'is-bright',
-              day === biggest && 'is-max',
-              day === selected && 'is-selected',
-            ]
-            return (
-              <button
-                key={day}
-                type="button"
-                className={classes.filter(Boolean).join(' ')}
-                style={fill ? { background: fill } : undefined}
-                disabled={!v}
-                aria-pressed={day === selected}
-                aria-label={`${formatLongDate(fromDayNumber(day))}: ${v ? formatDuration(v.ms) : 'no listening'}`}
-                onClick={() => onPick(day === selected ? null : day)}
-              >
-                {k + 1}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      <div className="daycal__months" role="group" aria-label={`Months of ${year}`}>
+        {Array.from({ length: 12 }, (_, m) => {
+          const key = year * 12 + m
+          const t = months.get(key)
+          const fill = t ? heatStep(t.ms, monthThresholds) : undefined
+          return (
+            <button
+              key={m}
+              type="button"
+              className={['daycal__month', fill && HEAT.indexOf(fill) >= 4 && 'is-bright'].filter(Boolean).join(' ')}
+              style={fill ? { background: fill } : undefined}
+              disabled={!t}
+              aria-pressed={key === month}
+              onClick={() => go(key)}
+              aria-label={`${formatMonthYear(monthDate(key))}${t ? `, ${formatDuration(t.ms)}` : ', no listening'}`}
+            >
+              {formatMonthShort(m)}
+            </button>
+          )
+        })}
+      </div>
 
-      <div className="scale-legend mcal__legend">
-        <span aria-hidden="true">Less</span>
-        {HEAT.map((c) => (
-          <i key={c} style={{ background: c }} aria-hidden="true" />
+      <p className="daycal__title">
+        <strong>{formatMonthYear(start)}</strong>
+        <span>{total ? `${formatDuration(total.ms)}, ${total.days} days with music` : 'No listening'}</span>
+      </p>
+
+      <div className="daycal__grid">
+        {WEEKDAYS.map((d, i) => (
+          <span key={i} className="daycal__weekday" aria-hidden="true">
+            {d}
+          </span>
         ))}
-        <span aria-hidden="true">More</span>
+        {Array.from({ length: offset }, (_, i) => (
+          <span key={`pad${i}`} />
+        ))}
+        {Array.from({ length }, (_, k) => {
+          const day = firstDay + k
+          const v = days.get(day)
+          const fill = v ? heatStep(v.ms, thresholds) : undefined
+          const classes = ['daycal__day', fill && HEAT.indexOf(fill) >= 4 && 'is-bright', day === biggest && 'is-max', day === selected && 'is-selected']
+          return (
+            <button
+              key={day}
+              type="button"
+              className={classes.filter(Boolean).join(' ')}
+              style={fill ? { background: fill } : undefined}
+              disabled={!v}
+              aria-pressed={day === selected}
+              aria-label={`${formatLongDate(fromDayNumber(day))}: ${v ? formatDuration(v.ms) : 'no listening'}`}
+              onClick={() => onPick(day === selected ? null : day)}
+            >
+              {k + 1}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="daycal__foot">
+        <div className="scale-legend daycal__legend" aria-hidden="true">
+          <span>Less</span>
+          {HEAT.map((c) => (
+            <i key={c} style={{ background: c }} />
+          ))}
+          <span>More</span>
+        </div>
         {biggest !== null && (
-          <button type="button" className="scale-legend__note scale-legend__button" onClick={() => onPick(biggest)}>
+          <button type="button" className="chip-button daycal__biggest" onClick={() => onPick(biggest)}>
             <i className="is-max-swatch" /> Biggest day
           </button>
         )}

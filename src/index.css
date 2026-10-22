@@ -5803,6 +5803,313 @@ html.cards-open body {
 
 /* ---------- Card: B2 Every Day ---------- */
 
+/* The calendar on a phone (and any narrow column): the year, its months, then the month as an ordinary calendar */
+.daycal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.daycal__years {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.daycal__step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.daycal__step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.daycal__step svg,
+.daycal__find svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.daycal__year {
+  min-width: 3.2em;
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+/* A plain button on top, the phone's date wheel underneath it */
+.daycal__find {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  margin-left: auto;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.9rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.daycal__find input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  font-size: 16px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.daycal__find:focus-within {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.daycal__months {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  /* Room for the picked month's ring, so the day sheet covers it too */
+  padding: 4px;
+  margin: -4px;
+}
+
+.daycal__month,
+.daycal__day {
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(244, 241, 234, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.daycal__month {
+  height: 34px;
+  font-size: 0.8rem;
+}
+
+.daycal__month.is-bright,
+.daycal__day.is-bright {
+  color: var(--accent-ink);
+}
+
+.daycal__month:disabled,
+.daycal__day:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.daycal__month:disabled {
+  background: transparent;
+}
+
+.daycal__month[aria-pressed='true'] {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.daycal__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0 0;
+}
+
+.daycal__title strong {
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.daycal__title span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: right;
+}
+
+.daycal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 42px;
+  gap: 4px;
+}
+
+.daycal__weekday {
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.daycal__day {
+  font-size: 0.88rem;
+}
+
+.daycal__day.is-max {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+.daycal__day[aria-pressed='true'] {
+  outline: 2.5px solid var(--lime);
+  outline-offset: 1px;
+}
+
+.daycal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.daycal__legend {
+  margin: 0;
+}
+
+.daycal__biggest {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daycal__biggest .is-max-swatch {
+  width: 11px;
+  height: 11px;
+}
+
+/* On a card the month fills whatever height is left, always six rows so it never jumps */
+.dash.is-cards .calendar--card {
+  position: relative;
+  height: 100%;
+}
+
+.dash.is-cards .daycal {
+  height: 100%;
+}
+
+.dash.is-cards .daycal__grid {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: auto repeat(6, minmax(0, 1fr));
+  grid-auto-rows: unset;
+}
+
+/* The day itself: a sheet over the calendar that fits the card */
+.dash.is-cards .day-panel--sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 14px 8px;
+  overflow: hidden;
+  border-radius: 18px;
+  animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__head {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__titles {
+  flex-basis: auto;
+  order: 0;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__titles h3 {
+  font-size: 1.15rem;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__nav {
+  gap: 4px;
+  order: 0;
+}
+
+.day-panel--sheet .day-panel__step,
+.day-panel--sheet .day-panel__close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+
+.day-panel--sheet .day-panel__step svg,
+.day-panel--sheet .day-panel__close svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__stats dd {
+  font-size: 1.2rem;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__bars {
+  height: 46px;
+}
+
+/* First listens on one line; the rest fade out at the edge rather than pushing the lists down */
+.dash.is-cards .day-panel--sheet .day-panel__new {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(90deg, #000 82%, transparent);
+}
+
+.day-panel__tabs {
+  align-self: flex-start;
+}
+
+.day-panel__pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.day-panel__pane .day-panel__list,
+.day-panel__pane .day-panel__log {
+  margin-top: 0;
+}
+
 
 /* ---------- end card: B2 Every Day ---------- */
 
