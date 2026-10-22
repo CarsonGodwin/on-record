@@ -948,6 +948,101 @@ th {
   margin: 6px 0;
 }
 
+.landing__less {
+  display: none;
+}
+
+/*
+ * Phones: everything you need on the first screen (what it is, the sleeve, the demo and the promise that
+ * nothing leaves the phone), in shorter words; the how-to and the small print below. The list of charts
+ * goes, since the record itself is one tap away.
+ */
+@media (max-width: 560px) {
+  .landing {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    padding-bottom: 32px;
+  }
+
+  /* Big blurred blobs drifting forever cost a phone more than they give it */
+  .landing__glow i {
+    animation: none;
+  }
+
+  .landing__main {
+    gap: 22px;
+    margin-top: 22px;
+  }
+
+  .landing .eyebrow,
+  .landing__more,
+  .features {
+    display: none;
+  }
+
+  .landing__less {
+    display: inline;
+  }
+
+  .landing__title {
+    margin: 0 0 14px;
+    font-size: clamp(3rem, 15vw, 3.6rem);
+  }
+
+  .landing__lede {
+    font-size: 1.05rem;
+    color: var(--text);
+  }
+
+  .landing__import {
+    gap: 14px;
+  }
+
+  /* A wide, short sleeve with the record peeking out of its right edge */
+  .sleeve {
+    width: calc(100% - 44px);
+    height: 208px;
+    aspect-ratio: auto;
+  }
+
+  .sleeve__record {
+    inset: 3% auto 3% auto;
+    right: 0;
+    width: auto;
+    aspect-ratio: 1;
+    transform: translateX(22%) rotate(0deg);
+  }
+
+  .sleeve__cover {
+    gap: 8px;
+    padding: 24px 24px 22px;
+  }
+
+  .sleeve__title {
+    font-size: 1.75rem;
+  }
+
+  .sleeve__kicker,
+  .sleeve__break {
+    display: none;
+  }
+
+  .landing__demo {
+    flex-wrap: nowrap;
+    margin-top: 2px;
+  }
+
+  .privacy {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 0.88rem;
+  }
+
+  .how-to {
+    margin-top: 40px;
+  }
+}
+
 /* Loading */
 
 .pressing {
