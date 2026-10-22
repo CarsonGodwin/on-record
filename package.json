@@ -19,7 +19,7 @@
     "d3-shape": "^3.2.0",
     "jszip": "^3.10.2",
     "mediabunny": "^1.61.6",
-    "react": "^19.2.8",
+    "react": "^19.3.1",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
