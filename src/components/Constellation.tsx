@@ -41,7 +41,8 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   const ref = useRef<HTMLDivElement>(null)
   const skyRef = useRef<HTMLDivElement>(null)
   const columnWidth = useWidth(ref, 900)
-  const box = useSize(skyRef, { width: 358, height: 400 })
+  // Only a card fits the sky to its box; the page goes by the column, so watching the box there would just redraw the sky
+  const box = useSize(skyRef, { width: 358, height: 400 }, card)
   const width = card ? box.width : columnWidth
   const narrow = width < 600
   const height = card ? box.height : narrow ? 480 : 600

@@ -4,7 +4,7 @@ import { fromDayNumber, isSkip } from '../data/stats'
 import { formatDuration, formatHour, formatLongDate, formatNumber, formatShortDate, formatTime } from '../lib/format'
 import { colorFor } from '../lib/palette'
 import { InCards } from '../lib/stage'
-import { swipeDirection } from '../lib/swipe'
+import { useSwipe } from '../lib/swipe'
 import type { Play } from '../types'
 import { Cover } from './Cover'
 import { Segmented } from './ui'
@@ -38,7 +38,11 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
   const [tab, setTab] = useState<Tab>('artists')
   // On the sheet, first listens show one name and "+n" until you ask for the rest
   const [allNew, setAllNew] = useState(false)
-  const swipe = useRef<{ x: number; y: number; t: number } | null>(null)
+  // On the sheet a sideways swipe steps to the day before or after; the list below it scrolls instead
+  const swipe = useSwipe((dir) => {
+    if (dir === 1 && next !== null) onSelect(next)
+    else if (dir === -1 && prev !== null) onSelect(prev)
+  }, '.day-panel__pane')
   const detail = useMemo(() => dayDetail(plays, day, firstHeard), [plays, day, firstHeard])
   // The full log stays open only for the day it was opened on
   const [expandedDay, setExpandedDay] = useState<number | null>(null)
@@ -168,20 +172,7 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
         onKeyDown={onKeyDown}
         role="dialog"
         aria-label={`Listening on ${formatLongDate(fromDayNumber(day))}`}
-        // A sideways swipe on the sheet steps to the day before or after
-        onTouchStart={(e) => {
-          const t = e.touches[0]
-          swipe.current = e.touches.length === 1 && !(e.target as Element).closest('.day-panel__pane') ? { x: t.clientX, y: t.clientY, t: e.timeStamp } : null
-        }}
-        onTouchEnd={(e) => {
-          const s = swipe.current
-          const t = e.changedTouches[0]
-          swipe.current = null
-          if (!s || !t) return
-          const dir = swipeDirection(t.clientX - s.x, t.clientY - s.y, e.timeStamp - s.t)
-          if (dir === 1 && next !== null) onSelect(next)
-          else if (dir === -1 && prev !== null) onSelect(prev)
-        }}
+        {...swipe}
       >
         <header className="day-panel__head">
           <div className="day-panel__titles">

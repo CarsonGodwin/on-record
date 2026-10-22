@@ -64,8 +64,6 @@ function Duel({ pick }: { pick: LoveHatePick }) {
         swatch={KEPT}
         songs={pick.loved}
         fact={lovedFact}
-        // Both lists count skips, so the numbers read the same way: few here, most of them below
-        count={(s) => `${formatNumber(s.skips)} of ${formatNumber(s.starts)} skipped`}
         empty={`Every song you started ${n} or more times got skipped more than 1 time in 5.`}
       />
       <DuelSide
@@ -73,7 +71,6 @@ function Duel({ pick }: { pick: LoveHatePick }) {
         swatch={SKIPPED}
         songs={pick.hated}
         fact={hatedFact}
-        count={(s) => `${formatNumber(s.skips)} of ${formatNumber(s.starts)} skipped`}
         empty={`Nothing you started ${n} or more times got skipped more often than not.`}
       />
     </div>
@@ -86,12 +83,10 @@ interface SideProps {
   /** The headliner first, then the runners-up */
   songs: SongTally[]
   fact: (s: SongTally) => string
-  /** The one number a runner-up shows, the same count its headliner's sentence uses */
-  count: (s: SongTally) => string
   empty: string
 }
 
-function DuelSide({ title, swatch, songs, fact, count, empty }: SideProps) {
+function DuelSide({ title, swatch, songs, fact, empty }: SideProps) {
   const [hero, ...rest] = songs
   return (
     <section className="duel__side" aria-label={title}>
@@ -120,7 +115,10 @@ function DuelSide({ title, swatch, songs, fact, count, empty }: SideProps) {
                   <span className="duel__song">
                     <span className="duel__song-title">{s.title}</span> <span className="duel__song-artist">{s.artist}</span>
                   </span>
-                  <span className="duel__count">{count(s)}</span>
+                  {/* Both sides count skips, so the numbers read the same way: few on one side, most of them on the other */}
+                  <span className="duel__count">
+                    {formatNumber(s.skips)} of {formatNumber(s.starts)} skipped
+                  </span>
                 </li>
               ))}
             </ol>

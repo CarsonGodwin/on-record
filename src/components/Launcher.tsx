@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Ranked } from '../data/stats'
 import { formatDuration } from '../lib/format'
 import { LAUNCH_KEY } from '../lib/keys'
-import { PHONE } from '../lib/pointer'
+import { COARSE, PHONE } from '../lib/pointer'
 import { matches } from '../lib/search'
 import { arrow, hover, NO_SELECTION, settle, span, stretchTo } from '../lib/selection'
 import { Modal } from './Panels'
@@ -117,6 +117,13 @@ function LauncherBody({
   const [note, setNote] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  // On a touch screen the search waits for a tap: focus in it brings the keyboard up over the list every
+  // time the launcher opens. The title (only read out, never seen) takes focus instead. On the first opening
+  // the dialog isn't open yet and its own focusing does this; switching pages, this effect does.
+  useEffect(() => {
+    if (COARSE) titleRef.current?.focus()
+  }, [])
   const listing = mode !== 'root'
   const verb = mode === 'manage' ? 'unhide' : 'hide'
   const pool = mode === 'manage' ? hidden : artists
@@ -195,7 +202,8 @@ function LauncherBody({
       setNote(`Unhid ${what}. The charts update when you close this.`)
     } else setNote(onHide(names) ? `Hid ${what}. The charts update when you close this.` : `Can’t hide ${what}: at least one artist has to stay`)
     setSel(settle(sel, items.length, firstPick))
-    inputRef.current?.focus()
+    // Not on a touch screen, where that would bring the keyboard back over the list
+    if (!COARSE) inputRef.current?.focus()
   }
 
   /** Runs a row; in the artist lists, a row inside the selection acts on the whole selection */
@@ -239,6 +247,10 @@ function LauncherBody({
 
   return (
     <>
+      {/* First in the dialog, so its opening never lands in the search on the way */}
+      <h2 className="sr-only" ref={titleRef} tabIndex={-1} data-autofocus={COARSE || undefined}>
+        {TITLES[mode]}
+      </h2>
       <div className="launcher__search">
         {listing && (
           <button type="button" className="chip-button" onClick={() => onMode('root')}>
@@ -257,8 +269,8 @@ function LauncherBody({
           placeholder={mode === 'manage' ? 'Search hidden artists…' : mode === 'hide' ? 'Search your artists…' : PHONE ? 'Jump to…' : 'Jump to a section or year, or run a command…'}
           autoComplete="off"
           spellCheck={false}
-          autoFocus
-          data-autofocus
+          autoFocus={!COARSE}
+          data-autofocus={!COARSE || undefined}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)

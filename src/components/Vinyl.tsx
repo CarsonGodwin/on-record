@@ -1,6 +1,7 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { fromDayNumber } from '../data/stats'
+import { useCloseOnBack } from '../lib/back'
 import { formatDuration, formatHour, formatLongDate, formatNumber, formatShortDate, formatTime } from '../lib/format'
 import { useMediaQuery, useSeen, useSize, useWidth } from '../lib/hooks'
 import { COARSE, useFingerDrag, useHoldDrag } from '../lib/pointer'
@@ -61,6 +62,8 @@ const STRIP_OTHER = 'rgba(244, 241, 234, 0.42)'
 
 /** Matches the CSS breakpoint where the record and deck stack */
 const STACKED = '(max-width: 900px)'
+/** On a card one finger always belongs to the needle, so panning the record takes two */
+const NEEDLE_FINGER = { current: true }
 export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPoster, learned, onLearned }: Props) {
   const inCards = useContext(InCards)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -108,9 +111,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
     },
     !inCards,
   )
-  // On a card one finger always belongs to the needle; panning takes two
-  const fingerOnNeedle = useRef(true)
-  const zoom = usePanZoom(platterRef, { width: size, height: size, max: maxZoom, busy: inCards ? fingerOnNeedle : holding })
+  const zoom = usePanZoom(platterRef, { width: size, height: size, max: maxZoom, busy: inCards ? NEEDLE_FINGER : holding })
   const view = zoom.view
   const zoomed = view.s > 1.01
   // The view the canvas was last drawn at; between redraws a CSS transform stretches it to the live view
@@ -845,6 +846,8 @@ function CardLegend({ items }: { items: ReactNode[] }) {
   const measureRef = useRef<HTMLUListElement>(null)
   const [fit, setFit] = useState(Infinity)
   const [open, setOpen] = useState(false)
+  // It opens over the record, so back closes it rather than leaving the card (on the first card, the record)
+  useCloseOnBack(open, () => setOpen(false))
   const wrapRef = useRef<HTMLDivElement>(null)
 
   // A hidden copy of the whole key, measured at the card's width: everything on its first two lines fits

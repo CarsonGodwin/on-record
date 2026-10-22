@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   artistGraph,
   artistSeries,
@@ -23,7 +23,7 @@ import { COARSE } from '../lib/pointer'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import { InCards, OnStage, resolveStop } from '../lib/stage'
 import { closeTopmost, useCloseOnBack } from '../lib/back'
-import { swipeDirection } from '../lib/swipe'
+import { useSwipe } from '../lib/swipe'
 import type { LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
 import { posterMoments, type PosterData, type PosterDesign } from '../viz/poster'
@@ -385,31 +385,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  // A quick sideways swipe on a card deals the next one; drags on things that move stay theirs.
-  // Touch events rather than pointer events: they keep coming even once the browser takes a gesture.
-  const swipe = useRef<{ x: number; y: number; t: number } | null>(null)
-  const swipeHandlers = cards
-    ? {
-        onTouchStart: (e: TouchEvent) => {
-          // A second finger makes it a pinch
-          if (e.touches.length > 1 || (e.target as Element).closest(OWN_GESTURES)) {
-            swipe.current = null
-            return
-          }
-          const t = e.touches[0]
-          swipe.current = { x: t.clientX, y: t.clientY, t: e.timeStamp }
-        },
-        onTouchEnd: (e: TouchEvent) => {
-          const s = swipe.current
-          swipe.current = null
-          const t = e.changedTouches[0]
-          if (!s || !t || e.touches.length > 0) return
-          const dir = swipeDirection(t.clientX - s.x, t.clientY - s.y, e.timeStamp - s.t)
-          if (dir) setCardStep(cardStep + dir)
-        },
-        onTouchCancel: () => (swipe.current = null),
-      }
-    : {}
+  // A quick sideways swipe on a card deals the next one; drags on things that move stay theirs
+  const swipe = useSwipe((dir) => setCardStep(cardStep + dir), OWN_GESTURES)
+  const swipeHandlers = cards ? swipe : {}
 
   /** Jumps to the poster studio with a design picked (on the tour, its last stop) */
   function makePoster(design: PosterDesign) {
