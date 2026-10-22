@@ -612,7 +612,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           </Chapter>
 
           <Chapter
-            id="race" hint="Hours per artist, raced month by month."
+            id="race" hint={`Hours per artist, raced ${bins.size} by ${bins.size}.`}
             num="A3"
             title="The Race"
             lede={`Total hours per artist, replayed ${bins.size} by ${bins.size}. Watch who pulls ahead.`}
