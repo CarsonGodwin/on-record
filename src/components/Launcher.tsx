@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Ranked } from '../data/stats'
 import { formatDuration } from '../lib/format'
-import { LAUNCH_KEY, PHONE } from '../lib/pointer'
+import { LAUNCH_KEY } from '../lib/keys'
+import { PHONE } from '../lib/pointer'
 import { matches } from '../lib/search'
+import { arrow, hover, NO_SELECTION, settle, span, stretchTo } from '../lib/selection'
 import { Modal } from './Panels'
 import type { Track } from './TrackMenu'
 
@@ -110,13 +112,7 @@ function LauncherBody({
   onReset,
 }: Props & { mode: 'root' | 'hide' | 'manage' }) {
   const [query, setQuery] = useState('')
-  // -1 means the first row you'd pick, which skips the "all matches" row so a quick Enter never acts on a crowd
-  const [active, setActive] = useState(-1)
-  // Where a Shift selection started; null while only the highlighted row is picked
-  const [anchor, setAnchor] = useState<number | null>(null)
-  // The row the keyboard last put the highlight on (null: the first pickable one). Hovering moves the
-  // highlight too, but a Shift-click stretches from here, not from wherever the pointer passed.
-  const [origin, setOrigin] = useState<number | null>(null)
+  const [sel, setSel] = useState(NO_SELECTION)
   // What the last hide or unhide did. It goes once you type or move on, so the selection count can show.
   const [note, setNote] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -185,11 +181,8 @@ function LauncherBody({
     return all.filter((item) => matches(query, `${item.label} ${item.hint ?? ''} ${item.terms ?? ''}`))
   }, [mode, query, pool, hidden, tracks, sides, years, year, musicOnly, onSettings, onReset, onMode, onJump, onYear])
 
-  const last = Math.max(items.length - 1, 0)
   const firstPick = items[0]?.names ? 1 : 0
-  const current = Math.min(active < 0 ? firstPick : active, last)
-  const from = anchor === null ? current : Math.min(anchor, current)
-  const to = anchor === null ? current : Math.max(anchor, current)
+  const { current, from, to } = span(sel, items.length, firstPick)
   // A Shift selection is a run of artists; the "all matches" row isn't one of them
   const picked = listing ? items.slice(from, to + 1).filter((item) => !item.names) : []
 
@@ -201,9 +194,7 @@ function LauncherBody({
       onUnhide(names)
       setNote(`Unhid ${what}. The charts update when you close this.`)
     } else setNote(onHide(names) ? `Hid ${what}. The charts update when you close this.` : `Can’t hide ${what}: at least one artist has to stay`)
-    setAnchor(null)
-    setActive(from)
-    setOrigin(from)
+    setSel(settle(sel, items.length, firstPick))
     inputRef.current?.focus()
   }
 
@@ -214,16 +205,6 @@ function LauncherBody({
     if (item.names) act(item.names)
     else if (listing) act(picked.length > 1 && i >= from && i <= to ? picked.map((p) => p.label) : [item.label])
     else item.run?.()
-  }
-
-  /** Moves the highlight; with Shift (in the artist lists) the selection stretches along instead of following it */
-  function moveTo(i: number, extend: boolean, fromPointer = false) {
-    if (extend && listing) {
-      if (anchor === null) setAnchor(fromPointer ? Math.min(origin ?? firstPick, last) : current)
-    } else setAnchor(null)
-    setActive(i)
-    if (!fromPointer) setOrigin(i)
-    setNote(null)
   }
 
   // Keep the highlighted row in view as the arrow keys move it
@@ -244,12 +225,9 @@ function LauncherBody({
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault()
-      if (items.length === 0) return
-      const step = e.key === 'ArrowDown' ? 1 : -1
-      // A selection stops at the ends rather than wrapping around to the other one,
-      // and never onto the "all matches" row, which would turn the selection into every match
-      if (e.shiftKey && listing) moveTo(Math.min(Math.max(current + step, firstPick), items.length - 1), true)
-      else moveTo((current + step + items.length) % items.length, false)
+      // With Shift (in the artist lists) the selection stretches along instead of the highlight moving
+      setSel(arrow(sel, items.length, firstPick, e.key === 'ArrowDown' ? 1 : -1, e.shiftKey && listing))
+      setNote(null)
     } else if (e.key === 'Enter') {
       e.preventDefault()
       pick(current)
@@ -284,9 +262,7 @@ function LauncherBody({
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
-            setActive(-1)
-            setAnchor(null)
-            setOrigin(null)
+            setSel(NO_SELECTION)
             setNote(null)
           }}
           onKeyDown={onKeyDown}
@@ -310,11 +286,11 @@ function LauncherBody({
                 className={i === current ? 'launcher__item is-active' : 'launcher__item'}
                 // Focus (and so the arrows and Enter) stays in the search box, and a Shift-click doesn't select text
                 onMouseDown={(e) => e.preventDefault()}
-                // Hovering moves the highlight, but not while a selection is out, which would reshape it
-                onPointerMove={() => anchor === null && setActive(i)}
+                onPointerMove={() => setSel((s) => hover(s, i))}
                 onClick={(e) => {
-                  if (e.shiftKey && listing && !item.names) moveTo(i, true, true)
-                  else pick(i)
+                  if (!e.shiftKey || !listing || item.names) return pick(i)
+                  setSel(stretchTo(sel, items.length, firstPick, i))
+                  setNote(null)
                 }}
               >
                 <span className="launcher__label">{item.label}</span>
