@@ -2265,6 +2265,58 @@ th {
   text-underline-offset: 3px;
 }
 
+/* Making the video: how far along, and a way out */
+.race-export--busy {
+  flex-wrap: nowrap;
+  max-width: 460px;
+}
+
+.race-export__meter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.race-export__status {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.race-export__progress {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+
+.race-export__progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.25s linear;
+}
+
+.race-export__cancel {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .scrubber {
   flex: 1;
   appearance: none;
@@ -5545,6 +5597,212 @@ html.cards-open body {
 
 /* ---------- Card: A2 Eras ---------- */
 
+/* The table toggle is the chart's text alternative: kept, but quiet */
+.dash.is-cards #eras .chapter__actions .chip-button {
+  padding: 6px 12px;
+  font-family: var(--display);
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.eras-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* The takeaway, or what the picked era adds up to: two lines kept free so picking one never moves the chart */
+.eras-card__status {
+  flex: none;
+  min-height: calc(2 * 1.35em);
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.eras-card__status em {
+  font-family: var(--serif);
+  font-size: 1.16em;
+  font-weight: 400;
+}
+
+.eras-card__more {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.eras-card__plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.eras-card__plot svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: visible;
+}
+
+.eras-card__tick {
+  font-size: 12px;
+}
+
+.eras-card__tickmark,
+.eras-card__edge {
+  stroke: var(--line-strong);
+}
+
+.eras-card__edge {
+  stroke: var(--text);
+  stroke-opacity: 0.55;
+  stroke-dasharray: 3 3;
+}
+
+.eras-card__leader {
+  fill: none;
+  stroke-width: 1.25;
+  stroke-opacity: 0.7;
+}
+
+/* Tapping or dragging down the river reads off a month; it owns the finger, so it never deals a card */
+.eras-card__river {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.eras-card__era {
+  position: absolute;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.eras-card__name {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--name);
+  line-height: 1.12;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.eras-card__era[aria-pressed='true'] .eras-card__name {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.eras-card__meta {
+  display: flex;
+  gap: 10px;
+  max-width: 100%;
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.eras-card__meta span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.eras-card__meta b {
+  flex: none;
+  font-weight: 500;
+}
+
+.eras-card__era:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+/* A month's top artists, laid over the labels instead of pushing them about; a tap puts it away */
+.eras-card__readout {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.eras-card__readout-title {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.eras-card__readout-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.eras-card__readout-row span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.eras-card__readout-row i {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.eras-card__readout-row b {
+  flex: none;
+  margin-left: auto;
+  color: var(--text);
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eras-card__era {
+    transition: none;
+  }
+}
 
 /* ---------- end card: A2 Eras ---------- */
 
@@ -5553,6 +5811,134 @@ html.cards-open body {
 
 /* ---------- Card: A3 The Race ---------- */
 
+/* The race as it is, sized to the card: the ten rows share whatever height the controls leave */
+.dash.is-cards .race {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dash.is-cards .race__room {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* Rows waiting below tenth place are invisible, but would still catch taps meant for the controls */
+.dash.is-cards .race__board {
+  pointer-events: none;
+}
+
+.dash.is-cards .race__controls {
+  flex: none;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+/* A finger-sized scrubber: the line stays thin, the input around it is 44px tall */
+.dash.is-cards .race .scrubber {
+  height: 44px;
+  background: none;
+  touch-action: none;
+}
+
+.dash.is-cards .race .scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent) var(--progress), var(--line-strong) var(--progress));
+}
+
+.dash.is-cards .race .scrubber::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+  margin-top: -9px;
+}
+
+.dash.is-cards .race-export {
+  flex: none;
+  min-height: 48px;
+  margin-top: 6px;
+}
+
+.dash.is-cards .race-export--busy {
+  max-width: none;
+}
+
+.dash.is-cards .race-export__go {
+  flex: 1;
+  justify-content: center;
+  min-height: 48px;
+}
+
+/* The finished video takes the race's place until it's shared or closed */
+.race-share {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  text-align: center;
+}
+
+/* The race underneath is paused and covered; hidden, its glows can't creep out around the sheet */
+.dash.is-cards .race:has(.race-share) .race__room,
+.dash.is-cards .race:has(.race-share) .race__controls {
+  visibility: hidden;
+}
+
+.race-share__video {
+  flex: none;
+  height: min(56cqh, 340px);
+  aspect-ratio: 9 / 16;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #0b0a0f;
+}
+
+.race-share__title {
+  margin: 12px 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.race-share__note {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.race-share__go {
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+}
+
+.race-share__more {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.race-share__link {
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.race-share__link:active {
+  color: var(--text);
+}
 
 /* ---------- end card: A3 The Race ---------- */
 
