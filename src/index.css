@@ -5609,6 +5609,76 @@ html.cards-open body {
 
 /* ---------- Card: D1 Liner Notes ---------- */
 
+/*
+ * The small print: a few facts you couldn't have guessed, each a sentence
+ * with its evidence under it. They share the card in equal bands with a rule
+ * between, and the first (the most surprising) is set biggest.
+ */
+.dash.is-cards .smallprint {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.dash.is-cards .smallprint__fact {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding-block: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.dash.is-cards .smallprint__fact[hidden] {
+  display: none;
+}
+
+.dash.is-cards .smallprint__fact:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dash.is-cards .smallprint__fact:last-child {
+  padding-bottom: 0;
+}
+
+.dash.is-cards .smallprint__line {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(1.3rem, 6.6cqw, 1.65rem);
+  line-height: 1.08;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.dash.is-cards .smallprint__fact:first-child .smallprint__line {
+  font-size: clamp(1.8rem, 9.6cqw, 2.4rem);
+  line-height: 1.02;
+}
+
+.dash.is-cards .smallprint__line em {
+  font-style: italic;
+}
+
+.dash.is-cards .smallprint__proof {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash.is-cards .smallprint--empty {
+  justify-content: center;
+  gap: 8px;
+}
 
 /* ---------- end card: D1 Liner Notes ---------- */
 
@@ -5617,5 +5687,199 @@ html.cards-open body {
 
 /* ---------- Card: D2 The Poster ---------- */
 
+.dash.is-cards .studio--card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  height: 100%;
+}
+
+/* The poster takes the height the controls leave, and the component fits it inside, so nothing
+   here depends on the poster's own size */
+.dash.is-cards .studio--card .studio__preview {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: hidden;
+}
+
+.dash.is-cards .studio--card .studio__canvas {
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Touch and hold saves the finished poster like any photo: the one thing on a card that may bring up
+   iOS's callout, so it opts back in to what the card turns off */
+.dash.is-cards .studio__press {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.dash.is-cards .studio--card .button {
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+}
+
+/* No lift on tap: a finger leaves hover stuck on */
+.dash.is-cards .studio--card .button:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.dash.is-cards .studio--card .button--ghost:hover {
+  background: transparent;
+}
+
+.dash.is-cards .studio--card .button--ghost:active {
+  background: rgba(244, 241, 234, 0.08);
+}
+
+/* One row of designs, each an equal share of the width, so nothing scrolls sideways under a swipe */
+.dash.is-cards .studio__designs,
+.dash.is-cards .studio__sizes {
+  display: flex;
+  flex: none;
+  width: 100%;
+  padding: 3px;
+  overflow: hidden;
+}
+
+/* Longer names take a bigger share, so "Annotated" still fits on a 360px phone */
+.dash.is-cards .studio__designs .segmented__option,
+.dash.is-cards .studio__sizes .segmented__option {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.88rem;
+}
+
+.dash.is-cards .studio--card .studio__bar {
+  display: flex;
+  flex: none;
+  gap: 10px;
+}
+
+.dash.is-cards .studio__share {
+  flex: 1;
+}
+
+.dash.is-cards .studio__options {
+  gap: 8px;
+}
+
+.dash.is-cards .studio--card .studio__notice {
+  flex: none;
+  margin: 0;
+  text-align: center;
+}
+
+/* Size, background and Ultra HD take the controls' place; the poster above shrinks to make room and
+   changes as you pick */
+.dash.is-cards .studio__sheet {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.dash.is-cards .studio__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash.is-cards .studio__label {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.dash.is-cards .studio__note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash.is-cards .studio__papers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash.is-cards .studio__paper {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dash.is-cards .studio__paper i {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(244, 241, 234, 0.3);
+}
+
+.dash.is-cards .studio__paper[aria-pressed='true'] {
+  border: 2px solid var(--text);
+}
+
+.dash.is-cards .studio__paper-name {
+  min-width: 0;
+  margin-left: 4px;
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash.is-cards .studio__more {
+  flex: 1 1 auto;
+}
+
+.dash.is-cards .studio__done {
+  flex: 1 1 auto;
+  background: var(--text);
+  color: var(--bg);
+}
+
+.dash.is-cards .studio--card .studio__done:hover {
+  background: var(--text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dash.is-cards .studio__sheet {
+    animation: studio-sheet-in 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes studio-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
 
 /* ---------- end card: D2 The Poster ---------- */

@@ -658,7 +658,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
           <Side label="Side D" title={SIDES.D} />
 
-          <Chapter id="notes" hint="The small print on your record." num="D1" title="Liner Notes" lede="The back of the sleeve: who played on this record, and how well you know your own habits.">
+          <Chapter id="notes" hint="The small print: what you’d never have guessed." num="D1" title="Liner Notes" lede="The back of the sleeve: who played on this record, and how well you know your own habits.">
             <LinerNotes
               takes={lines}
               fun={fun}
@@ -667,13 +667,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
               devices={devices}
               topArtists={topArtists}
               hours={hours}
+              wear={wear}
               period={year === null ? span : String(year)}
               isAllTime={year === null}
             />
           </Chapter>
 
           <Chapter
-            id="poster" hint="Take it home."
+            id="poster" hint="Touch and hold the poster to save it."
             num="D2"
             title="The Poster"
             lede="Take it home. Pick a design, a size and a background, then download it or send it straight from your phone."
