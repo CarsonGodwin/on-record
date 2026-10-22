@@ -5585,6 +5585,93 @@ html.cards-open body {
 
 /* ---------- Card: C1 Constellation ---------- */
 
+/* The sky fills the card and a finger always explores it; the caption under it names what you tapped */
+.dash.is-cards .constellation.is-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* The page's purple and teal wash, turned down so the artists' own colors lead */
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(160, 83, 253, 0.08), transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(12, 162, 188, 0.06), transparent 50%),
+    #07060c;
+}
+
+.dash.is-cards .constellation.is-card .constellation__sky {
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+}
+
+.dash.is-cards .constellation.is-card .constellation__sky svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* Background stars and halos stay, just quieter, so they don't read as artists on a small screen */
+.dash.is-cards .constellation.is-card .constellation__star {
+  opacity: 0.16;
+  animation-name: twinkle-faint;
+}
+
+@keyframes twinkle-faint {
+  from { opacity: 0.04; }
+  to { opacity: 0.3; }
+}
+
+.dash.is-cards .constellation.is-card .constellation__halo {
+  opacity: 0.14;
+}
+
+.constellation__reset {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(7, 6, 12, 0.82);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.constellation__reset:active {
+  background: var(--surface-2);
+}
+
+/* A fixed two lines, so picking a star never resizes the sky under your finger */
+.constellation__caption {
+  flex: none;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  height: calc(2 * 1.4em + 22px);
+  margin: 0;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--line);
+  background: rgba(11, 10, 15, 0.6);
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.constellation__caption em {
+  color: var(--text);
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+.constellation__caption .constellation__who {
+  font-size: 1.4em;
+}
 
 /* ---------- end card: C1 Constellation ---------- */
 
@@ -5593,6 +5680,146 @@ html.cards-open body {
 
 /* ---------- Card: C2 Pulse ---------- */
 
+/* The ridges fill the card; under them, one line on how to read it, or the line you picked */
+.dash.is-cards .pulse.is-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+}
+
+.pulse__plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 12px 4px 0;
+}
+
+.pulse__plot svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* A faint wash of each line's color under it: still opaque, so the ridges in front hide the ones behind */
+.dash.is-cards .pulse.is-card .pulse__fill {
+  fill: color-mix(in srgb, var(--c) 9%, #000);
+}
+
+.dash.is-cards .pulse.is-card .pulse__ridge.is-on .pulse__fill {
+  fill: color-mix(in srgb, var(--c) 18%, #000);
+  fill-opacity: 0.85;
+}
+
+.dash.is-cards .pulse.is-card .pulse__ridge.is-on .pulse__line {
+  filter: none;
+}
+
+.pulse__found {
+  fill: var(--c);
+  stroke: #000;
+  stroke-width: 1.5;
+}
+
+.dash.is-cards .pulse.is-card .pulse__tag text {
+  font-size: 12px;
+}
+
+.dash.is-cards .pulse.is-card .axis-label {
+  font-size: 12px;
+}
+
+.pulse__panel {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 96px;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.pulse__lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.pulse__lead em {
+  color: var(--text);
+  font-size: 1.15em;
+}
+
+.pulse__pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pulse__readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+
+.pulse__readout em {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1.4rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pulse__peak {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.dash.is-cards .pulse.is-card .pulse__scrub {
+  position: static;
+  gap: 4px;
+  padding: 0;
+  background: none;
+  touch-action: none;
+}
+
+.dash.is-cards .pulse.is-card .pulse__step {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+
+.dash.is-cards .pulse.is-card .scrubber {
+  min-width: 0;
+  margin: 0 8px;
+  touch-action: none;
+}
+
+.pulse__at {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 5.6em;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.pulse__at b {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
 
 /* ---------- end card: C2 Pulse ---------- */
 
@@ -5601,6 +5828,311 @@ html.cards-open body {
 
 /* ---------- Card: C3 The Charts ---------- */
 
+/* One row of controls, the podium, then as many rows as fit; the full list opens over the card */
+.dash.is-cards .charts.is-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.charts__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.charts__bar .segmented {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+.charts__bar .segmented__option {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 0.86rem;
+}
+
+/* A narrow phone's row, and four categories (with podcasts) on any phone, get a little less air */
+@container (max-width: 350px) {
+  .charts__bar .segmented__option {
+    padding-inline: 7px;
+  }
+}
+
+.charts__bar:has(.segmented__option:nth-child(4)) .segmented__option {
+  padding-inline: 6px;
+  font-size: 0.8rem;
+}
+
+.charts__bar:has(.segmented__option:nth-child(4)) .charts__sort {
+  padding-inline: 8px 10px;
+}
+
+.charts__sort {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 46px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(244, 241, 234, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.charts__sort svg {
+  color: var(--muted);
+}
+
+.charts__sort:active {
+  background: var(--surface-2);
+}
+
+/* Each spot shares the podium's rows, so the covers sit on one line and every name starts right under its cover */
+.dash.is-cards .charts.is-card .podium {
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-rows: auto;
+  column-gap: 12px;
+  row-gap: 0;
+  margin: 0 0 4px;
+}
+
+.dash.is-cards .charts.is-card .podium__spot {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  align-items: start;
+}
+
+.dash.is-cards .charts.is-card .podium__art {
+  align-self: end;
+}
+
+.dash.is-cards .charts.is-card .podium__spot--1 {
+  order: 2;
+  grid-column: auto;
+}
+
+.dash.is-cards .charts.is-card .podium__art {
+  margin-bottom: 10px;
+}
+
+.dash.is-cards .charts.is-card .podium__art .cover {
+  border-radius: 10px;
+  box-shadow: 0 16px 30px -14px rgba(0, 0, 0, 0.8);
+}
+
+.dash.is-cards .charts.is-card .podium__spot:hover .cover {
+  transform: none;
+}
+
+.dash.is-cards .charts.is-card .podium__rank {
+  left: 0;
+  bottom: -12px;
+  font-size: 2.3rem;
+  -webkit-text-stroke: 2.5px var(--bg);
+}
+
+.dash.is-cards .charts.is-card .podium__spot--1 .podium__rank {
+  font-size: 2.8rem;
+}
+
+.dash.is-cards .charts.is-card .podium__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin-top: 4px;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.dash.is-cards .charts.is-card .podium__sub {
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dash.is-cards .charts.is-card .podium__value {
+  margin-top: 2px;
+  font-size: 0.8rem;
+}
+
+.charts__rest {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Up here rather than at the bottom, where a missed tap would land on the next-track button */
+.charts__more {
+  flex: none;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--more);
+  padding: 0 2px 0 14px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.charts__more:active {
+  color: var(--muted);
+}
+
+/* Rows at a fixed height (set from TopCharts.tsx): the card works out how many fit from it */
+.dash.is-cards .charts.is-card .chart-list {
+  margin: 0;
+}
+
+.dash.is-cards .charts.is-card .chart-list__row,
+.dash.is-cards .charts.is-card .chart-list--hideable .chart-list__row {
+  grid-template-columns: 1.6rem 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  height: var(--row);
+  padding: 0;
+}
+
+.dash.is-cards .charts.is-card .chart-list--hideable .chart-list__row {
+  grid-template-columns: 1.6rem 36px minmax(0, 1fr) auto auto;
+}
+
+.dash.is-cards .charts.is-card .chart-list__rank {
+  font-size: 1.15rem;
+}
+
+.dash.is-cards .charts.is-card .chart-list__main {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.dash.is-cards .charts.is-card .chart-list__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.dash.is-cards .charts.is-card .chart-list__sub {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.dash.is-cards .charts.is-card .chart-list__value {
+  font-size: 0.82rem;
+}
+
+.charts__sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--line-strong);
+  background: var(--bg);
+  animation: charts-sheet-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes charts-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charts__sheet {
+    animation: none;
+  }
+}
+
+.charts__sheet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.charts__sheet-head strong {
+  font-size: 1.05rem;
+}
+
+.charts__close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The one thing on this card that scrolls, and only because you opened it */
+.charts__sheet-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.charts__sheet .charts__hidden {
+  margin: 10px 0;
+}
+
+.charts__sheet .chip-button,
+.dash.is-cards .charts__sheet .chart-hide {
+  min-height: 40px;
+  padding: 0 14px;
+  font-family: var(--display);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  opacity: 1;
+}
 
 /* ---------- end card: C3 The Charts ---------- */
 

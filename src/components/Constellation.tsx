@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { GraphLink, GraphNode } from '../data/insights'
 import { formatDuration, formatNumber } from '../lib/format'
-import { useWidth } from '../lib/hooks'
+import { useSize, useWidth } from '../lib/hooks'
 import { isHover } from '../lib/pointer'
 import { mulberry32 } from '../lib/random'
+import { InCards } from '../lib/stage'
 import { usePanZoom } from '../lib/zoom'
-import { layoutConstellation, starSize, trimGraph } from '../viz/constellation'
+import { layoutConstellation, nearestStar, starSize, trimGraph } from '../viz/constellation'
 import { ZoomControls } from './ZoomControls'
 
 /*
@@ -21,15 +22,31 @@ interface Props {
 }
 
 const STARLIGHT = '#d9d4ff'
+/** On a phone's card a tap takes the nearest star this far past its edge, since the stars themselves are small targets */
+const REACH = 30
+
+/** "A", "A and B", "A, B and C", each name in the serif */
+function nameList(names: string[]): ReactNode {
+  return names.map((name, i) => (
+    <span key={name}>
+      {i > 0 && (i === names.length - 1 ? ' and ' : ', ')}
+      <em>{name}</em>
+    </span>
+  ))
+}
 
 export function Constellation({ nodes: allNodes, links: allLinks, colors, onPoster }: Props) {
+  // On a phone's card the sky fills the card and a finger always explores it; on the page it's a band in the column
+  const card = useContext(InCards)
   const ref = useRef<HTMLDivElement>(null)
-  const width = useWidth(ref, 900)
-  const narrow = width < 600
-  const height = narrow ? 480 : 600
-  const [active, setActiveNow] = useState<string | null>(null)
   const skyRef = useRef<HTMLDivElement>(null)
-  const zoom = usePanZoom(skyRef, { width, height, max: 4 })
+  const columnWidth = useWidth(ref, 900)
+  const box = useSize(skyRef, { width: 358, height: 400 })
+  const width = card ? box.width : columnWidth
+  const narrow = width < 600
+  const height = card ? box.height : narrow ? 480 : 600
+  const [active, setActiveNow] = useState<string | null>(null)
+  const zoom = usePanZoom(skyRef, { width, height, max: 4, oneFinger: card, doubleTap: card })
   const view = zoom.view
   // A clicked star stays selected until it is clicked again (or the sky is)
   const [pinned, setPinned] = useState<string | null>(null)
@@ -51,7 +68,7 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   // Fit the layout into the box
   const xs = [...layout.values()].map((p) => p.x)
   const ys = [...layout.values()].map((p) => p.y)
-  const pad = narrow ? 44 : 70
+  const pad = card ? 40 : narrow ? 44 : 70
   const minX = Math.min(...xs)
   const minY = Math.min(...ys)
   const spanX = Math.max(...xs) - minX || 1
@@ -104,9 +121,13 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
     const placed = new Map<string, Label>()
     const charW = narrow ? 7.4 : 7
     const boxes: { x0: number; x1: number; y0: number; y1: number }[] = []
+    // A name that would land on another, or off the card, waits until zooming spreads the stars out
+    const off = (b: (typeof boxes)[number]) => b.x0 < 0 || b.x1 > width || (card && (b.y0 < 0 || b.y1 > height))
     const place = (n: GraphNode, avoid: boolean) => {
       const p = pos(n.id)
       const r = radius(n)
+      // Zoomed in on a card, a star panned out of sight takes its name with it
+      if (card && (p.x < -r || p.x > width + r || p.y < -r || p.y > height + r)) return
       const w = n.id.length * charW + 6
       // Keep centred names inside the sky instead of half off its edge
       const cx = Math.max(w / 2, Math.min(width - w / 2, p.x))
@@ -118,14 +139,14 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
       ]
       for (const { x0, ...spot } of avoid ? spots : spots.slice(0, 1)) {
         const box = { x0, x1: x0 + w, y0: spot.y - 12, y1: spot.y + 4 }
-        if (avoid && (box.x0 < 0 || box.x1 > width || boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1))) continue
+        if (avoid && (off(box) || boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1))) continue
         boxes.push(box)
         placed.set(n.id, spot)
         return
       }
     }
     if (!shown) {
-      for (const n of nodes) if (labelled.has(n.id)) place(n, false)
+      for (const n of nodes) if (labelled.has(n.id)) place(n, card)
     } else if (!narrow) {
       for (const n of nodes) if (isLit(n.id)) place(n, false)
     } else {
@@ -143,15 +164,25 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   // Neighbors past the top three that didn't get a name on the sky
   const unnamed = activeLinks.slice(3).filter((l) => !labels.has(l.other))
 
-  return (
-    <div className="constellation" ref={ref}>
-      <div className={view.s > 1.01 ? 'constellation__sky is-zoomed' : 'constellation__sky'} ref={skyRef}>
+  const nearest = (x: number, y: number) => nearestStar(nodes.map((n) => ({ id: n.id, ...pos(n.id), r: radius(n) })), x, y, REACH)
+  // With nothing picked, the card's caption names the pair you play back to back the most
+  const tightest = links.reduce<GraphLink | null>((best, l) => (!best || l.count > best.count ? l : best), null)
+
+  const zoomed = view.s > 1.01
+  const sky = (
+    <div className={zoomed ? 'constellation__sky is-zoomed' : 'constellation__sky'} ref={skyRef} data-drag={card || undefined}>
       <svg
         width={width}
         height={height}
         role="img"
         aria-label="Network of your top artists, linked by what you play back to back"
         onClick={(e) => {
+          if (card) {
+            const r = e.currentTarget.getBoundingClientRect()
+            const id = nearest(e.clientX - r.left, e.clientY - r.top)
+            setPinned(id === pinned ? null : id)
+            return
+          }
           if (e.target !== e.currentTarget) return
           setPinned(null)
           setActive(null)
@@ -207,16 +238,18 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
               onPointerEnter={(e) => isHover(e) && setActive(n.id)}
               onPointerLeave={(e) => isHover(e) && setActive(null)}
               aria-pressed={pinned === n.id}
-              onClick={() => setPinned(pinned === n.id ? null : n.id)}
+              // On a card the sky picks the nearest star itself
+              onClick={card ? undefined : () => setPinned(pinned === n.id ? null : n.id)}
               onKeyDown={(e) => {
                 if (e.key !== 'Enter' && e.key !== ' ') return
                 e.preventDefault()
                 setPinned(pinned === n.id ? null : n.id)
               }}
-              onFocus={() => setActive(n.id)}
+              // A tap focuses the star too; on a card only keyboard focus should light it, or a second tap couldn't let go
+              onFocus={(e) => (!card || e.currentTarget.matches(':focus-visible')) && setActive(n.id)}
               onBlur={() => setActive(null)}
             >
-              <circle cx={p.x} cy={p.y} r={r * 1.9} fill={color} opacity={0.35} filter="url(#star-glow)" />
+              <circle cx={p.x} cy={p.y} r={r * 1.9} fill={color} opacity={0.35} filter="url(#star-glow)" className="constellation__halo" />
               <circle cx={p.x} cy={p.y} r={r} fill={color} />
               <circle cx={p.x} cy={p.y} r={r * 0.35} fill="#fff" opacity={0.75} />
               <circle cx={p.x} cy={p.y} r={Math.max(r + 8, 14)} fill="transparent" />
@@ -233,8 +266,38 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
           ))}
         </g>
       </svg>
-      <ZoomControls zoom={zoom} className="constellation__zoom" />
+      {!card && <ZoomControls zoom={zoom} className="constellation__zoom" />}
+    </div>
+  )
+
+  if (card) {
+    return (
+      <div className="constellation is-card" ref={ref}>
+        {sky}
+        {zoomed && (
+          <button type="button" className="constellation__reset" onClick={zoom.reset}>
+            Reset
+          </button>
+        )}
+        <p className="constellation__caption" aria-live="polite">
+          {shown ? (
+            <>
+              <em className="constellation__who">{shown}</em>,{' '}
+              {activeLinks.length ? <>often next to {nameList(activeLinks.slice(0, 2).map((l) => l.other))}.</> : 'rarely played next to your other favorites.'}
+            </>
+          ) : tightest ? (
+            <>Most often back to back: {nameList([tightest.source, tightest.target])}, {formatNumber(tightest.count)} times.</>
+          ) : (
+            'None of these artists come up back to back often enough to join.'
+          )}
+        </p>
       </div>
+    )
+  }
+
+  return (
+    <div className="constellation" ref={ref}>
+      {sky}
 
       <div className="constellation__readout" aria-live="polite">
         <div className="constellation__text">

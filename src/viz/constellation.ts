@@ -49,3 +49,28 @@ export function trimGraph(nodes: GraphNode[], links: GraphLink[], n: number): { 
   const ids = new Set(kept.map((k) => k.id))
   return { nodes: kept, links: links.filter((l) => ids.has(l.source) && ids.has(l.target)) }
 }
+
+export interface Star {
+  id: string
+  x: number
+  y: number
+  r: number
+}
+
+/**
+ * The star a tap at (x, y) means: the one whose edge is nearest, as long as the tap
+ * is within `reach` of that edge. Small stars make small targets, so a phone
+ * lets a finger land a little off one and still get it.
+ */
+export function nearestStar(stars: Star[], x: number, y: number, reach: number): string | null {
+  let best: string | null = null
+  let gap = reach
+  for (const s of stars) {
+    const d = Math.hypot(s.x - x, s.y - y) - s.r
+    if (d <= gap) {
+      gap = d
+      best = s.id
+    }
+  }
+  return best
+}

@@ -6,6 +6,10 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
  * finger still scrolls the page; zoomed in, it pans instead. A drag never
  * counts as a click, so tap-to-select keeps working underneath.
  *
+ * A box that fills a phone's card has no page to scroll, so it can opt into
+ * `oneFinger` (a finger always pans, with a little give at the edges that
+ * springs back) and `doubleTap` (two quick taps zoom in where they land).
+ *
  * The view maps content to screen: screen = view.x + view.s * content.
  */
 
@@ -30,6 +34,10 @@ interface Options {
   max: number
   /** While true, a single finger belongs to something else (like a hold-and-drag scrub) and doesn't pan */
   busy?: RefObject<boolean>
+  /** A single finger pans at any zoom, for a box with no page around it to scroll */
+  oneFinger?: boolean
+  /** Two quick taps zoom in 2× at that spot (and back out from the closest zoom) */
+  doubleTap?: boolean
 }
 
 interface Point {
@@ -39,8 +47,18 @@ interface Point {
 
 /** Pixels a press can wander before it counts as a drag rather than a tap */
 const DRAG_SLOP = 5
+/** How soon and how near a second tap has to land to make a double tap */
+const DOUBLE_TAP_MS = 300
+const DOUBLE_TAP_SLOP = 30
+/** How far past an edge a one-finger pan can stretch before it springs back */
+const GIVE = 36
 
-export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, max, busy }: Options): PanZoom {
+/** Dragging past an edge moves less and less the further you go, up to GIVE */
+function rubber(over: number): number {
+  return Math.sign(over) * GIVE * (1 - 1 / (1 + Math.abs(over) / (GIVE * 2)))
+}
+
+export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, max, busy, oneFinger = false, doubleTap = false }: Options): PanZoom {
   const [view, setViewState] = useState<View>(IDENTITY)
   const viewRef = useRef(view)
   const bounds = useRef({ width, height, max })
@@ -52,16 +70,15 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
     return { s, x: Math.min(0, Math.max(w - w * s, v.x)), y: Math.min(0, Math.max(h - h * s, v.y)) }
   }, [])
 
-  const setView = useCallback(
-    (v: View) => {
-      const next = clamp(v)
-      const cur = viewRef.current
-      if (next.s === cur.s && next.x === cur.x && next.y === cur.y) return
-      viewRef.current = next
-      setViewState(next)
-    },
-    [clamp],
-  )
+  // Unclamped, for the stretch past an edge and the spring back from it
+  const show = useCallback((next: View) => {
+    const cur = viewRef.current
+    if (next.s === cur.s && next.x === cur.x && next.y === cur.y) return
+    viewRef.current = next
+    setViewState(next)
+  }, [])
+
+  const setView = useCallback((v: View) => show(clamp(v)), [show, clamp])
 
   /** Zooms by `factor`, keeping the content under (px, py) where it is */
   const zoomAt = useCallback(
@@ -82,12 +99,12 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
       const step = (now: number) => {
         const t = Math.min(1, (now - start) / 220)
         const e = 1 - Math.pow(1 - t, 3)
-        setView({ s: from.s + (target.s - from.s) * e, x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e })
+        show({ s: from.s + (target.s - from.s) * e, x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e })
         if (t < 1) tween.current = requestAnimationFrame(step)
       }
       tween.current = requestAnimationFrame(step)
     },
-    [setView],
+    [show],
   )
 
   const zoomBy = useCallback(
@@ -116,6 +133,10 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
     let start: { view: View; pts: Point[] } | null = null
     let dragged = false
     let gestureStart = 1
+    // The last tap that could start a double tap, and whether the press now down is its second half
+    let lastTap: { t: number; p: Point } | null = null
+    let second = false
+    let swallow = false
 
     const local = (e: { clientX: number; clientY: number }): Point => {
       const r = el.getBoundingClientRect()
@@ -130,8 +151,13 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
       cancelAnimationFrame(tween.current)
-      if (pts.size === 0) dragged = false
-      pts.set(e.pointerId, local(e))
+      const p = local(e)
+      if (pts.size === 0) {
+        dragged = false
+        swallow = false
+        second = doubleTap && lastTap !== null && e.timeStamp - lastTap.t < DOUBLE_TAP_MS && Math.hypot(p.x - lastTap.p.x, p.y - lastTap.p.y) < DOUBLE_TAP_SLOP
+      } else second = false
+      pts.set(e.pointerId, p)
       restart()
     }
 
@@ -154,7 +180,7 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
         setView({ s, x: mid.x - cx * s, y: mid.y - cy * s })
         return
       }
-      if (v0.s <= 1 || busy?.current) return
+      if ((v0.s <= 1 && !oneFinger) || busy?.current) return
       const p = now[0]
       const p0 = start.pts[0]
       if (!dragged) {
@@ -163,18 +189,39 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
         el.setPointerCapture(e.pointerId)
         el.classList.add('is-panning')
       }
-      setView({ s: v0.s, x: v0.x + p.x - p0.x, y: v0.y + p.y - p0.y })
+      const want = { s: v0.s, x: v0.x + p.x - p0.x, y: v0.y + p.y - p0.y }
+      if (!oneFinger) return setView(want)
+      const fit = clamp(want)
+      show({ s: fit.s, x: fit.x + rubber(want.x - fit.x), y: fit.y + rubber(want.y - fit.y) })
     }
 
     const up = (e: PointerEvent) => {
       if (!pts.delete(e.pointerId)) return
       restart()
+      if (pts.size > 0) return
+      const v = viewRef.current
+      const fit = clamp(v)
+      if (fit.x !== v.x || fit.y !== v.y) animateTo(fit)
+      if (!doubleTap || dragged || e.type === 'pointercancel') {
+        lastTap = null
+        return
+      }
+      const p = local(e)
+      if (!second) {
+        lastTap = { t: e.timeStamp, p }
+        return
+      }
+      // The second tap zooms in on the spot, or back out once there's no closer to go
+      lastTap = null
+      swallow = true
+      animateTo(v.s >= bounds.current.max - 0.01 ? IDENTITY : zoomAt(2, p.x, p.y))
     }
 
-    // Swallow the click that ends a drag or pinch
+    // Swallow the click that ends a drag or pinch, or a double tap's second half
     const click = (e: MouseEvent) => {
-      if (!dragged) return
+      if (!dragged && !swallow) return
       dragged = false
+      swallow = false
       e.stopPropagation()
       e.preventDefault()
     }
@@ -224,7 +271,7 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, { width, height, 
       el.removeEventListener('gesturechange', gestureChange)
       cancelAnimationFrame(tween.current)
     }
-  }, [ref, setView, zoomAt, busy])
+  }, [ref, setView, show, clamp, animateTo, zoomAt, busy, oneFinger, doubleTap])
 
   return { view, max, zoomBy, reset }
 }
