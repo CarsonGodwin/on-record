@@ -18,7 +18,10 @@ interface Props {
   plays: Play[]
   /** Hides an artist from the whole page; returns false if they're all that's left */
   onHide: (artist: string) => boolean
-  /** A new set every time it changes, which is how a refusal knows it's out of date */
+  /**
+   * What's been hidden, which can be ahead of `plays` for a moment while the page catches up.
+   * A new set every time it changes, which is how a refusal knows it's out of date.
+   */
   hidden: ReadonlySet<string>
   onManage: () => void
 }
@@ -35,7 +38,11 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
   const hasPodcasts = useMemo(() => plays.some((p) => p.kind === 'episode'), [plays])
   const options = hasPodcasts ? CATEGORIES : CATEGORIES.filter((c) => c.value !== 'show')
   const active = !hasPodcasts && category === 'show' ? 'artist' : category
-  const items = useMemo(() => topItems(plays, active, rankBy, expanded ? 50 : 20), [plays, active, rankBy, expanded])
+  // A hidden artist leaves the list at once; the rest of the page catches up a moment later
+  const items = useMemo(() => {
+    const ranked = topItems(plays, active, rankBy, expanded ? 50 : 20)
+    return active === 'artist' ? ranked.filter((r) => !hidden.has(r.label)) : ranked
+  }, [plays, active, rankBy, expanded, hidden])
 
   const value = rankBy === 'time' ? (r: Ranked) => r.ms : (r: Ranked) => r.plays
   const primary = rankBy === 'time' ? (r: Ranked) => formatDuration(r.ms) : (r: Ranked) => playsLabel(r.plays)

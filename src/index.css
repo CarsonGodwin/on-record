@@ -5411,3 +5411,29 @@ kbd {
     opacity: 1;
   }
 }
+
+/* While the charts are worked out again after a filter change */
+
+.dash.is-updating .dash__main {
+  opacity: 0.5;
+}
+
+.dash__updating {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  z-index: 250;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-raise);
+  color: var(--text);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.dash__updating:empty {
+  display: none;
+}

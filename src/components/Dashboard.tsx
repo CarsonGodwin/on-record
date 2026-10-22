@@ -15,7 +15,7 @@ import {
   songStats,
   takes,
 } from '../data/insights'
-import { filterByYear, filterPlays, funStats, getYears, newArtistsIn, platforms, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
+import { filterByYear, filterPlays, funStats, getYears, newArtistsIn, platforms, sameFilter, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
 import { formatHour, formatNumber } from '../lib/format'
 import { COARSE, LAUNCH_KEY, PHONE } from '../lib/pointer'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
@@ -72,16 +72,37 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
   const otherPlays = useMemo(() => result.plays.filter((p) => p.kind !== 'track').length, [result.plays])
   const hasAnyMusic = otherPlays < result.plays.length
+  const [launcher, setLauncher] = useState<LauncherMode | null>(null)
+  // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
+  const [settingsOpen, setSettingsOpen] = useState(false)
   // A history with no music at all keeps its podcasts, or there would be nothing to show
-  const filter = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden }), [musicOnly, hasAnyMusic, hidden])
-  const all = useMemo(() => filterPlays(result.plays, filter), [result.plays, filter])
+  const chosen = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden }), [musicOnly, hasAnyMusic, hidden])
+  /*
+   * The charts follow `applied`, which catches up with `chosen` once the launcher and Settings are
+   * closed and an "Updating" note has painted. Re-running every chart over a long history holds the
+   * page for a moment, so it happens once when you're done choosing, not once per artist, and never
+   * without saying so.
+   */
+  const [applied, setApplied] = useState(chosen)
+  const choosing = launcher !== null || settingsOpen
+  const updating = !choosing && !sameFilter(applied, chosen)
+  useEffect(() => {
+    if (!updating) return
+    let timer = 0
+    // requestAnimationFrame runs just before the paint, so the timeout after it lands just after
+    const frame = requestAnimationFrame(() => {
+      timer = window.setTimeout(() => setApplied(chosen))
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [updating, chosen])
+  const all = useMemo(() => filterPlays(result.plays, applied), [result.plays, applied])
   const years = useMemo(() => getYears(all), [all])
   const [pickedYear, setYear] = useState<number | null>(null)
   // Hiding an artist can empty a year; the page then falls back to all time
   const year = pickedYear !== null && years.includes(pickedYear) ? pickedYear : null
-  const [launcher, setLauncher] = useState<LauncherMode | null>(null)
-  // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [posterDesign, setPosterDesign] = useState<PosterDesign>('deep')
   const [current, setCurrent] = useState<string | null>(null)
   // Where The Long Play is: the id of the stop on stage, or null when it's put away. An id, not an index,
@@ -115,10 +136,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const graph = useMemo(() => artistGraph(plays, 36, 3), [plays])
 
   const firstHeard = useMemo(() => firstListens(all), [all])
-  const allArtists = useMemo(() => topItems(all, 'artist', 'time', Infinity), [all])
-  const hiddenArtists = useMemo(
-    () => topItems(result.plays.filter((p) => p.kind === 'track' && hidden.has(p.artist)), 'artist', 'time', Infinity),
-    [result.plays, hidden],
+  // Every music artist, most-listened first, ranked once. The launcher's lists split it by what's hidden,
+  // which stays quick with thousands of artists.
+  const musicArtists = useMemo(() => topItems(result.plays, 'artist', 'time', Infinity), [result.plays])
+  const shownArtists = useMemo(() => musicArtists.filter((a) => !hidden.has(a.label)), [musicArtists, hidden])
+  const hiddenArtists = useMemo(() => musicArtists.filter((a) => hidden.has(a.label)), [musicArtists, hidden])
+  const hiddenPlays = useMemo(
+    () => (applied.hidden.size === 0 ? 0 : result.plays.filter((p) => p.kind === 'track' && applied.hidden.has(p.artist)).length),
+    [result.plays, applied.hidden],
   )
   const pulseArtists = useMemo(
     () =>
@@ -304,7 +329,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    */
   function hideArtists(artists: string[]): boolean {
     const going = new Set(artists)
-    if (!result.plays.some((p) => p.kind === 'track' && !hidden.has(p.artist) && !going.has(p.artist))) return false
+    if (!musicArtists.some((a) => !hidden.has(a.label) && !going.has(a.label))) return false
     setHidden((prev) => new Set([...prev, ...going]))
     return true
   }
@@ -388,7 +413,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   }, [hasMusic])
 
   return (
-    <div className={touring ? 'dash is-touring' : 'dash'}>
+    <div className={['dash', touring && 'is-touring', updating && 'is-updating'].filter(Boolean).join(' ')}>
       <header className="topbar" ref={topbarRef}>
         <a className="brand" href="#top" aria-label="On Record, back to the top">
           <span className="brand__name">On Record</span>
@@ -419,7 +444,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         <button
           type="button"
           className="topbar__launch"
-          aria-label={hidden.size > 0 ? `Open the launcher (${hidden.size} artists hidden)` : 'Open the launcher'}
+          aria-label={hidden.size > 0 ? `Open the launcher (${hidden.size} artist${hidden.size === 1 ? '' : 's'} hidden)` : 'Open the launcher'}
           onClick={() => setLauncher('root')}
         >
           <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
@@ -608,11 +633,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                   {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
                 </li>
                 <li>{formatNumber(result.skippedRows)} rows without track info ignored (usually local files)</li>
-                {filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
-                {hidden.size > 0 && (
+                {applied.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
+                {applied.hidden.size > 0 && (
                   <li>
-                    {formatNumber(result.plays.filter((p) => p.kind === 'track' && hidden.has(p.artist)).length)} plays by {hidden.size} hidden
-                    artist{hidden.size === 1 ? '' : 's'} left out
+                    {formatNumber(hiddenPlays)} plays by {applied.hidden.size} hidden artist{applied.hidden.size === 1 ? '' : 's'} left out
                   </li>
                 )}
                 {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
@@ -643,7 +667,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         sides={SIDES}
         years={years}
         year={year}
-        artists={allArtists}
+        musicOnly={chosen.musicOnly}
+        artists={shownArtists}
         hidden={hiddenArtists}
         onJump={jumpTo}
         onYear={pickYear}
@@ -664,6 +689,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         otherPlays={otherPlays}
         hasAnyMusic={hasAnyMusic}
       />
+      {/* Paints before the charts are worked out again, so the moment that takes doesn't look like a hang */}
+      <p className="dash__updating" role="status">
+        {updating ? 'Updating the charts…' : ''}
+      </p>
 
       {tourStep !== null && (
         <Tour

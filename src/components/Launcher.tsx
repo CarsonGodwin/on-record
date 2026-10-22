@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Ranked } from '../data/stats'
 import { formatDuration } from '../lib/format'
-import { LAUNCH_KEY } from '../lib/pointer'
+import { LAUNCH_KEY, PHONE } from '../lib/pointer'
 import { matches } from '../lib/search'
 import { Modal } from './Panels'
 import type { Track } from './TrackMenu'
@@ -48,6 +48,8 @@ interface Props {
   sides: Record<string, string>
   years: number[]
   year: number | null
+  /** Whether podcasts and audiobooks are left out, shown beside Settings */
+  musicOnly: boolean
   /** Music artists still showing, most-listened first */
   artists: Ranked[]
   /** Hidden artists, most-listened first */
@@ -97,6 +99,7 @@ function LauncherBody({
   sides,
   years,
   year,
+  musicOnly,
   artists,
   hidden,
   onJump,
@@ -114,6 +117,7 @@ function LauncherBody({
   // The row the keyboard last put the highlight on (null: the first pickable one). Hovering moves the
   // highlight too, but a Shift-click stretches from here, not from wherever the pointer passed.
   const [origin, setOrigin] = useState<number | null>(null)
+  // What the last hide or unhide did. It goes once you type or move on, so the selection count can show.
   const [note, setNote] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -142,7 +146,7 @@ function LauncherBody({
       return [all, ...listed]
     }
     const all: Item[] = [
-      { key: 'settings', group: 'Commands', label: 'Settings', hint: 'Music only', run: onSettings },
+      { key: 'settings', group: 'Commands', label: 'Settings', hint: musicOnly ? 'Music only' : 'Music + Podcasts and Audiobooks', run: onSettings },
       { key: 'hide', group: 'Commands', label: 'Hide Artists…', terms: 'exclude remove filter', run: () => onMode('hide') },
       ...(hidden.length > 0
         ? [
@@ -179,7 +183,7 @@ function LauncherBody({
     ]
     // The hint beside a command finds it too: "music" finds Settings, "license" finds About
     return all.filter((item) => matches(query, `${item.label} ${item.hint ?? ''} ${item.terms ?? ''}`))
-  }, [mode, query, pool, hidden, tracks, sides, years, year, onSettings, onReset, onMode, onJump, onYear])
+  }, [mode, query, pool, hidden, tracks, sides, years, year, musicOnly, onSettings, onReset, onMode, onJump, onYear])
 
   const last = Math.max(items.length - 1, 0)
   const firstPick = items[0]?.names ? 1 : 0
@@ -192,10 +196,11 @@ function LauncherBody({
   /** The search stays, so the next match for the same word is right there */
   function act(names: string[]) {
     const what = names.length === 1 ? names[0] : `${names.length} artists`
+    // The page works its charts out again once, when the launcher closes, rather than after every pick
     if (mode === 'manage') {
       onUnhide(names)
-      setNote(`Unhid ${what}`)
-    } else setNote(onHide(names) ? `Hid ${what}` : `Can’t hide ${what}: at least one artist has to stay`)
+      setNote(`Unhid ${what}. The charts update when you close this.`)
+    } else setNote(onHide(names) ? `Hid ${what}. The charts update when you close this.` : `Can’t hide ${what}: at least one artist has to stay`)
     setAnchor(null)
     setActive(from)
     setOrigin(from)
@@ -218,6 +223,7 @@ function LauncherBody({
     } else setAnchor(null)
     setActive(i)
     if (!fromPointer) setOrigin(i)
+    setNote(null)
   }
 
   // Keep the highlighted row in view as the arrow keys move it
@@ -270,7 +276,7 @@ function LauncherBody({
           aria-controls="launcher-list"
           aria-activedescendant={items[current] ? `launcher-${items[current].key}` : undefined}
           aria-label={mode === 'manage' ? 'Search hidden artists' : mode === 'hide' ? 'Search your artists' : 'Search sections, years and commands'}
-          placeholder={mode === 'manage' ? 'Search hidden artists…' : mode === 'hide' ? 'Search your artists…' : 'Jump to a section or year, or run a command…'}
+          placeholder={mode === 'manage' ? 'Search hidden artists…' : mode === 'hide' ? 'Search your artists…' : PHONE ? 'Jump to…' : 'Jump to a section or year, or run a command…'}
           autoComplete="off"
           spellCheck={false}
           autoFocus
@@ -281,6 +287,7 @@ function LauncherBody({
             setActive(-1)
             setAnchor(null)
             setOrigin(null)
+            setNote(null)
           }}
           onKeyDown={onKeyDown}
         />
@@ -301,6 +308,8 @@ function LauncherBody({
                 role="option"
                 aria-selected={i === current || inPick}
                 className={i === current ? 'launcher__item is-active' : 'launcher__item'}
+                // Focus (and so the arrows and Enter) stays in the search box, and a Shift-click doesn't select text
+                onMouseDown={(e) => e.preventDefault()}
                 // Hovering moves the highlight, but not while a selection is out, which would reshape it
                 onPointerMove={() => anchor === null && setActive(i)}
                 onClick={(e) => {

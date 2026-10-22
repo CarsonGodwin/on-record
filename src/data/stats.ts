@@ -52,6 +52,14 @@ export function filterPlays(plays: Play[], { musicOnly, hidden }: PlayFilter): P
   return plays.filter((p) => (p.kind === 'track' ? !hidden.has(p.artist) : !musicOnly))
 }
 
+/** True when two filters leave out the same plays, so hiding an artist and unhiding them again costs nothing */
+export function sameFilter(a: PlayFilter, b: PlayFilter): boolean {
+  if (a === b) return true
+  if (a.musicOnly !== b.musicOnly || a.hidden.size !== b.hidden.size) return false
+  for (const artist of a.hidden) if (!b.hidden.has(artist)) return false
+  return true
+}
+
 // ---------- Summary ----------
 
 export interface Summary {

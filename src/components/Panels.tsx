@@ -19,6 +19,9 @@ interface ModalProps {
 export function Modal({ open, onClose, onGone, label, className, children }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const openRef = useRef(open)
+  // Whether the last press began on the backdrop. A click that starts in the search box and ends
+  // outside (selecting text) also lands on the dialog itself, and mustn't close it.
+  const downOnBackdrop = useRef(false)
 
   useEffect(() => {
     openRef.current = open
@@ -29,6 +32,25 @@ export function Modal({ open, onClose, onGone, label, className, children }: Mod
       // showModal focuses the first button it finds; start on the heading (or the launcher's search) instead
       dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
     } else if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  /*
+   * Keys pressed in the dialog stop at its onKeyDown below. Focus can still end up on <body> (a
+   * focused button that goes away, or in some browsers a click on plain text), and keys from there
+   * would skip the dialog and reach the page's window listeners: the tour's arrows and Escape would
+   * act behind it. Those stop here, and focus goes back in so the next key works. The browser still
+   * closes the dialog on Escape as usual.
+   */
+  useEffect(() => {
+    if (!open) return
+    const guard = (e: KeyboardEvent) => {
+      const dialog = ref.current
+      if (!dialog || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || dialog.contains(e.target as Node)) return
+      e.stopPropagation()
+      if (e.key !== 'Tab') dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+    }
+    window.addEventListener('keydown', guard, true)
+    return () => window.removeEventListener('keydown', guard, true)
   }, [open])
 
   return (
@@ -54,9 +76,13 @@ export function Modal({ open, onClose, onGone, label, className, children }: Mod
         e.preventDefault()
         onClose()
       }}
-      // The dialog itself has no padding, so a click that lands on it (not its content) is on the backdrop
+      // The dialog itself has no padding, so a press that lands on it (not its content) is on the backdrop
+      onPointerDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (downOnBackdrop.current && e.target === e.currentTarget) onClose()
+        downOnBackdrop.current = false
       }}
     >
       {open && <div className="modal__body">{children}</div>}
@@ -109,8 +135,6 @@ export function SettingsPanel({ open, onClose, onGone, musicOnly, onMusicOnly, o
               : `Leaves out ${formatNumber(otherPlays)} podcast and audiobook play${otherPlays === 1 ? '' : 's'}.`}
         </p>
       </section>
-
-      <p className="settings__foot">These reset when you leave the page. Nothing is stored.</p>
     </Modal>
   )
 }

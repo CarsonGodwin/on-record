@@ -9,6 +9,7 @@ import {
   isSkip,
   newArtistsIn,
   platforms,
+  sameFilter,
   startDate,
   summarize,
   topItems,
@@ -308,5 +309,18 @@ describe('filterPlays', () => {
   it('only hides music, even when a show shares the name', () => {
     const sameName = play(at(2024, 1, 5), { kind: 'episode', artist: 'Gone' })
     expect(filterPlays([hiddenSong, sameName], { musicOnly: false, hidden: new Set(['Gone']) })).toEqual([sameName])
+  })
+})
+
+describe('sameFilter', () => {
+  it('compares what is hidden, not which set holds it', () => {
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A', 'B']) }, { musicOnly: true, hidden: new Set(['B', 'A']) })).toBe(true)
+    expect(sameFilter({ musicOnly: true, hidden: new Set() }, { musicOnly: true, hidden: new Set() })).toBe(true)
+  })
+
+  it('tells filters apart', () => {
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: false, hidden: new Set(['A']) })).toBe(false)
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['B']) })).toBe(false)
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['A', 'B']) })).toBe(false)
   })
 })
