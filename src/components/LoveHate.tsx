@@ -1,27 +1,145 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { SongStat } from '../data/insights'
+import { hatedFact, loveHate, lovedFact, type LoveHatePick, type SongTally } from '../data/lovehate'
 import { formatDuration, formatNumber, formatPercent } from '../lib/format'
 import { usePageScroll, useWidth } from '../lib/hooks'
 import { leaveUnlessTouch } from '../lib/pointer'
 import { SERIES } from '../lib/palette'
+import { InCards } from '../lib/stage'
+import type { Play } from '../types'
+import { Cover } from './Cover'
 import { FloatTip } from './ui'
 
 /*
- * "Love / Hate": your most-played songs by how often you play them (across)
- * and how often you skip them (up). The corners tell different stories.
+ * "Love / Hate": the song you let play the most against the one you skip the
+ * most, each with two runners-up. Below that on the page, every one of your
+ * most-played songs by how often you start it (across) and skip it (up).
  */
 
 const M = { top: 20, right: 12, bottom: 40, left: 42 }
+
+/** Let-play and skipped, in the bars and the swatches by each side's name */
+const KEPT = SERIES[1]
+const SKIPPED = SERIES[2]
 
 interface Props {
   songs: SongStat[]
   /** Overall skip rate, used as the horizontal divider */
   skipRate: number
+  /** The filtered plays, for the head-to-head */
+  plays: Play[]
 }
 
 const noop = () => {}
 
-export function LoveHate({ songs, skipRate }: Props) {
+export function LoveHate({ songs, skipRate, plays }: Props) {
+  const cards = useContext(InCards)
+  const pick = useMemo(() => loveHate(plays), [plays])
+  const marks = useMemo(
+    () =>
+      [
+        { key: pick.loved[0]?.key, tag: 'Most loved' },
+        { key: pick.hated[0]?.key, tag: 'Most skipped' },
+      ].filter((m): m is { key: string; tag: string } => !!m.key),
+    [pick],
+  )
+  const duel = <Duel pick={pick} />
+  // A phone gets the two songs alone; the scatter stays on the page, with the two songs marked on it
+  if (cards) return <div className="lovehate lovehate--card">{duel}</div>
+  return (
+    <div className="lovehate">
+      {duel}
+      <Scatter songs={songs} skipRate={skipRate} marks={marks} />
+    </div>
+  )
+}
+
+/** Most loved against most skipped, like the two sides of a single */
+function Duel({ pick }: { pick: LoveHatePick }) {
+  const n = pick.minStarts
+  return (
+    <div className="duel">
+      <DuelSide
+        title="Most loved"
+        swatch={KEPT}
+        songs={pick.loved}
+        fact={lovedFact}
+        count={(s) => `${formatNumber(s.kept)} of ${formatNumber(s.starts)}`}
+        empty={`Every song you started ${n} or more times got skipped more than 1 time in 5.`}
+      />
+      <DuelSide
+        title="Most skipped"
+        swatch={SKIPPED}
+        songs={pick.hated}
+        fact={hatedFact}
+        count={(s) => `${formatNumber(s.skips)} of ${formatNumber(s.starts)}`}
+        empty={`Nothing you started ${n} or more times got skipped more often than not.`}
+      />
+    </div>
+  )
+}
+
+interface SideProps {
+  title: string
+  swatch: string
+  /** The headliner first, then the runners-up */
+  songs: SongTally[]
+  fact: (s: SongTally) => string
+  /** The one number a runner-up shows, the same count its headliner's sentence uses */
+  count: (s: SongTally) => string
+  empty: string
+}
+
+function DuelSide({ title, swatch, songs, fact, count, empty }: SideProps) {
+  const [hero, ...rest] = songs
+  return (
+    <section className="duel__side" aria-label={title}>
+      <h3 className="duel__label">
+        <i className="duel__swatch" style={{ background: swatch }} aria-hidden="true" />
+        {title}
+      </h3>
+      {hero ? (
+        <>
+          <div className="duel__hero">
+            <Cover name={`${hero.title}|${hero.artist}`} size={96} className="duel__cover" />
+            <div className="duel__info">
+              <strong className="duel__title">{hero.title}</strong>
+              <span className="duel__artist">{hero.artist}</span>
+              <p className="duel__fact">{fact(hero)}</p>
+              <div className="duel__bar" aria-hidden="true">
+                <i style={{ flexGrow: hero.kept, background: KEPT }} />
+                <i style={{ flexGrow: hero.skips, background: SKIPPED }} />
+              </div>
+            </div>
+          </div>
+          {rest.length > 0 && (
+            <ol className="duel__more" start={2}>
+              {rest.map((s) => (
+                <li key={s.key}>
+                  <span className="duel__song">
+                    <span className="duel__song-title">{s.title}</span> <span className="duel__song-artist">{s.artist}</span>
+                  </span>
+                  <span className="duel__count">{count(s)}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
+      ) : (
+        <p className="duel__empty">{empty}</p>
+      )}
+    </section>
+  )
+}
+
+interface ScatterProps {
+  songs: SongStat[]
+  skipRate: number
+  /** Songs to mark and name on the chart */
+  marks: { key: string; tag: string }[]
+}
+
+function Scatter({ songs, skipRate, marks }: ScatterProps) {
   const ref = useRef<HTMLDivElement>(null)
   const width = useWidth(ref, 900)
   const height = width < 600 ? 380 : 460
@@ -56,16 +174,10 @@ export function LoveHate({ songs, skipRate }: Props) {
 
   const midPlays = Math.sqrt(minPlays * maxPlays)
 
-  const callouts = useMemo(() => {
-    const rate = (s: SongStat) => s.skips / s.plays
-    const best = (score: (s: SongStat) => number) => songs.reduce((b, s) => (score(s) > score(b) ? s : b), songs[0])
-    const picks = [
-      { song: best((s) => s.plays * (1 - rate(s)) ** 3), tag: 'The keeper' },
-      { song: best((s) => (s.plays >= midPlays ? s.plays * rate(s) ** 2 : 0)), tag: 'Can’t quit it, can’t finish it' },
-      { song: best((s) => (s.plays >= 6 ? rate(s) : 0)), tag: 'Instant skip' },
-    ]
-    return picks.filter((p, i) => picks.findIndex((q) => q.song.key === p.song.key) === i)
-  }, [songs, midPlays])
+  const callouts = useMemo(
+    () => marks.flatMap(({ key, tag }) => songs.filter((s) => s.key === key).map((song) => ({ song, tag }))),
+    [songs, marks],
+  )
   const calloutKeys = new Set(callouts.map((c) => c.song.key))
 
   const xTicks = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].filter((t) => t >= minPlays * 0.9 && t <= maxPlays * 1.1)
@@ -102,7 +214,7 @@ export function LoveHate({ songs, skipRate }: Props) {
   const hovered = shown ? songs[shown.i] : null
 
   return (
-    <div className="lovehate" ref={ref}>
+    <div className="lovehate__scatter" ref={ref}>
       <svg
         width={width}
         height={height}
@@ -198,17 +310,6 @@ export function LoveHate({ songs, skipRate }: Props) {
         </FloatTip>
       )}
 
-      <ul className="callout-cards">
-        {callouts.map(({ song, tag }) => (
-          <li key={song.key}>
-            <span className="callout-cards__tag">{tag}</span>
-            <strong>{song.title}</strong>
-            <span className="muted">
-              {song.artist} · {formatNumber(song.plays)} plays · skipped {formatPercent(song.skips / song.plays)}
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }

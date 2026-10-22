@@ -623,13 +623,13 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           <Side label="Side B" title={SIDES.B} />
 
           <Chapter
-            id="clock" hint="When the music happens, and who’s on at each hour."
+            id="clock" hint="Drag across the clock or the dots to read any hour."
             num="B1"
             title="Around the Clock"
             lede="When the music happens, and who you reach for at each hour. Midnight is at the top."
             table={() => <ClockTable hours={hours} />}
           >
-            <Clock hours={hours} parts={parts} grid={grid} />
+            <Clock hours={hours} parts={parts} grid={grid} plays={plays} />
           </Chapter>
 
           <Chapter id="days" hint="Tap a day to see everything you played." num="B2" title="Every Day" lede="A square for every day. The brighter it glows, the longer you listened. Tap a day to see what you played.">
@@ -637,13 +637,13 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           </Chapter>
 
           <Chapter
-            id="lovehate" hint="The songs you finish, and the ones you can’t."
+            id="lovehate" hint="The song you let play, and the one you skip."
             num="B3"
             title="Love / Hate"
-            lede={`Your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up). The lines mark the middle of the pack.`}
+            lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
             table={() => <LoveHateTable songs={songs} />}
           >
-            {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} /> : <NotEnough />}
+            {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
           </Chapter>
 
           <Side label="Side C" title={SIDES.C} />
