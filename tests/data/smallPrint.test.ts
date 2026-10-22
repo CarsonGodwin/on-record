@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Records } from '../../src/data/insights'
-import { clipName, factText, NAME_MAX, smallPrint } from '../../src/data/smallPrint'
+import { clipName, factText, NAME_MAX, ordinal, smallPrint } from '../../src/data/smallPrint'
 import { WEAR_MAX, type FunStats, type WearOut } from '../../src/data/stats'
 import { at } from '../helpers'
 
@@ -30,7 +30,7 @@ describe('smallPrint', () => {
     expect(facts[0].line[0]).toEqual({ name: 'Tides Fade' })
     expect(factText(facts[1])).toBe('Summer Dust played in 43 of the 46 months you listened.')
     expect(factText(facts[2])).toBe('You tire of a song by about play 24.')
-    expect(facts[2].proof).toContain('play 5')
+    expect(facts[2].proof).toContain('5th play')
     expect(factText(facts[3])).toBe('75 hrs of Juniper Vale, then nothing.')
     expect(factText(facts[4])).toBe('You pressed play 77 days in a row.')
   })
@@ -63,7 +63,7 @@ describe('smallPrint', () => {
   it('words a wear-out past the last counted play as "after about"', () => {
     const facts = smallPrint(noFun, noRecords, { rates: [], average: 0.3, best: 1, wornOut: WEAR_MAX }, true)
     expect(factText(facts[0])).toBe(`You tire of a song after about ${WEAR_MAX} plays.`)
-    expect(facts[0].proof.startsWith('Fewest skips the first time')).toBe(true)
+    expect(facts[0].proof.startsWith('Skipped least the first time')).toBe(true)
   })
 
   it('only counts a long session', () => {
@@ -96,5 +96,11 @@ describe('clipName', () => {
 
   it('drops dangling punctuation before the ellipsis', () => {
     expect(clipName('Song (feat. Somebody)', 7)).toBe('Song…')
+  })
+})
+
+describe('ordinal', () => {
+  it('suffixes numbers the English way, teens included', () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '101st', '111th'])
   })
 })

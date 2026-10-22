@@ -67,8 +67,9 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stage = useSize(stageRef, { width: 560, height: 560 })
   const width = stage.width
-  // Leave room on the right for the tonearm; on a card, as big as the space between the readout and the key allows
-  const size = inCards ? Math.max(160, Math.min(Math.round(width * 0.9), stage.height)) : Math.min(Math.round(width * 0.86), 600)
+  // Leave room on the right for the tonearm; on a card, as big as the space between the readout and the key allows,
+  // less a little at the top where the arm's counterweight swings up past the record's square
+  const size = inCards ? Math.max(160, Math.min(Math.round(width * 0.9), Math.round(stage.height * 0.92))) : Math.min(Math.round(width * 0.86), 600)
   const g = recordGeometry(size, model.days)
   // Deep enough that a single day's groove gets about 10px wide
   const maxZoom = Math.min(100, Math.max(6, 10 / g.ring))
@@ -130,18 +131,26 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
 
   const coach = !inCards && COARSE && seen && !learned && !touched && !zoomed
 
-  // Where the needle was before a touch, in case the touch turns out to be a pinch
+  // Where the needle was before a touch, in case the touch turns out to be a pinch, and before the touch
+  // ahead of it, since a double tap means zoom: neither of its taps should have moved the needle
   const beforeTouch = useRef<{ needle: Needle | null; pinned: boolean } | null>(null)
+  const beforeLastTouch = useRef<{ needle: Needle | null; pinned: boolean } | null>(null)
+  // After a double tap the finger is zooming, not steering, until it lifts
+  const zoomingTap = useRef(false)
   useFingerDrag(
     platterRef,
     {
       onStart: (e) => {
+        beforeLastTouch.current = beforeTouch.current
         beforeTouch.current = { needle, pinned }
         setScrubbing(true)
         pick(e, false)
       },
-      onMove: (e) => pick(e, false),
+      onMove: (e) => {
+        if (!zoomingTap.current) pick(e, false)
+      },
       onEnd: () => {
+        zoomingTap.current = false
         setScrubbing(false)
         setPinned(true)
         if (!learned) onLearned()
@@ -154,6 +163,12 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
         setPinned(was.pinned)
       },
       onDoubleTap: (e) => {
+        zoomingTap.current = true
+        const was = beforeLastTouch.current
+        if (was) {
+          setNeedle(was.needle)
+          setPinned(was.pinned)
+        }
         const r = platterRef.current!.getBoundingClientRect()
         if (zoomed) zoom.reset()
         else zoom.zoomTo(Math.min(4, maxZoom), e.clientX - r.left, e.clientY - r.top)

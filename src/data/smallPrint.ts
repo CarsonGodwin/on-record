@@ -1,4 +1,4 @@
-import { formatDate, formatDuration, formatNumber, formatPercent, formatTime } from '../lib/format'
+import { formatDate, formatDuration, formatNumber, formatTime } from '../lib/format'
 import type { Records } from './insights'
 import { WEAR_MAX, type FunStats, type WearOut } from './stats'
 
@@ -67,7 +67,7 @@ export function smallPrint(fun: FunStats, rec: Records, wear: WearOut | null, is
       key: 'evergreen',
       line: [name(e.title), all ? ` played in all ${e.activeMonths} months you listened.` : ` played in ${e.months} of the ${e.activeMonths} months you listened.`],
       // Several songs can tie for the most months, so this never claims it beat them all
-      proof: `${clipName(e.artist)}. No song came up in more months`,
+      proof: `By ${clipName(e.artist)}. No other song came back more often`,
       score: clamp((e.months / e.activeMonths - 0.4) / 0.6),
     })
   }
@@ -75,11 +75,12 @@ export function smallPrint(fun: FunStats, rec: Records, wear: WearOut | null, is
   // How many plays it takes before a song gets skipped as often as anything else
   if (wear && wear.wornOut !== null) {
     const n = wear.wornOut
-    const low = wear.best === 1 ? 'Fewest skips the first time' : `Fewest skips on play ${wear.best}`
+    const low = wear.best === 1 ? 'Skipped least the first time you hear it' : `Skipped least on its ${ordinal(wear.best)} play`
     out.push({
       key: 'wear',
       line: [n >= WEAR_MAX ? `You tire of a song after about ${WEAR_MAX} plays.` : `You tire of a song by about play ${n}.`],
-      proof: `${low}, back to your usual ${formatPercent(wear.average)}`,
+      // "Tire of" means it's skipped as often as your songs are on average
+      proof: n >= WEAR_MAX ? `${low}, then more and more` : `${low}, then more and more until play ${n}`,
       score: 0.7,
     })
   }
@@ -135,4 +136,11 @@ export function smallPrint(fun: FunStats, rec: Records, wear: WearOut | null, is
 /** The sentence as plain text, for labels and keys */
 export function factText(fact: Fact): string {
   return fact.line.map((p) => (typeof p === 'string' ? p : p.name)).join('')
+}
+
+/** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st */
+export function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13
+  const suffix = teen ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'
+  return `${n}${suffix}`
 }

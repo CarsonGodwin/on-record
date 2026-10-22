@@ -64,7 +64,8 @@ function Duel({ pick }: { pick: LoveHatePick }) {
         swatch={KEPT}
         songs={pick.loved}
         fact={lovedFact}
-        count={(s) => `${formatNumber(s.kept)} of ${formatNumber(s.starts)}`}
+        // Both lists count skips, so the numbers read the same way: few here, most of them below
+        count={(s) => `${formatNumber(s.skips)} of ${formatNumber(s.starts)} skipped`}
         empty={`Every song you started ${n} or more times got skipped more than 1 time in 5.`}
       />
       <DuelSide
@@ -72,7 +73,7 @@ function Duel({ pick }: { pick: LoveHatePick }) {
         swatch={SKIPPED}
         songs={pick.hated}
         fact={hatedFact}
-        count={(s) => `${formatNumber(s.skips)} of ${formatNumber(s.starts)}`}
+        count={(s) => `${formatNumber(s.skips)} of ${formatNumber(s.starts)} skipped`}
         empty={`Nothing you started ${n} or more times got skipped more often than not.`}
       />
     </div>

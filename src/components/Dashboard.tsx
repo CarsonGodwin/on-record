@@ -588,7 +588,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
             <Side label="Side A" title={SIDES.A} />
 
-            <Chapter id="record" num="A1" title="The Record" hint="Each ring is a day. Drag the needle." lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
+            <Chapter id="record" num="A1" title="The Record" hint={`${formatNumber(summary.totalMs / 3_600_000)} hours, a ring for every day. Drag the needle, pinch to zoom.`} lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
               <Vinyl
                 key={viewKey}
                 plays={plays}

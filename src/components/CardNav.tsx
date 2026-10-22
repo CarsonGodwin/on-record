@@ -46,7 +46,21 @@ export function CardNav({ tracks, sides, deck, step, onStep, onJump, onPoster, o
           <path d="M15 5l-7 7 7 7" />
         </svg>
       </button>
-      <TrackMenu tracks={tracks} sides={sides} current={deck[step]?.id ?? null} onJump={onJump} onPoster={onPoster} onReset={onReset} up />
+      {/* The card names its track; down here the button opens the list and says how far in you are */}
+      <TrackMenu
+        tracks={tracks}
+        sides={sides}
+        current={deck[step]?.id ?? null}
+        onJump={onJump}
+        onPoster={onPoster}
+        onReset={onReset}
+        up
+        label={
+          <>
+            Tracks <span className="cardnav__count">{step + 1} of {deck.length}</span>
+          </>
+        }
+      />
       <button type="button" className="cardnav__step" onClick={() => onStep(step + 1)} disabled={!next} aria-label={next ? `On to ${next.title}` : 'Last track'}>
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
           <path d="M9 5l7 7-7 7" />

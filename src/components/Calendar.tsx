@@ -356,16 +356,17 @@ function DayWidget({ days, years, listened, thresholds, biggest, selected, year,
           const t = months.get(key)
           const fill = t ? heatStep(t.ms, monthThresholds) : undefined
           return (
+            // A dot of heat rather than a whole tinted chip, so the month you're in and the days under it stand out
             <button
               key={m}
               type="button"
-              className={['daycal__month', fill && HEAT.indexOf(fill) >= 4 && 'is-bright'].filter(Boolean).join(' ')}
-              style={fill ? { background: fill } : undefined}
+              className="daycal__month"
               disabled={!t}
               aria-pressed={key === month}
               onClick={() => go(key)}
               aria-label={`${formatMonthYear(monthDate(key))}${t ? `, ${formatDuration(t.ms)}` : ', no listening'}`}
             >
+              {fill && <i className="daycal__heat" style={{ background: fill }} aria-hidden="true" />}
               {formatMonthShort(m)}
             </button>
           )

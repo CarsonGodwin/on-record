@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 /*
  * The tracklist for phones, where the side nav doesn't fit: the top bar names
@@ -23,9 +23,11 @@ interface Props {
   onJump?: (id: string) => void
   /** Opens upwards, for the bar at the bottom of the deck */
   up?: boolean
+  /** What the button says, when something else already names the track */
+  label?: ReactNode
 }
 
-export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump, up }: Props) {
+export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump, up, label }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const track = tracks.find((t) => t.id === current)
@@ -49,7 +51,9 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump, u
   return (
     <div className={up ? 'trackmenu trackmenu--up' : 'trackmenu'} ref={ref}>
       <button type="button" className="trackmenu__button" aria-expanded={open} aria-controls="trackmenu-sheet" onClick={() => setOpen(!open)}>
-        {track ? (
+        {label ? (
+          <span className="trackmenu__title">{label}</span>
+        ) : track ? (
           <>
             <span className="trackmenu__num">{track.num}</span>
             <span className="trackmenu__title">{track.title}</span>

@@ -74,11 +74,13 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   const spanX = Math.max(...xs) - minX || 1
   const spanY = Math.max(...ys) - minY || 1
   const scale = Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanY, 2.2)
+  // A phone's card is taller than the graph is: stretch it down a little (up to 1.7×) to fill the sky and open up the labels
+  const scaleY = card ? Math.min((height - pad * 2) / spanY, scale * 1.7) : scale
   // Zooming spreads the stars apart; their sizes grow only a little, so crowded clusters open up
   const pos = (id: string) => {
     const p = layout.get(id)!
     const x = width / 2 + (p.x - minX - spanX / 2) * scale
-    const y = height / 2 + (p.y - minY - spanY / 2) * scale
+    const y = height / 2 + (p.y - minY - spanY / 2) * scaleY
     return { x: view.x + view.s * x, y: view.y + view.s * y }
   }
   const grow = Math.pow(view.s, 0.3)

@@ -5173,41 +5173,50 @@ html.cards-open body {
   }
 }
 
-/* The top bar already names the track: the card keeps a line on what to do here */
+/* Each card keeps the record's track heading, shrunk to one line: the outlined number, the title, and under it a line on what to do here */
 .dash.is-cards .chapter__head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: none;
   margin: 0;
-  padding: 10px 0;
+  padding: 10px 0 10px;
 }
 
-.dash.is-cards .chapter__num,
-.dash.is-cards .chapter__lede {
+.dash.is-cards .chapter__num {
+  flex: none;
+  font-size: 2.5rem;
+  line-height: 0.8;
+  -webkit-text-stroke-width: 1.2px;
+}
+
+.dash.is-cards .chapter__lede,
+.dash.is-cards .chapter__actions {
   display: none;
 }
 
 .dash.is-cards .chapter__titles {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
 .dash.is-cards .chapter__titles h2 {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
+  font-size: 1.32rem;
+  letter-spacing: -0.03em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dash.is-cards .chapter__hint {
   display: block;
   margin: 0;
   color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.35;
+  font-size: 0.86rem;
+  line-height: 1.3;
   text-wrap: balance;
 }
 
@@ -5219,10 +5228,6 @@ html.cards-open body {
   font-weight: 650;
   letter-spacing: 0;
   text-transform: none;
-}
-
-.dash.is-cards .chapter__actions .chip-button {
-  padding: 6px 12px;
 }
 
 .dash.is-cards .chapter__body {
@@ -5319,6 +5324,15 @@ html.cards-open body {
   width: 100%;
   height: 46px;
   font-size: 0.98rem;
+}
+
+.cardnav__count {
+  margin-left: 6px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 .trackmenu--up .trackmenu__sheet {
@@ -5469,7 +5483,7 @@ html.cards-open body {
   position: relative;
   display: grid;
   flex: 1;
-  place-items: center;
+  place-items: end center;
   min-height: 0;
   overflow: hidden;
 }
@@ -5559,15 +5573,6 @@ html.cards-open body {
 
 
 /* ---------- Card: A2 Eras ---------- */
-
-/* The table toggle is the chart's text alternative: kept, but quiet */
-.dash.is-cards #eras .chapter__actions .chip-button {
-  padding: 6px 12px;
-  font-family: var(--display);
-  font-size: 0.82rem;
-  letter-spacing: 0;
-  text-transform: none;
-}
 
 .eras-card {
   display: flex;
@@ -6382,8 +6387,19 @@ html.cards-open body {
 }
 
 .daycal__month {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   height: 34px;
   font-size: 0.8rem;
+}
+
+.daycal__heat {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
 }
 
 .daycal__month.is-bright,
@@ -6401,9 +6417,13 @@ html.cards-open body {
   background: transparent;
 }
 
-/* A ring inside the chip, light then dark, so it shows on the palest month and the darkest */
 .daycal__month[aria-pressed='true'] {
-  box-shadow: inset 0 0 0 2px var(--text), inset 0 0 0 4px var(--bg);
+  background: var(--text);
+  color: var(--accent-ink);
+}
+
+.daycal__month[aria-pressed='true'] .daycal__heat {
+  box-shadow: 0 0 0 1.5px var(--accent-ink);
 }
 
 .daycal__title {
@@ -6434,7 +6454,7 @@ html.cards-open body {
 
 .daycal__weekday {
   color: var(--faint);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 600;
   text-align: center;
 }
