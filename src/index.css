@@ -5483,8 +5483,11 @@ html.cards-open body {
   margin-left: auto;
 }
 
-/* The bar at the bottom: back, the track you're on (tap for the list), and on */
+/* The bar at the bottom: back, the track you're on (tap for the list), and on.
+   Above the card, like the top bar, so the tracklist it opens covers the chart under it. */
 .cardnav {
+  position: relative;
+  z-index: 40;
   flex: none;
   display: flex;
   align-items: center;
@@ -5893,9 +5896,6 @@ html.cards-open body {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 5px;
-  /* Room for the picked month's ring, so the day sheet covers it too */
-  padding: 4px;
-  margin: -4px;
 }
 
 .daycal__month,
@@ -5933,9 +5933,9 @@ html.cards-open body {
   background: transparent;
 }
 
+/* A ring inside the chip, light then dark, so it shows on the palest month and the darkest */
 .daycal__month[aria-pressed='true'] {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
+  box-shadow: inset 0 0 0 2px var(--text), inset 0 0 0 4px var(--bg);
 }
 
 .daycal__title {
