@@ -5,6 +5,7 @@ import { InCards, OnStage } from '../lib/stage'
 import { POSTER_DESIGN_SIZES, POSTER_SIZES, SOLID_PAPER_DESIGNS, isDarkPaper, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
 import { Segmented } from './ui'
+import { useCloseOnBack } from '../lib/back'
 
 /*
  * "Take it home": pick a design, size and background, see it live, then download
@@ -77,6 +78,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const stage = useContext(OnStage)
   const showing = stage === null || stage === 'poster'
   const [sheet, setSheet] = useState(false)
+  useCloseOnBack(sheet, () => setSheet(false))
   const optionsRef = useRef<HTMLButtonElement>(null)
   const doneRef = useRef<HTMLButtonElement>(null)
   const [size, setSize] = useState<PosterSize>('post')

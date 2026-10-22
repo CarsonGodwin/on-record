@@ -22,6 +22,7 @@ import { isLaunchKey, LAUNCH_KEY } from '../lib/keys'
 import { COARSE } from '../lib/pointer'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import { InCards, OnStage, resolveStop } from '../lib/stage'
+import { closeTopmost, useCloseOnBack } from '../lib/back'
 import { swipeDirection } from '../lib/swipe'
 import type { LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
@@ -66,10 +67,10 @@ const SIDES: Record<string, string> = { A: 'Time', B: 'Rhythm', C: 'Taste', D: '
  * A phone held upright gets the record as a deck of cards: one track fills the screen, nothing scrolls,
  * and you deal the next one with a swipe or the bar at the bottom. Turned sideways it's the page again.
  */
-const CARDS = '(pointer: coarse) and (max-width: 699px)'
+const CARDS = '(pointer: coarse) and (max-width: 699px) and (orientation: portrait)'
 
 /** What a swipe can't start on: things you drag, and fields you type or slide in */
-const OWN_GESTURES = '[data-drag], input, select, textarea, .day-panel'
+const OWN_GESTURES = '[data-drag], input, select, textarea, .day-panel, .table-wrap'
 
 interface Props {
   result: LoadResult
@@ -127,6 +128,12 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const [cardAt, setCardAt] = useState(TRACKS[0].id)
   // Which way the last card was dealt, so the new one comes in from that side
   const [dealt, setDealt] = useState<'next' | 'prev'>('next')
+  // Turning the phone upright again deals the card for the section you'd scrolled to on the page
+  const [wasCards, setWasCards] = useState(cards)
+  if (cards !== wasCards) {
+    setWasCards(cards)
+    if (cards && current !== null) setCardAt(current)
+  }
   // Once a finger has scrubbed the record, its how-to stays hidden until new data comes in
   const [scrubLearned, setScrubLearned] = useState(false)
   const topbarRef = useRef<HTMLElement>(null)
@@ -326,8 +333,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     }
   }, [])
 
-  // The deck owns the screen: the page behind it doesn't scroll or bounce
-  useEffect(() => {
+  // The deck owns the screen: the page behind it doesn't scroll or bounce. A layout effect, so that turning
+  // the phone sideways frees the page before it scrolls to the track you were on (see the effect on onStage).
+  useLayoutEffect(() => {
     if (!cards) return
     const root = document.documentElement
     root.classList.add('cards-open')
@@ -346,8 +354,11 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   })
   useEffect(() => {
     if (!cards) return
-    history.pushState({ onRecordCards: true }, '')
+    // One entry for the deck, however often the phone turns back to it
+    if (!history.state?.onRecordCards) history.pushState({ onRecordCards: true }, '')
     const onPop = () => {
+      // Something open over the card closes first, and the deck keeps its entry
+      if (closeTopmost()) return history.pushState({ onRecordCards: true }, '')
       const { stops, step, onReset: reset } = backTo.current
       if (step === 0) return reset()
       history.pushState({ onRecordCards: true }, '')
@@ -357,6 +368,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [cards])
+
+  useCloseOnBack(launcher !== null, () => setLauncher(null))
+  useCloseOnBack(settingsOpen, () => setSettingsOpen(false))
 
   // Arrow keys deal cards too, except where a slider or the day details want them
   useEffect(() => {

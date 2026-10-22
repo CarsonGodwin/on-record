@@ -6,6 +6,7 @@ import { InCards } from '../lib/stage'
 import type { Play } from '../types'
 import { Cover } from './Cover'
 import { Segmented } from './ui'
+import { useCloseOnBack } from '../lib/back'
 
 const CATEGORIES: { value: Category; label: string }[] = [
   { value: 'artist', label: 'Artists' },
@@ -47,6 +48,7 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
   const [rankBy, setRankBy] = useState<RankBy>('time')
   const [expanded, setExpanded] = useState(false)
   const [sheet, setSheet] = useState(false)
+  useCloseOnBack(sheet, () => setSheet(false))
   const restRef = useRef<HTMLDivElement>(null)
   const rest = useSize(restRef, { width: 358, height: 200 })
   // Why the last Hide didn't happen; it stops applying once the hidden set changes

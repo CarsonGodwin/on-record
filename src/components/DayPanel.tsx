@@ -36,6 +36,8 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
   const inCards = useContext(InCards)
   const ref = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<Tab>('artists')
+  // On the sheet, first listens show one name and "+n" until you ask for the rest
+  const [allNew, setAllNew] = useState(false)
   const swipe = useRef<{ x: number; y: number; t: number } | null>(null)
   const detail = useMemo(() => dayDetail(plays, day, firstHeard), [plays, day, firstHeard])
   // The full log stays open only for the day it was opened on
@@ -213,13 +215,18 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
         {hourChart}
 
         {detail.firstTimers.length > 0 && (
-          <p className="day-panel__new">
-            <span className="day-panel__label">First time hearing</span>
-            {detail.firstTimers.map((name) => (
+          <p className={allNew ? 'day-panel__new is-open' : 'day-panel__new'}>
+            <span className="day-panel__label">New to you</span>
+            {(allNew ? detail.firstTimers : detail.firstTimers.slice(0, 1)).map((name) => (
               <span key={name} className="day-panel__chip">
                 {name}
               </span>
             ))}
+            {detail.firstTimers.length > 1 && (
+              <button type="button" className="day-panel__more" aria-expanded={allNew} onClick={() => setAllNew(!allNew)}>
+                {allNew ? 'Less' : `+${detail.firstTimers.length - 1}`}
+              </button>
+            )}
           </p>
         )}
 

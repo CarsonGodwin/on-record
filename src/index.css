@@ -4712,6 +4712,15 @@ kbd {
 
 .modal--launcher {
   margin-top: max(10vh, 24px);
+  max-height: min(640px, calc(100dvh - max(10vh, 24px) - 24px));
+}
+
+/* Keyboard shortcuts mean nothing to a finger */
+@media (pointer: coarse) {
+  .launcher__foot,
+  .launcher__shortcut {
+    display: none;
+  }
 }
 
 .modal__head {
@@ -5119,7 +5128,21 @@ html.cards-open body {
   display: none;
 }
 
-/* Long presses on a card never select text or bring up iOS's magnifier and callout */
+/* Long presses anywhere on the deck never select text or bring up iOS's magnifier, callout or link
+   preview, and a pinch that misses the record or the stars doesn't zoom the whole deck out of shape */
+.dash.is-cards {
+  touch-action: pan-x pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Fields still take typing (iOS won't focus a field that can't be selected) */
+.dash.is-cards :is(input, textarea) {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
 .dash.is-cards .dash__main {
   position: relative;
   flex: 1;
@@ -5128,10 +5151,11 @@ html.cards-open body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
+}
+
+/* Cards waiting offstage hold still, so their animations don't run down a battery out of sight */
+.dash.is-cards .chapter.is-offstage * {
+  animation-play-state: paused;
 }
 
 .dash.is-cards .chapter {
@@ -6468,8 +6492,7 @@ html.cards-open body {
 }
 
 .daycal__day[aria-pressed='true'] {
-  outline: 2.5px solid var(--lime);
-  outline-offset: 1px;
+  box-shadow: inset 0 0 0 3px var(--lime), inset 0 0 0 5px var(--bg);
 }
 
 .daycal__foot {
@@ -6573,12 +6596,34 @@ html.cards-open body {
   height: 46px;
 }
 
-/* First listens on one line; the rest fade out at the edge rather than pushing the lists down */
+/* First listens on one line, the rest behind "+n"; opened, they wrap and the list below gives up the room */
 .dash.is-cards .day-panel--sheet .day-panel__new {
   flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__new.is-open {
+  flex-wrap: wrap;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__new:not(.is-open) .day-panel__chip {
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  mask-image: linear-gradient(90deg, #000 82%, transparent);
+}
+
+.day-panel__more {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
 }
 
 .day-panel__tabs {

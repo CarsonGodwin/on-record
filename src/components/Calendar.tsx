@@ -2,10 +2,11 @@ import { useCallback, useContext, useMemo, useRef, useState, type ChangeEvent, t
 import type { DayTotal } from '../data/insights'
 import type { Play } from '../types'
 import { dayNumber, fromDayNumber } from '../data/stats'
-import { formatDuration, formatLongDate, formatMonthShort, formatMonthYear, formatNumber } from '../lib/format'
+import { formatDuration, formatLongDate, formatMonthShort, formatMonthYear, formatNumber, formatShortDate } from '../lib/format'
 import { useWidth } from '../lib/hooks'
 import { HEAT, heatStep, quantileThresholds } from '../lib/palette'
 import { isHover, leaveUnlessTouch } from '../lib/pointer'
+import { useCloseOnBack } from '../lib/back'
 import { InCards } from '../lib/stage'
 import { DayPanel } from './DayPanel'
 import { FloatTip, Segmented } from './ui'
@@ -71,6 +72,7 @@ export function Calendar({ days, years, plays, firstHeard, colors }: Props) {
     if (selected !== null) setChosenYear(fromDayNumber(selected).getFullYear())
   }
   const year = chosenYear !== null && years.includes(chosenYear) ? chosenYear : years[years.length - 1]
+  useCloseOnBack(inCards && selected !== null, () => setPicked(null))
 
   const panel = selected !== null && (
     <DayPanel
@@ -293,8 +295,12 @@ function DayWidget({ days, years, listened, thresholds, biggest, selected, year,
   }, [months, year])
   const month = chosenMonth !== null && Math.floor(chosenMonth / 12) === year ? chosenMonth : busiest
 
+  // A date you looked for that had no listening, said in the header instead of opening an empty day
+  const [missed, setMissed] = useState<number | null>(null)
+
   const go = (key: number) => {
     setChosenMonth(key)
+    setMissed(null)
     onYear(Math.floor(key / 12))
   }
 
@@ -314,6 +320,7 @@ function DayWidget({ days, years, listened, thresholds, biggest, selected, year,
     const day = dayNumber(new Date(y, m - 1, d))
     go(y * 12 + m - 1)
     onPick(days.has(day) ? day : null)
+    if (!days.has(day)) setMissed(day)
   }
 
   return (
@@ -375,7 +382,13 @@ function DayWidget({ days, years, listened, thresholds, biggest, selected, year,
 
       <p className="daycal__title">
         <strong>{formatMonthYear(start)}</strong>
-        <span>{total ? `${formatDuration(total.ms)}, ${total.days} days with music` : 'No listening'}</span>
+        <span aria-live="polite">
+          {missed !== null
+            ? `Nothing played on ${formatShortDate(fromDayNumber(missed))}`
+            : total
+              ? `${formatDuration(total.ms)}, ${total.days} days with music`
+              : 'No listening'}
+        </span>
       </p>
 
       <div className="daycal__grid">

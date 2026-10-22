@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCloseOnBack } from '../lib/back'
 
 /*
  * The tracklist for phones, where the side nav doesn't fit: the top bar names
@@ -29,6 +30,7 @@ interface Props {
 
 export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump, up, label }: Props) {
   const [open, setOpen] = useState(false)
+  useCloseOnBack(open, () => setOpen(false))
   const ref = useRef<HTMLDivElement>(null)
   const track = tracks.find((t) => t.id === current)
 
