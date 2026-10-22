@@ -649,7 +649,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           <Side label="Side C" title={SIDES.C} />
 
           <Chapter
-            id="constellation" hint="Artists you play back to back, joined up. Pinch to explore."
+            id="constellation" hint="Artists you play back to back, joined up. Tap a star, pinch to zoom."
             num="C1"
             title="Constellation"
             lede="Your top artists as stars, joined when you play one straight after the other. Clusters are your scenes."
@@ -659,7 +659,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           </Chapter>
 
           <Chapter
-            id="pulse" hint="Your top artists over time, one line each."
+            id="pulse" hint="Your top artists over time, one line each. Tap a line."
             num="C2"
             title="Pulse"
             lede="Your top artists over time, one line each."
