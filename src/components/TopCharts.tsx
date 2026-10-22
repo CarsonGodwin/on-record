@@ -14,21 +14,47 @@ const CATEGORIES: { value: Category; label: string }[] = [
 
 const playsLabel = (n: number) => `${formatNumber(n)} play${n === 1 ? '' : 's'}`
 
+interface Props {
+  plays: Play[]
+  /** Hides an artist from the whole page; returns false if they're all that's left */
+  onHide: (artist: string) => boolean
+  /**
+   * What's been hidden, which can be ahead of `plays` for a moment while the page catches up.
+   * A new set every time it changes, which is how a refusal knows it's out of date.
+   */
+  hidden: ReadonlySet<string>
+  onManage: () => void
+}
+
 /** "The Charts": your top artists, songs, albums and podcasts, with a podium for the top 3 */
-export function TopCharts({ plays }: { plays: Play[] }) {
+export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
   const [category, setCategory] = useState<Category>('artist')
   const [rankBy, setRankBy] = useState<RankBy>('time')
   const [expanded, setExpanded] = useState(false)
+  // Why the last Hide didn't happen; it stops applying once the hidden set changes
+  const [refused, setRefused] = useState<{ name: string; hidden: ReadonlySet<string> } | null>(null)
+  const hiddenCount = hidden.size
 
   const hasPodcasts = useMemo(() => plays.some((p) => p.kind === 'episode'), [plays])
   const options = hasPodcasts ? CATEGORIES : CATEGORIES.filter((c) => c.value !== 'show')
   const active = !hasPodcasts && category === 'show' ? 'artist' : category
-  const items = useMemo(() => topItems(plays, active, rankBy, expanded ? 50 : 20), [plays, active, rankBy, expanded])
+  // A hidden artist leaves the list at once; the rest of the page catches up a moment later
+  const items = useMemo(() => {
+    const ranked = topItems(plays, active, rankBy, expanded ? 50 : 20)
+    return active === 'artist' ? ranked.filter((r) => !hidden.has(r.label)) : ranked
+  }, [plays, active, rankBy, expanded, hidden])
 
   const value = rankBy === 'time' ? (r: Ranked) => r.ms : (r: Ranked) => r.plays
   const primary = rankBy === 'time' ? (r: Ranked) => formatDuration(r.ms) : (r: Ranked) => playsLabel(r.plays)
   const secondary = rankBy === 'time' ? (r: Ranked) => playsLabel(r.plays) : (r: Ranked) => formatDuration(r.ms)
   const max = Math.max(...items.map(value), 1)
+  const canHide = active === 'artist'
+  const hideButton = (name: string) =>
+    canHide && (
+      <button type="button" className="chart-hide" aria-label={`Hide ${name} everywhere`} title="Hide everywhere" onClick={() => setRefused(onHide(name) ? null : { name, hidden })}>
+        Hide
+      </button>
+    )
 
   return (
     <div className="charts">
@@ -44,6 +70,21 @@ export function TopCharts({ plays }: { plays: Play[] }) {
           ]}
         />
       </div>
+
+      {refused?.hidden === hidden && (
+        <p className="charts__hidden" role="status">
+          Can’t hide {refused.name}: at least one artist has to stay.
+        </p>
+      )}
+
+      {hiddenCount > 0 && (
+        <p className="charts__hidden">
+          {hiddenCount} artist{hiddenCount === 1 ? '' : 's'} hidden from every chart.{' '}
+          <button type="button" className="chip-button" onClick={onManage}>
+            Manage
+          </button>
+        </p>
+      )}
 
       {items.length === 0 ? (
         <p className="muted">Nothing here for this period.</p>
@@ -63,11 +104,12 @@ export function TopCharts({ plays }: { plays: Play[] }) {
                 <span className="podium__value">
                   {primary(item)} <span className="muted">· {secondary(item)}</span>
                 </span>
+                {hideButton(item.label)}
               </li>
             ))}
           </ol>
 
-          <ol className="chart-list" start={4}>
+          <ol className={canHide ? 'chart-list chart-list--hideable' : 'chart-list'} start={4}>
             {items.slice(3).map((item, i) => (
               <li key={item.key} className="chart-list__row">
                 <span className="chart-list__rank">{i + 4}</span>
@@ -83,6 +125,7 @@ export function TopCharts({ plays }: { plays: Play[] }) {
                   <span>{primary(item)}</span>
                   <span className="chart-list__sub">{secondary(item)}</span>
                 </div>
+                {hideButton(item.label)}
               </li>
             ))}
           </ol>
