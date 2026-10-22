@@ -567,186 +567,197 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       </nav>
 
       <InCards value={cards}>
-      <OnStage value={onStage}>
-        {/* Turning a phone swaps the deck and the page, which lay their charts out differently: start them over */}
-        <main key={cards ? 'cards' : 'page'} className="dash__main" data-dealt={cards ? dealt : undefined} {...swipeHandlers}>
-          {!cards && <Hero
-            summary={summary}
-            year={year}
-            span={span}
-            isSample={isSample}
-            topArtist={topArtists[0]}
-            hours={hours}
-            newArtists={newArtists}
-            onPlay={() => openTour(true)}
-            onPoster={() => makePoster(posterDesign)}
-          />}
-
-          {!hasMusic && <p className="empty">There’s no music in this period, only podcasts. Most of the visuals below need songs.</p>}
-
-          <Side label="Side A" title={SIDES.A} />
-
-          <Chapter id="record" hint="Each ring is a day. Drag the needle." num="A1" title="The Record" lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
-            <Vinyl
-              key={viewKey}
-              plays={plays}
-              model={record}
-              slotColors={slotColors}
-              legend={legend}
-              title={recordTitle}
-              subtitle={recordSubtitle}
-              onPoster={() => makePoster('record')}
-              learned={scrubLearned}
-              onLearned={() => setScrubLearned(true)}
-            />
-          </Chapter>
-
-          <Chapter
-            id="eras" hint="Who ruled your listening, and when."
-            num="A2"
-            title="Eras"
-            lede="Who ruled your listening, and when."
-            table={() => <RiverTable bins={bins} totals={totals} artists={legend} />}
-          >
-            {hasMusic ? <River key={viewKey} bins={bins} totals={totals} eras={eras} artists={legend} colors={colors} /> : <NotEnough />}
-          </Chapter>
-
-          <Chapter
-            id="race" hint={`Hours per artist, raced ${bins.size} by ${bins.size}.`}
-            num="A3"
-            title="The Race"
-            lede={`Total hours per artist, replayed ${bins.size} by ${bins.size}. Watch who pulls ahead.`}
-          >
-            {race.names.length > 1 ? <Race key={viewKey} bins={bins} race={race} colors={colors} /> : <NotEnough />}
-          </Chapter>
-
-          <Side label="Side B" title={SIDES.B} />
-
-          <Chapter
-            id="clock" hint="Drag across the clock or the dots to read any hour."
-            num="B1"
-            title="Around the Clock"
-            lede="When the music happens, and who you reach for at each hour. Midnight is at the top."
-            table={() => <ClockTable hours={hours} />}
-          >
-            <Clock hours={hours} parts={parts} grid={grid} plays={plays} />
-          </Chapter>
-
-          <Chapter id="days" hint="Tap a day to see everything you played." num="B2" title="Every Day" lede="A square for every day. The brighter it glows, the longer you listened. Tap a day to see what you played.">
-            <Calendar days={days} years={year === null ? years : [year]} plays={plays} firstHeard={firstHeard} colors={colors} />
-          </Chapter>
-
-          <Chapter
-            id="lovehate" hint="The song you let play, and the one you skip."
-            num="B3"
-            title="Love / Hate"
-            lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
-            table={() => <LoveHateTable songs={songs} />}
-          >
-            {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
-          </Chapter>
-
-          <Side label="Side C" title={SIDES.C} />
-
-          <Chapter
-            id="constellation" hint="Artists you play back to back, joined up. Tap a star, pinch to zoom."
-            num="C1"
-            title="Constellation"
-            lede="Your top artists as stars, joined when you play one straight after the other. Clusters are your scenes."
-            table={() => <ConstellationTable links={graph.links} />}
-          >
-            {graph.nodes.length >= 3 ? <Constellation nodes={graph.nodes} links={graph.links} colors={colors} /> : <NotEnough />}
-          </Chapter>
-
-          <Chapter
-            id="pulse" hint="Your top artists over time, one line each. Tap a line."
-            num="C2"
-            title="Pulse"
-            lede="Your top artists over time, one line each."
-          >
-            {pulseLines.length >= 2 ? (
-              <Pulse
-                key={viewKey}
-                bins={bins}
-                totals={totals}
-                artists={pulseLines}
-                firstHeard={firstHeard}
-                colors={colors}
+        <OnStage value={onStage}>
+          {/* Turning a phone swaps the deck and the page, which lay their charts out differently: start them over */}
+          <main key={cards ? 'cards' : 'page'} className="dash__main" data-dealt={cards ? dealt : undefined} {...swipeHandlers}>
+            {!cards && (
+              <Hero
+                summary={summary}
+                year={year}
+                span={span}
+                isSample={isSample}
+                topArtist={topArtists[0]}
+                hours={hours}
+                newArtists={newArtists}
+                onPlay={() => openTour(true)}
+                onPoster={() => makePoster(posterDesign)}
               />
-            ) : (
-              <NotEnough />
             )}
-          </Chapter>
 
-          <Chapter id="charts" hint="Your rankings." num="C3" title="The Charts" lede="The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.">
-            <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('manage')} />
-          </Chapter>
+            {!hasMusic && <p className="empty">There’s no music in this period, only podcasts. Most of the visuals below need songs.</p>}
 
-          <Side label="Side D" title={SIDES.D} />
+            <Side label="Side A" title={SIDES.A} />
 
-          <Chapter id="notes" hint="The small print: what you’d never have guessed." num="D1" title="Liner Notes" lede="The back of the sleeve: who played on this record, and how well you know your own habits.">
-            <LinerNotes
-              takes={lines}
-              fun={fun}
-              rec={rec}
-              summary={summary}
-              devices={devices}
-              topArtists={topArtists}
-              hours={hours}
-              wear={wear}
-              period={year === null ? span : String(year)}
-              isAllTime={year === null}
-            />
-          </Chapter>
+            <Chapter id="record" num="A1" title="The Record" hint="Each ring is a day. Drag the needle." lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
+              <Vinyl
+                key={viewKey}
+                plays={plays}
+                model={record}
+                slotColors={slotColors}
+                legend={legend}
+                title={recordTitle}
+                subtitle={recordSubtitle}
+                onPoster={() => makePoster('record')}
+                learned={scrubLearned}
+                onLearned={() => setScrubLearned(true)}
+              />
+            </Chapter>
 
-          <Chapter
-            id="poster" hint="Touch and hold the poster to save it."
-            num="D2"
-            title="The Poster"
-            lede="Take it home. Pick a design, a size and a background, then download it or send it straight from your phone."
-          >
-            <PosterStudio data={posterData} design={posterDesign} onDesign={setPosterDesign} />
-          </Chapter>
+            <Chapter
+              id="eras"
+              num="A2"
+              title="Eras"
+              hint="Who ruled your listening, and when."
+              lede="Who ruled your listening, and when."
+              table={() => <RiverTable bins={bins} totals={totals} artists={legend} />}
+            >
+              {hasMusic ? <River key={viewKey} bins={bins} totals={totals} eras={eras} artists={legend} colors={colors} /> : <NotEnough />}
+            </Chapter>
 
-          {tourStep !== null && <UpNext tracks={tourTracks} sides={SIDES} step={tourStep} onStep={setTourStep} onFinish={() => closeTour(true)} />}
+            <Chapter
+              id="race"
+              num="A3"
+              title="The Race"
+              hint={`Hours per artist, raced ${bins.size} by ${bins.size}.`}
+              lede={`Total hours per artist, replayed ${bins.size} by ${bins.size}. Watch who pulls ahead.`}
+            >
+              {race.names.length > 1 ? <Race key={viewKey} bins={bins} race={race} colors={colors} /> : <NotEnough />}
+            </Chapter>
 
-          {!cards && <footer className="dash__footer">
-            <p>
-              <strong>Pressed locally.</strong> Everything on this page was worked out inside this browser tab. Nothing was uploaded.
-            </p>
-            <details className="load-details">
-              <summary>Load details</summary>
-              <ul>
-                <li>
-                  {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
-                </li>
-                <li>{formatNumber(result.skippedRows)} rows without track info ignored (usually local files)</li>
-                {applied.filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
-                {applied.filter.hidden.size > 0 && (
-                  <li>
-                    {formatNumber(hiddenPlays)} plays by {applied.filter.hidden.size} hidden artist{applied.filter.hidden.size === 1 ? '' : 's'} left out
-                  </li>
-                )}
-                {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
-                {result.warnings.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            </details>
-            <p className="colophon">
-              On Record is open source.{' '}
-              <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
-                Star it, report a bug or support it on GitHub
-              </a>
-              .
-            </p>
-            <p className="disclaimer">
-              On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
-              trademark of Spotify AB.
-            </p>
-          </footer>}
-        </main>
-      </OnStage>
+            <Side label="Side B" title={SIDES.B} />
+
+            <Chapter
+              id="clock"
+              num="B1"
+              title="Around the Clock"
+              hint="Drag across the clock or the dots to read any hour."
+              lede="When the music happens, and who you reach for at each hour. Midnight is at the top."
+              table={() => <ClockTable hours={hours} />}
+            >
+              <Clock hours={hours} parts={parts} grid={grid} plays={plays} />
+            </Chapter>
+
+            <Chapter id="days" num="B2" title="Every Day" hint="Tap a day to see everything you played." lede="A square for every day. The brighter it glows, the longer you listened. Tap a day to see what you played.">
+              <Calendar days={days} years={year === null ? years : [year]} plays={plays} firstHeard={firstHeard} colors={colors} />
+            </Chapter>
+
+            <Chapter
+              id="lovehate"
+              num="B3"
+              title="Love / Hate"
+              hint="The song you let play, and the one you skip."
+              lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
+              table={() => <LoveHateTable songs={songs} />}
+            >
+              {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
+            </Chapter>
+
+            <Side label="Side C" title={SIDES.C} />
+
+            <Chapter
+              id="constellation"
+              num="C1"
+              title="Constellation"
+              hint="Artists you play back to back, joined up. Tap a star, pinch to zoom."
+              lede="Your top artists as stars, joined when you play one straight after the other. Clusters are your scenes."
+              table={() => <ConstellationTable links={graph.links} />}
+            >
+              {graph.nodes.length >= 3 ? <Constellation nodes={graph.nodes} links={graph.links} colors={colors} /> : <NotEnough />}
+            </Chapter>
+
+            <Chapter
+              id="pulse"
+              num="C2"
+              title="Pulse"
+              hint="Your top artists over time, one line each. Tap a line."
+              lede="Your top artists over time, one line each."
+            >
+              {pulseLines.length >= 2 ? (
+                <Pulse
+                  key={viewKey}
+                  bins={bins}
+                  totals={totals}
+                  artists={pulseLines}
+                  firstHeard={firstHeard}
+                  colors={colors}
+                />
+              ) : (
+                <NotEnough />
+              )}
+            </Chapter>
+
+            <Chapter id="charts" num="C3" title="The Charts" hint="Your rankings." lede="The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.">
+              <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('manage')} />
+            </Chapter>
+
+            <Side label="Side D" title={SIDES.D} />
+
+            <Chapter id="notes" num="D1" title="Liner Notes" hint="The small print: what you’d never have guessed." lede="The back of the sleeve: who played on this record, and how well you know your own habits.">
+              <LinerNotes
+                takes={lines}
+                fun={fun}
+                rec={rec}
+                summary={summary}
+                devices={devices}
+                topArtists={topArtists}
+                hours={hours}
+                wear={wear}
+                period={year === null ? span : String(year)}
+                isAllTime={year === null}
+              />
+            </Chapter>
+
+            <Chapter
+              id="poster"
+              num="D2"
+              title="The Poster"
+              hint="Touch and hold the poster to save it."
+              lede="Take it home. Pick a design, a size and a background, then download it or send it straight from your phone."
+            >
+              <PosterStudio data={posterData} design={posterDesign} onDesign={setPosterDesign} />
+            </Chapter>
+
+            {tourStep !== null && <UpNext tracks={tourTracks} sides={SIDES} step={tourStep} onStep={setTourStep} onFinish={() => closeTour(true)} />}
+
+            {!cards && (
+              <footer className="dash__footer">
+                <p>
+                  <strong>Pressed locally.</strong> Everything on this page was worked out inside this browser tab. Nothing was uploaded.
+                </p>
+                <details className="load-details">
+                  <summary>Load details</summary>
+                  <ul>
+                    <li>
+                      {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
+                    </li>
+                    <li>{formatNumber(result.skippedRows)} rows without track info ignored (usually local files)</li>
+                    {applied.filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
+                    {applied.filter.hidden.size > 0 && (
+                      <li>
+                        {formatNumber(hiddenPlays)} plays by {applied.filter.hidden.size} hidden artist{applied.filter.hidden.size === 1 ? '' : 's'} left out
+                      </li>
+                    )}
+                    {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
+                    {result.warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                </details>
+                <p className="colophon">
+                  On Record is open source.{' '}
+                  <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
+                    Star it, report a bug or support it on GitHub
+                  </a>
+                  .
+                </p>
+                <p className="disclaimer">
+                  On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
+                  trademark of Spotify AB.
+                </p>
+              </footer>
+            )}
+          </main>
+        </OnStage>
       </InCards>
 
       {cards && (
