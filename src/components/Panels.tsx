@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { formatNumber } from '../lib/format'
+import { isLaunchKey } from '../lib/keys'
 
 interface ModalProps {
   open: boolean
@@ -45,7 +46,7 @@ export function Modal({ open, onClose, onGone, label, className, children }: Mod
     if (!open) return
     const guard = (e: KeyboardEvent) => {
       const dialog = ref.current
-      if (!dialog || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || dialog.contains(e.target as Node)) return
+      if (!dialog || isLaunchKey(e) || dialog.contains(e.target as Node)) return
       e.stopPropagation()
       if (e.key !== 'Tab') dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
     }
@@ -69,7 +70,7 @@ export function Modal({ open, onClose, onGone, label, className, children }: Mod
       // Keys pressed in a dialog stay in it, so the tour's arrows and Escape don't act behind it.
       // ⌘K still gets through, so it can close the launcher again.
       onKeyDown={(e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') return
+        if (isLaunchKey(e)) return
         e.stopPropagation()
         // An Escape that cancels an input method's composition is the input's, not a close
         if (e.key !== 'Escape' || e.nativeEvent.isComposing) return

@@ -52,6 +52,15 @@ export function filterPlays(plays: Play[], { musicOnly, hidden }: PlayFilter): P
   return plays.filter((p) => (p.kind === 'track' ? !hidden.has(p.artist) : !musicOnly))
 }
 
+/**
+ * False when hiding `going` as well would leave none of `artists` (every music artist) showing.
+ * One always stays: with only podcasts left, turning Music only back on would empty the page.
+ */
+export function canHide(artists: readonly Ranked[], hidden: ReadonlySet<string>, going: readonly string[]): boolean {
+  const gone = new Set(going)
+  return artists.some((a) => !hidden.has(a.label) && !gone.has(a.label))
+}
+
 /** True when two filters leave out the same plays, so hiding an artist and unhiding them again costs nothing */
 export function sameFilter(a: PlayFilter, b: PlayFilter): boolean {
   if (a === b) return true

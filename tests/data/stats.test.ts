@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canHide,
   dayNumber,
   filterByYear,
   filterPlays,
@@ -309,6 +310,24 @@ describe('filterPlays', () => {
   it('only hides music, even when a show shares the name', () => {
     const sameName = play(at(2024, 1, 5), { kind: 'episode', artist: 'Gone' })
     expect(filterPlays([hiddenSong, sameName], { musicOnly: false, hidden: new Set(['Gone']) })).toEqual([sameName])
+  })
+})
+
+describe('canHide', () => {
+  const artists = topItems([play(at(2024, 1, 1), { artist: 'A' }), play(at(2024, 1, 2), { artist: 'B' })], 'artist', 'time', Infinity)
+
+  it('hides while someone is left', () => {
+    expect(canHide(artists, new Set(), ['A'])).toBe(true)
+    expect(canHide(artists, new Set(['A']), [])).toBe(true)
+  })
+
+  it('refuses to hide the last artist showing', () => {
+    expect(canHide(artists, new Set(['A']), ['B'])).toBe(false)
+    expect(canHide(artists, new Set(), ['A', 'B'])).toBe(false)
+  })
+
+  it('doesn’t count a name that isn’t an artist as one left showing', () => {
+    expect(canHide(artists, new Set(['A']), ['B', 'Nobody'])).toBe(false)
   })
 })
 

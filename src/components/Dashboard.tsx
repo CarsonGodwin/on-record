@@ -15,9 +15,10 @@ import {
   songStats,
   takes,
 } from '../data/insights'
-import { filterByYear, filterPlays, funStats, getYears, newArtistsIn, platforms, sameFilter, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
+import { canHide, filterByYear, filterPlays, funStats, getYears, newArtistsIn, platforms, sameFilter, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
 import { formatHour, formatNumber } from '../lib/format'
-import { COARSE, LAUNCH_KEY, PHONE } from '../lib/pointer'
+import { isLaunchKey, LAUNCH_KEY } from '../lib/keys'
+import { COARSE, PHONE } from '../lib/pointer'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import { OnStage, resolveStop } from '../lib/stage'
 import type { LoadResult } from '../types'
@@ -81,24 +82,24 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    * The charts follow `applied`, which catches up with `chosen` once the launcher and Settings are
    * closed and an "Updating" note has painted. Re-running every chart over a long history holds the
    * page for a moment, so it happens once when you're done choosing, not once per artist, and never
-   * without saying so.
+   * without saying so. `version` counts the changes that have reached the charts, for `viewKey`.
    */
-  const [applied, setApplied] = useState(chosen)
+  const [applied, setApplied] = useState({ filter: chosen, version: 0 })
   const choosing = launcher !== null || settingsOpen
-  const updating = !choosing && !sameFilter(applied, chosen)
+  const updating = !choosing && !sameFilter(applied.filter, chosen)
   useEffect(() => {
     if (!updating) return
     let timer = 0
     // requestAnimationFrame runs just before the paint, so the timeout after it lands just after
     const frame = requestAnimationFrame(() => {
-      timer = window.setTimeout(() => setApplied(chosen))
+      timer = window.setTimeout(() => setApplied((a) => ({ filter: chosen, version: a.version + 1 })))
     })
     return () => {
       cancelAnimationFrame(frame)
       window.clearTimeout(timer)
     }
   }, [updating, chosen])
-  const all = useMemo(() => filterPlays(result.plays, applied), [result.plays, applied])
+  const all = useMemo(() => filterPlays(result.plays, applied.filter), [result.plays, applied.filter])
   const years = useMemo(() => getYears(all), [all])
   const [pickedYear, setYear] = useState<number | null>(null)
   // Hiding an artist can empty a year; the page then falls back to all time
@@ -142,8 +143,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const shownArtists = useMemo(() => musicArtists.filter((a) => !hidden.has(a.label)), [musicArtists, hidden])
   const hiddenArtists = useMemo(() => musicArtists.filter((a) => hidden.has(a.label)), [musicArtists, hidden])
   const hiddenPlays = useMemo(
-    () => (applied.hidden.size === 0 ? 0 : result.plays.filter((p) => p.kind === 'track' && applied.hidden.has(p.artist)).length),
-    [result.plays, applied.hidden],
+    () => (applied.filter.hidden.size === 0 ? 0 : result.plays.filter((p) => p.kind === 'track' && applied.filter.hidden.has(p.artist)).length),
+    [result.plays, applied.filter.hidden],
   )
   const pulseArtists = useMemo(
     () =>
@@ -174,18 +175,12 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     [colors, legend],
   )
   /*
-   * Charts that hold on to a groove, a pinned ridge or a finished video start over when what that
-   * state points into changes (hiding an artist can shift the days, the ridges or the racers), and
-   * keep it when a filter change leaves their own data alone.
+   * Charts that hold on to a groove, a pinned song or ridge, a hovered week or a finished video start
+   * over whenever their data is worked out again: a new year, or a filter change reaching the charts
+   * (hiding an artist can shift the days, the songs and the racers). One key for all of them can't
+   * miss an input the way a key per chart, listing what its state points into, can.
    */
-  const binsKey = `${year ?? 'all'}|${bins.size}|${bins.starts[0]}|${bins.starts.length}`
-  // The legend too: a focused artist is held by its place in it
-  const vinylKey = `${year ?? 'all'}|${record.firstDay}|${record.days}|${legend.join('\n')}`
-  const riverKey = `${binsKey}|${legend.join('\n')}`
-  // The video also prints the last day, which a later podcast can move without moving the bins
-  const raceKey = `${binsKey}|${bins.end}|${race.names.map((n) => `${n}=${colors.get(n)}`).join('\n')}`
-  const pulseKey = `${binsKey}|${pulseLines.join('\n')}`
-  const songsKey = `${year ?? 'all'}|${songs.map((s) => s.key).join('\n')}`
+  const viewKey = `${year ?? 'all'}|${applied.version}`
   const recordTitle = year === null ? 'ALL TIME' : String(year)
   const recordSubtitle = `${formatNumber(summary.totalMs / 3_600_000)} HRS  ·  ${formatNumber(summary.artists)} ARTISTS`
 
@@ -323,14 +318,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     else document.getElementById('poster')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  /**
-   * Hides artists everywhere, but always leaves at least one: with only podcasts left,
-   * turning Music only back on would empty the page.
-   */
+  /** Hides artists everywhere, but always leaves at least one (see canHide) */
   function hideArtists(artists: string[]): boolean {
-    const going = new Set(artists)
-    if (!musicArtists.some((a) => !hidden.has(a.label) && !going.has(a.label))) return false
-    setHidden((prev) => new Set([...prev, ...going]))
+    if (!canHide(musicArtists, hidden, artists)) return false
+    setHidden((prev) => new Set([...prev, ...artists]))
     return true
   }
 
@@ -376,7 +367,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   // ⌘K (Ctrl K) opens the launcher from anywhere, the tour included, and closes it again
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'k' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      if (!isLaunchKey(e)) return
       e.preventDefault()
       setSettingsOpen(false)
       setLauncher((open) => (open ? null : 'root'))
@@ -501,7 +492,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
           <Chapter id="record" num="A1" title="The Record" lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
             <Vinyl
-              key={vinylKey}
+              key={viewKey}
               plays={plays}
               model={record}
               slotColors={slotColors}
@@ -521,7 +512,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             lede="Who ruled your listening, and when."
             table={() => <RiverTable bins={bins} totals={totals} artists={legend} />}
           >
-            {hasMusic ? <River key={riverKey} bins={bins} totals={totals} eras={eras} artists={legend} colors={colors} /> : <NotEnough />}
+            {hasMusic ? <River key={viewKey} bins={bins} totals={totals} eras={eras} artists={legend} colors={colors} /> : <NotEnough />}
           </Chapter>
 
           <Chapter
@@ -530,7 +521,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             title="The Race"
             lede={`Total hours per artist, replayed ${bins.size} by ${bins.size}. Watch who pulls ahead.`}
           >
-            {race.names.length > 1 ? <Race key={raceKey} bins={bins} race={race} colors={colors} /> : <NotEnough />}
+            {race.names.length > 1 ? <Race key={viewKey} bins={bins} race={race} colors={colors} /> : <NotEnough />}
           </Chapter>
 
           <Side label="Side B" title={SIDES.B} />
@@ -556,7 +547,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             lede={`Your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up). The lines mark the middle of the pack.`}
             table={() => <LoveHateTable songs={songs} />}
           >
-            {songs.length >= 5 ? <LoveHate key={songsKey} songs={songs} skipRate={summary.skipRate} /> : <NotEnough />}
+            {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} /> : <NotEnough />}
           </Chapter>
 
           <Side label="Side C" title={SIDES.C} />
@@ -579,7 +570,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           >
             {pulseLines.length >= 2 ? (
               <Pulse
-                key={pulseKey}
+                key={viewKey}
                 bins={bins}
                 totals={totals}
                 artists={pulseLines}
@@ -633,10 +624,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                   {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
                 </li>
                 <li>{formatNumber(result.skippedRows)} rows without track info ignored (usually local files)</li>
-                {applied.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
-                {applied.hidden.size > 0 && (
+                {applied.filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
+                {applied.filter.hidden.size > 0 && (
                   <li>
-                    {formatNumber(hiddenPlays)} plays by {applied.hidden.size} hidden artist{applied.hidden.size === 1 ? '' : 's'} left out
+                    {formatNumber(hiddenPlays)} plays by {applied.filter.hidden.size} hidden artist{applied.filter.hidden.size === 1 ? '' : 's'} left out
                   </li>
                 )}
                 {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}

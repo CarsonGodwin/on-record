@@ -13,9 +13,6 @@ export const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: 
 export const PHONE = COARSE && matchMedia('(max-width: 699px), (max-height: 559px)').matches
 
 /** Runs `clear` when a mouse or pen leaves, but not after a tap */
-/** The launcher's shortcut as this keyboard writes it: ⌘K on Apple devices, Ctrl K everywhere else */
-export const LAUNCH_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘K' : 'Ctrl K'
-
 export function leaveUnlessTouch(clear: () => void) {
   return (e: PointerEvent) => {
     if (e.pointerType !== 'touch') clear()
