@@ -19,9 +19,11 @@ interface Props {
   current: string | null
   onPoster: () => void
   onReset: () => void
+  /** On the phone's deck of cards there's nothing to scroll to: picking a track deals its card instead */
+  onJump?: (id: string) => void
 }
 
-export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) {
+export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const track = tracks.find((t) => t.id === current)
@@ -69,7 +71,16 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) 
                     .filter((t) => t.num.startsWith(side))
                     .map((t) => (
                       <li key={t.id}>
-                        <a href={`#${t.id}`} aria-current={t.id === current ? 'true' : undefined} onClick={() => setOpen(false)}>
+                        <a
+                          href={`#${t.id}`}
+                          aria-current={t.id === current ? 'true' : undefined}
+                          onClick={(e) => {
+                            setOpen(false)
+                            if (!onJump) return
+                            e.preventDefault()
+                            onJump(t.id)
+                          }}
+                        >
                           <span>{t.num}</span>
                           {t.title}
                         </a>
@@ -80,9 +91,11 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) 
             ))}
           </div>
           <div className="trackmenu__foot">
-            <a href="#top" onClick={() => setOpen(false)}>
-              Back to the top
-            </a>
+            {!onJump && (
+              <a href="#top" onClick={() => setOpen(false)}>
+                Back to the top
+              </a>
+            )}
             <button type="button" className="button button--ghost button--small" onClick={onReset}>
               New data
             </button>

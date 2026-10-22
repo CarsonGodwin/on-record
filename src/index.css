@@ -4816,141 +4816,6 @@ html.tour-open {
   transform: translateX(3px);
 }
 
-/* The needle drop: the blank record and its arm, before the first track */
-.needle-drop {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding-top: 24px;
-  text-align: center;
-  animation: tour-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.needle-drop__title {
-  max-width: 14ch;
-  font-size: clamp(2.2rem, 9vw, 3.8rem);
-  font-weight: 800;
-  line-height: 0.95;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
-}
-
-.needle-drop__title em {
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-  background: linear-gradient(95deg, var(--accent), var(--violet) 60%, var(--cyan));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  padding-right: 0.06em;
-}
-
-/* As big as fits above the card, so the whole thing is on one screen */
-.needle-drop__platter {
-  position: relative;
-  width: max(220px, min(100%, 460px, calc(100svh - var(--topbar-h, 64px) - var(--tour-card-h, 88px) - 340px)));
-  aspect-ratio: 1;
-  margin-top: 6px;
-  border-radius: 24px;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
-  outline: none;
-  cursor: grab;
-}
-
-.needle-drop__platter:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 6px;
-}
-
-.needle-drop__platter.is-aiming {
-  cursor: grabbing;
-}
-
-.needle-drop__platter:not(.is-idle):not(.is-aiming) {
-  cursor: default;
-}
-
-.needle-drop__spin,
-.needle-drop__spin canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-/* The record turns once the needle's down */
-.needle-drop__platter:is(.is-landing, .is-pressing, .is-pressed) .needle-drop__spin {
-  animation: needle-spin 24s linear infinite;
-}
-
-@keyframes needle-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* The light on the vinyl stays put while the record turns under it */
-.needle-drop__sheen {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  background: conic-gradient(from -60deg, transparent 0 2%, rgba(255, 255, 255, 0.1) 9%, transparent 17% 50%, rgba(255, 255, 255, 0.1) 59%, transparent 67%);
-  mix-blend-mode: screen;
-}
-
-.needle-drop__arm {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-/* Aiming, the arm stays under the finger; pressing, it rides the grooves frame by frame */
-.needle-drop__platter.is-aiming .tonearm__arm {
-  transition-duration: 0.06s;
-}
-
-.needle-drop__platter.is-pressing .tonearm__arm {
-  transition-duration: 0.12s;
-  transition-timing-function: linear;
-}
-
-.needle-drop__beacon {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2.5;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: needle-beacon 1.8s ease-out infinite;
-}
-
-@keyframes needle-beacon {
-  from {
-    opacity: 0.9;
-    transform: scale(0.5);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.6);
-  }
-}
-
-.needle-drop__readout {
-  min-height: 1.5em;
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
 /* =================================================================
    Launcher (⌘K), Settings and Help
    ================================================================= */
@@ -5437,3 +5302,320 @@ kbd {
 .dash__updating:empty {
   display: none;
 }
+
+/* =================================================================
+   Phones held upright: the record as a deck of cards
+   One track fills the screen between the top bar and the bar at the
+   bottom. Nothing scrolls: each card fits its chart to the space it has
+   (the body is a size container, so charts can use cqw / cqh).
+   ================================================================= */
+
+.chapter__hint {
+  display: none;
+}
+
+html.cards-open,
+html.cards-open body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.dash.is-cards {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash.is-cards .topbar {
+  position: relative;
+  flex: none;
+}
+
+.dash.is-cards .tracklist,
+.dash.is-cards .side,
+.dash.is-cards .up-next,
+.dash.is-cards .dash__main > .empty,
+.dash.is-cards .dash__main > .sr-only {
+  display: none;
+}
+
+/* Long presses on a card never select text or bring up iOS's magnifier and callout */
+.dash.is-cards .dash__main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.dash.is-cards .chapter {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+}
+
+/* The cards around this one wait at full size, so each shows up drawn and the way you left it */
+.dash.is-cards .chapter.is-offstage {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  padding-block: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.dash.is-cards .chapter:not(.is-offstage) {
+  animation: card-in 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dash.is-cards .dash__main[data-dealt='prev'] .chapter:not(.is-offstage) {
+  animation-name: card-in-prev;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+
+@keyframes card-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+
+/* The top bar already names the track: the card keeps a line on what to do here */
+.dash.is-cards .chapter__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  margin: 0;
+  padding: 10px 0;
+}
+
+.dash.is-cards .chapter__num,
+.dash.is-cards .chapter__lede {
+  display: none;
+}
+
+.dash.is-cards .chapter__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.dash.is-cards .chapter__titles h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.dash.is-cards .chapter__hint {
+  display: block;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.dash.is-cards .chapter__actions .chip-button {
+  padding: 6px 12px;
+}
+
+.dash.is-cards .chapter__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  padding-bottom: 12px;
+}
+
+/* A table is the one thing on a card that scrolls, and only because you asked for it */
+.dash.is-cards .table-wrap {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+
+.dash.is-cards .dash__updating {
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+/* The bar at the bottom: back, where you are, and the next track by name */
+.cardnav {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.cardnav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cardnav button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.cardnav button:active:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.cardnav__prev {
+  flex: none;
+  width: 48px;
+}
+
+.cardnav__count {
+  flex: 1;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.cardnav__next {
+  flex: none;
+  gap: 8px;
+  max-width: 64%;
+  padding: 0 12px 0 18px;
+  border-color: transparent;
+  background: var(--surface-2) !important;
+  font-weight: 700;
+}
+
+.cardnav__num {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.cardnav__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash.is-cards .chapter:not(.is-offstage) {
+    animation: none;
+  }
+}
+
+/* ---------- Card: A1 The Record ---------- */
+
+
+/* ---------- end card: A1 The Record ---------- */
+
+
+
+
+/* ---------- Card: A2 Eras ---------- */
+
+
+/* ---------- end card: A2 Eras ---------- */
+
+
+
+
+/* ---------- Card: A3 The Race ---------- */
+
+
+/* ---------- end card: A3 The Race ---------- */
+
+
+
+
+/* ---------- Card: B1 Around the Clock ---------- */
+
+
+/* ---------- end card: B1 Around the Clock ---------- */
+
+
+
+
+/* ---------- Card: B2 Every Day ---------- */
+
+
+/* ---------- end card: B2 Every Day ---------- */
+
+
+
+
+/* ---------- Card: B3 Love / Hate ---------- */
+
+
+/* ---------- end card: B3 Love / Hate ---------- */
+
+
+
+
+/* ---------- Card: C1 Constellation ---------- */
+
+
+/* ---------- end card: C1 Constellation ---------- */
+
+
+
+
+/* ---------- Card: C2 Pulse ---------- */
+
+
+/* ---------- end card: C2 Pulse ---------- */
+
+
+
+
+/* ---------- Card: C3 The Charts ---------- */
+
+
+/* ---------- end card: C3 The Charts ---------- */
+
+
+
+
+/* ---------- Card: D1 Liner Notes ---------- */
+
+
+/* ---------- end card: D1 Liner Notes ---------- */
+
+
+
+
+/* ---------- Card: D2 The Poster ---------- */
+
+
+/* ---------- end card: D2 The Poster ---------- */

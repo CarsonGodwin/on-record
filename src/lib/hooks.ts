@@ -82,3 +82,20 @@ export function useMediaQuery(query: string): boolean {
   )
   return useSyncExternalStore(subscribe, () => matchMedia(query).matches)
 }
+
+/** Tracks an element's content-box width and height, for charts that fill a card rather than a column */
+export function useSize(ref: RefObject<HTMLElement | null>, fallback = { width: 800, height: 600 }): { width: number; height: number } {
+  const [size, setSize] = useState(fallback)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width)
+      const height = Math.round(entry.contentRect.height)
+      setSize((cur) => (cur.width === width && cur.height === height ? cur : { width, height }))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return size
+}

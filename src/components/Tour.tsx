@@ -10,9 +10,6 @@ import type { Track } from './TrackMenu'
  * back up.
  */
 
-/** The first stop, before the tracks: the needle drop */
-export const INTRO = 'needle-drop'
-
 interface Tip {
   /** What to try first */
   try: string
@@ -23,10 +20,6 @@ interface Tip {
 const TAP = COARSE ? 'Tap' : 'Click'
 
 const TIPS: Record<string, Tip> = {
-  [INTRO]: {
-    try: `Drag the needle onto the record, or ${TAP.toLowerCase()} it.`,
-    then: 'One groove for every day you listened.',
-  },
   record: {
     try: COARSE ? 'Hold the record, then drag to skim your days.' : 'Hover the record to skim, click to hold a day.',
     then: `${TAP} an artist below to light up their grooves.`,
@@ -77,7 +70,7 @@ interface Props {
   tracks: Track[]
   /** Side letter → side title, e.g. A → "Time" */
   sides: Record<string, string>
-  /** Index into the needle drop followed by the tracks */
+  /** Index into the tracks */
   step: number
   onStep: (step: number) => void
   /** Leaves partway, onto the chapter you were on */
@@ -88,7 +81,7 @@ interface Props {
 
 /** The tour's top bar and its tip. The way on is at the end of each stop, in the page: see UpNext. */
 export function Tour({ tracks, sides, step, onStep, onClose, topRef }: Props) {
-  const stops = [INTRO, ...tracks.map((t) => t.id)]
+  const stops = tracks.map((t) => t.id)
   const id = stops[step]
   const track = tracks.find((t) => t.id === id)
   const side = track?.num[0]
@@ -152,8 +145,8 @@ export function Tour({ tracks, sides, step, onStep, onClose, topRef }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [step, last, onStep, onClose])
 
-  // Progress grouped like the record: the needle drop, then a run of bars per side
-  const groups: { key: string; from: number; count: number }[] = [{ key: 'intro', from: 0, count: 1 }]
+  // Progress grouped like the record: a run of bars per side
+  const groups: { key: string; from: number; count: number }[] = []
   for (const s of Object.keys(sides)) {
     const from = stops.findIndex((stop) => tracks.find((t) => t.id === stop)?.num.startsWith(s))
     if (from >= 0) groups.push({ key: s, from, count: tracks.filter((t) => t.num.startsWith(s)).length })
@@ -235,15 +228,15 @@ interface UpNextProps {
  * there, and it's there whenever you're done, never sooner or louder.
  */
 export function UpNext({ tracks, sides, step, onStep, onFinish }: UpNextProps) {
-  const next = tracks[step]
+  const next = tracks[step + 1]
   const side = next?.num[0]
-  const newSide = side !== undefined && side !== tracks[step - 1]?.num[0]
+  const newSide = side !== undefined && side !== tracks[step]?.num[0]
   return (
     <nav className="up-next" aria-label="The Long Play">
       {next ? (
         <button type="button" className="up-next__button" onClick={() => onStep(step + 1)}>
           <span className="up-next__kicker">
-            {step === 0 ? 'Up first' : 'Up next'}
+            Up next
             {newSide && (
               <>
                 {' '}
