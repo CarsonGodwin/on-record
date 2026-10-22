@@ -949,6 +949,12 @@ th {
   margin: 6px 0;
 }
 
+.how-to h3 {
+  margin: 18px 0 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
 /* Loading */
 
 .pressing {

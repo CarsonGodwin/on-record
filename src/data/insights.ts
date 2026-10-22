@@ -690,11 +690,13 @@ export function takes(plays: Play[], summary: Summary, rec: Records, fun: FunSta
     })
   }
 
-  if (summary.shuffleRate >= 0.85 || (summary.shuffleRate <= 0.1 && summary.musicMs > 0)) {
-    const on = summary.shuffleRate >= 0.85
+  // Apple Music's export doesn't record shuffle, so there's nothing to say
+  const shuffle = summary.shuffleRate
+  if (shuffle !== null && (shuffle >= 0.85 || (shuffle <= 0.1 && summary.musicMs > 0))) {
+    const on = shuffle >= 0.85
     out.push({
-      text: on ? `Lets shuffle pick ${pct(summary.shuffleRate)} of the time.` : `Shuffle? Only ${pct(summary.shuffleRate)} of the time. You pick the order.`,
-      proof: `Shuffle was on for ${pct(summary.shuffleRate)} of songs`,
+      text: on ? `Lets shuffle pick ${pct(shuffle)} of the time.` : `Shuffle? Only ${pct(shuffle)} of the time. You pick the order.`,
+      proof: `Shuffle was on for ${pct(shuffle)} of songs`,
       score: 0.4,
     })
   }

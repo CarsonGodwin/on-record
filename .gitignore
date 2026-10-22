@@ -23,12 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 
-# Personal Spotify exports: never commit real listening data
+# Personal Spotify and Apple Music exports: never commit real listening data
 *.zip
 Streaming_History*.json
 StreamingHistory*.json
 Spotify Extended Streaming History/
 my_spotify_data/
+Apple Music*.csv
+Apple Music*.json
+Apple_Media_Services/
+Apple Media Services*/
 
 # Secrets
 .env

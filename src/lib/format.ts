@@ -1,3 +1,5 @@
+import type { DataSource } from '../types'
+
 const number = new Intl.NumberFormat()
 const oneDecimal = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
 const percent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 })
@@ -30,6 +32,12 @@ export function formatDate(d: number | Date): string {
 
 export function formatMonthShort(month: number): string {
   return monthShort.format(new Date(2000, month, 1))
+}
+
+/** What the history is called where a poster credits its data */
+export function historyName(sources: DataSource[]): string {
+  if (sources.includes('apple')) return sources.includes('spotify') ? 'Spotify and Apple Music listening history' : 'Apple Music listening history'
+  return 'Spotify Extended Streaming History'
 }
 
 /** Hour of day as "12 AM", "9 PM" */

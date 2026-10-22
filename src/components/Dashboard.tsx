@@ -16,11 +16,11 @@ import {
   takes,
 } from '../data/insights'
 import { filterByYear, funStats, getYears, newArtistsIn, platforms, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
-import { formatHour, formatNumber } from '../lib/format'
+import { formatHour, formatNumber, historyName } from '../lib/format'
 import { COARSE, PHONE } from '../lib/pointer'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import { OnStage } from '../lib/stage'
-import type { LoadResult } from '../types'
+import type { DataSource, LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
 import { posterMoments, type PosterData, type PosterDesign } from '../viz/poster'
 import { buildRecord, GROOVE, PODCAST } from '../viz/record'
@@ -144,8 +144,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, songs: summary.tracks, peak: formatHour(peak.hour) },
       wearOut: wear,
       moments: posterMoments(record, fun, rec),
+      source: historyName(result.sources),
     }),
-    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, fun, rec],
+    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, fun, rec, result.sources],
   )
 
   /*
@@ -495,8 +496,17 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 <li>
                   {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
                 </li>
-                <li>{formatNumber(result.skippedRows)} rows without track info ignored (usually local files)</li>
+                <li>
+                  {formatNumber(result.skippedRows)} rows without track info ignored ({skippedRowsHint(result.sources)})
+                </li>
                 {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
+                {result.unmatchedArtists > 0 && (
+                  <li>
+                    {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export, so they show as
+                    “Unknown artist”
+                  </li>
+                )}
+                {result.sources.includes('apple') && <li>Apple Music’s export doesn’t record shuffle, so shuffle stats leave those plays out</li>}
                 {result.warnings.map((w) => (
                   <li key={w}>{w}</li>
                 ))}
@@ -510,8 +520,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
               .
             </p>
             <p className="disclaimer">
-              On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
-              trademark of Spotify AB.
+              On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
+              Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
             </p>
           </footer>
         </main>
@@ -533,4 +543,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
 function NotEnough() {
   return <p className="empty">Not enough music in this period to draw this one.</p>
+}
+
+/** What usually leaves a row without track info, for the load details */
+function skippedRowsHint(sources: DataSource[]): string {
+  if (sources.includes('apple')) return sources.includes('spotify') ? 'usually local files on Spotify, radio on Apple Music' : 'usually radio'
+  return 'usually local files'
 }

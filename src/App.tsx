@@ -66,19 +66,19 @@ export default function App() {
         <span className="brand">
           On Record<span className="brand__dot" aria-hidden="true" />
         </span>
-        <span className="landing__tag">A Spotify history visualizer</span>
+        <span className="landing__tag">A Spotify &amp; Apple Music history visualizer</span>
       </header>
 
       <main className="landing__main">
         <div className="landing__copy">
-          <p className="eyebrow">An in-depth analysis of your entire Spotify history</p>
+          <p className="eyebrow">An in-depth analysis of your entire Spotify or Apple Music history</p>
           <h1 className="landing__title">
             Your life,
             <br />
             <em>on record.</em>
           </h1>
           <p className="landing__lede">
-            Drop in your Spotify export and get every day of your listening pressed into vinyl. Your eras, your 3 AM artist, the
+            Drop in your Spotify or Apple Music export and get every day of your listening pressed into vinyl. Your eras, your 3 AM artist, the
             songs you always skip, the scenes you drift between, and a poster worth sharing.
           </p>
 
@@ -125,7 +125,8 @@ export default function App() {
       </ul>
 
       <details className="how-to">
-        <summary>How to get your Extended Streaming History</summary>
+        <summary>How to get your listening history</summary>
+        <h3>Spotify</h3>
         <ol>
           <li>
             Go to{' '}
@@ -141,6 +142,21 @@ export default function App() {
           <li>Wait for the download link. Spotify says it takes up to 30 days, but it’s often faster.</li>
           <li>Drop the zip file on the sleeve above.</li>
         </ol>
+        <h3>Apple Music</h3>
+        <ol>
+          <li>
+            Go to{' '}
+            <a href="https://privacy.apple.com/" target="_blank" rel="noreferrer">
+              privacy.apple.com
+            </a>{' '}
+            and sign in with your Apple Account.
+          </li>
+          <li>
+            Choose <strong>Request a copy of your data</strong>, then check <strong>Apple Media Services information</strong>.
+          </li>
+          <li>Wait for the email saying it’s ready. Apple says it can take up to a week.</li>
+          <li>Download every part (big exports come in several zips) and drop them all on the sleeve above.</li>
+        </ol>
       </details>
 
       <p className="colophon">
@@ -152,8 +168,8 @@ export default function App() {
       </p>
 
       <p className="disclaimer">
-        On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
-        trademark of Spotify AB.
+        On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
+        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
       </p>
     </div>
   )

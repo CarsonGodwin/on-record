@@ -68,6 +68,8 @@ export interface PosterData {
   wearOut: WearOut
   /** Standout days and runs, for the designs that point them out on the record */
   moments: PosterMoment[]
+  /** Where the data came from, for the credit line: "Spotify Extended Streaming History" */
+  source: string
 }
 
 export interface PosterMoment {

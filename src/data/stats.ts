@@ -53,8 +53,8 @@ export interface Summary {
   activeDays: number
   /** Share of music plays that were skipped, 0–1 */
   skipRate: number
-  /** Share of music plays with shuffle on, 0–1 */
-  shuffleRate: number
+  /** Share of music plays with shuffle on, 0–1, out of the plays that say; null when none do (Apple Music) */
+  shuffleRate: number | null
   /** Share of listening time that was offline, 0–1 */
   offlineShare: number
 }
@@ -68,6 +68,7 @@ export function summarize(plays: Play[]): Summary {
   let musicPlays = 0
   let skips = 0
   let shuffles = 0
+  let shuffleKnown = 0
   const artists = new Set<string>()
   const tracks = new Set<string>()
   const days = new Set<number>()
@@ -82,6 +83,7 @@ export function summarize(plays: Play[]): Summary {
       musicMs += p.msPlayed
       musicPlays++
       if (isSkip(p)) skips++
+      if (p.shuffle !== null) shuffleKnown++
       if (p.shuffle) shuffles++
       artists.add(p.artist)
       if (p.msPlayed >= COUNTED_PLAY_MS) tracks.add(trackKey(p))
@@ -99,7 +101,8 @@ export function summarize(plays: Play[]): Summary {
     tracks: tracks.size,
     activeDays: days.size,
     skipRate: musicPlays ? skips / musicPlays : 0,
-    shuffleRate: musicPlays ? shuffles / musicPlays : 0,
+    // With no music at all there's nothing unknown about it, so that stays 0 as it always was
+    shuffleRate: shuffleKnown ? shuffles / shuffleKnown : musicPlays ? null : 0,
     offlineShare: totalMs ? offlineMs / totalMs : 0,
   }
 }

@@ -32,9 +32,19 @@ export interface RawStreamRecord {
 
 export type PlayKind = 'track' | 'episode' | 'audiobook'
 
-/** A cleaned-up stream. Every chart works from Play[]. */
+/** The service an export came from */
+export type DataSource = 'spotify' | 'apple'
+
+/**
+ * A cleaned-up stream. Every chart works from Play[], whichever service it came from.
+ * Apple Music listens are converted into the same shape in data/apple.ts.
+ */
 export interface Play {
-  /** When playback stopped, as epoch ms. Spotify's `ts` is the end time, not the start. */
+  /**
+   * When playback stopped, as epoch ms. Spotify's `ts` is the end time, not the start.
+   * startDate() takes msPlayed off this to find the start, so Apple Music listens use
+   * their start plus msPlayed here: a pause mid-song would otherwise move the start later.
+   */
   endTime: number
   msPlayed: number
   kind: PlayKind
@@ -48,9 +58,11 @@ export interface Play {
   /** Normalized platform family, e.g. "iOS", "macOS", "Web" */
   platform: string
   country: string
+  /** Spotify's reason_start / reason_end vocabulary ("trackdone", "fwdbtn", ...); Apple's end reasons are mapped onto it */
   reasonStart: string
   reasonEnd: string
-  shuffle: boolean
+  /** null when the export doesn't say (Apple Music's doesn't) */
+  shuffle: boolean | null
   skipped: boolean
   offline: boolean
   incognito: boolean
@@ -60,9 +72,13 @@ export interface LoadResult {
   plays: Play[]
   /** Names of the files the plays came from */
   filesRead: string[]
-  /** Rows with no track/episode/audiobook info (e.g. local files), which are ignored */
+  /** Which services the plays came from, in a fixed order (Spotify first) */
+  sources: DataSource[]
+  /** Rows with no track/episode/audiobook info (e.g. local files, or radio on Apple Music), which are ignored */
   skippedRows: number
   /** Rows seen more than once, e.g. the same file dropped twice */
   duplicateRows: number
+  /** Apple Music plays whose artist couldn't be found anywhere in the export, kept as "Unknown artist" */
+  unmatchedArtists: number
   warnings: string[]
 }

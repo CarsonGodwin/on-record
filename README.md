@@ -1,8 +1,8 @@
 # On Record
 
-**React + Vite app that visualizes your Spotify listening history.**
+**React + Vite app that visualizes your Spotify or Apple Music listening history.**
 
-Drop in your **Extended Streaming History** export and get your listening pressed into vinyl, plus a dozen other ways to look at it.
+Drop in your Spotify **Extended Streaming History** or your Apple Music **privacy export** and get your listening pressed into vinyl, plus a dozen other ways to look at it.
 
 Everything runs in your browser. There's no server, and your data is never uploaded. Even the cover art is generated from names rather than fetched. The built site ships with a Content Security Policy that blocks all network requests (`connect-src 'none'`), so the browser itself enforces that.
 
@@ -27,11 +27,37 @@ Every view follows the year picker at the top.
 
 ## Getting your data
 
+**Spotify**
+
 1. Go to [spotify.com/account/privacy](https://www.spotify.com/account/privacy/) and request **Extended streaming history**.
 2. Confirm the email, then wait for the download link (up to 30 days).
 3. Drop the `.zip` onto the record sleeve.
 
+**Apple Music**
+
+1. Go to [privacy.apple.com](https://privacy.apple.com/), choose **Request a copy of your data** and check **Apple Media Services information**.
+2. Wait for the email (Apple says up to a week).
+3. Download every part and drop them all onto the record sleeve. The zips, the folder they unzip to, or the `Apple Music*.csv`/`.json` files all work. Only the Apple Music files are opened; the rest of the export (purchases, Apple Pay and so on) is never read.
+
+You can drop a Spotify export and an Apple Music export together to get one timeline, for example if you switched services.
+
 No data yet? Use **Try the demo**.
+
+## Spotify vs. Apple Music
+
+Both exports become the same plays, so every view works with either. Apple's export records less than Spotify's, so a few things differ:
+
+| | Spotify | Apple Music |
+|---|---|---|
+| **Artist** | In every row | Not in the play activity. Matched by song title from the export's other Apple Music files (and the library), using the album and the day played to tell apart songs that share a title. Songs with no match show as "Unknown artist", and Load details counts them. |
+| **Shuffle** | Recorded | Not recorded. The shuffle question and shuffle facts are left out. With both services, shuffle stats use the Spotify plays only. |
+| **Podcasts and audiobooks** | Included | Not in Apple Music's export, so the podcast views stay empty. |
+| **Skips** | `skipped` flag and end reason | From Apple's end reason (skipped forward). |
+| **Plays** | One row per stream | Apple splits a listen whenever you pause or seek; parts of the same song within 30 seconds are joined back into one play. A song on repeat stays separate plays. |
+| **Songs** | Told apart by Spotify's track ID | No track IDs, so songs are told apart by artist and title. A single and its album version count as one song. |
+| **Devices** | Phone, computer, web, speakers | The same families, plus Apple Watch and Apple TV; HomePod counts as a speaker. |
+
+On the Deep dive poster, the credit line names whichever export the data came from.
 
 ## Development
 
@@ -54,8 +80,11 @@ The build emits `dist/_headers`, which Cloudflare applies as response headers: t
 ```
 src/
   types.ts              Raw Spotify row type and the cleaned-up Play type
-  data/parse.ts         Turns one raw row into a Play
-  data/load.ts          Reads zip/JSON files, validates, dedupes
+  data/parse.ts         Turns one raw Spotify row into a Play
+  data/load.ts          Reads zip/JSON/CSV files (including Apple's zips within zips), validates, dedupes
+  data/appleFiles.ts    Which files in Apple's privacy export hold Apple Music history
+  data/apple.ts         Apple Music's export to Plays: joins split listens, finds artists by title
+  data/csv.ts           A small CSV reader that copies out only the columns asked for
   data/sample.ts        Seeded fake history in Spotify's raw format
   data/stats.ts         Summary numbers, rankings, streaks
   data/insights.ts      Time bins, eras, race frames, sessions, artist graph, listener profile
@@ -79,4 +108,4 @@ src/
 
 ## Disclaimer
 
-On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a trademark of Spotify AB.
+On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc. Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
