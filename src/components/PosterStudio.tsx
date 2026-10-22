@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useWidth } from '../lib/hooks'
+import { useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useSize } from '../lib/hooks'
 import { COARSE } from '../lib/pointer'
+import { InCards, OnStage } from '../lib/stage'
 import { POSTER_DESIGN_SIZES, POSTER_SIZES, SOLID_PAPER_DESIGNS, isDarkPaper, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
 import { Segmented } from './ui'
@@ -16,6 +17,14 @@ const DESIGNS: { value: PosterDesign; label: string }[] = [
   { value: 'sleeve', label: 'Sleeve' },
   { value: 'annotated', label: 'Annotated' },
   // Archived for now (renderers kept in viz/poster.ts): macro, constellation, pulse
+]
+
+/** On a phone's card the vinyl leads, and the names are short enough for one row */
+const CARD_DESIGNS: { value: PosterDesign; label: string }[] = [
+  { value: 'record', label: 'Record' },
+  { value: 'deep', label: 'Deep dive' },
+  { value: 'sleeve', label: 'Sleeve' },
+  { value: 'annotated', label: 'Annotated' },
 ]
 
 /** iPhone and iPad (which calls itself a Mac): there the share sheet's "Save Image" is the way into Photos */
@@ -44,6 +53,14 @@ const SOLID_PAPERS: { value: PosterPaper; label: string; swatch: string }[] = [
   { value: 'solid-cream', label: 'Cream', swatch: '#efe8da' },
 ]
 
+/** The card's round swatches: the textured papers show a hint of their glow, so they read apart from the flat ones */
+const DOTS: Record<PosterPaper, string> = {
+  midnight: 'radial-gradient(circle at 30% 28%, #3b2b47, #0b0a0f 72%)',
+  cream: 'radial-gradient(circle at 30% 28%, #fffaf1, #d9cdb8 82%)',
+  black: '#0e0d12',
+  'solid-cream': '#efe8da',
+}
+
 interface Props {
   data: PosterData
   design: PosterDesign
@@ -53,7 +70,15 @@ interface Props {
 export function PosterStudio({ data, design, onDesign }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const width = useWidth(wrapRef, 420)
+  const box = useSize(wrapRef, { width: 420, height: 0 })
+  const inCards = useContext(InCards)
+  // While another card is on screen (or the Long Play is on another stop) the poster isn't drawn,
+  // so a year change doesn't make every other card stutter for a picture nobody can see yet
+  const stage = useContext(OnStage)
+  const showing = stage === null || stage === 'poster'
+  const [sheet, setSheet] = useState(false)
+  const optionsRef = useRef<HTMLButtonElement>(null)
+  const doneRef = useRef<HTMLButtonElement>(null)
   const [size, setSize] = useState<PosterSize>('post')
   const [paper, setPaper] = useState<PosterPaper>('midnight')
   const [fontsReady, setFontsReady] = useState(false)
@@ -75,7 +100,10 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const sizes = POSTER_DESIGN_SIZES[design] ?? (Object.keys(POSTER_SIZES) as PosterSize[])
   const activeSize = sizes.includes(size) ? size : sizes[0]
   const spec = POSTER_SIZES[activeSize]
-  const cssW = Math.min(width, activeSize === 'story' ? 330 : 440)
+  // A card fits the whole poster into the space it has; the page gives it a column
+  const cssW = inCards
+    ? Math.max(1, Math.floor(Math.min(box.width, (box.height * spec.width) / spec.height)))
+    : Math.min(box.width, activeSize === 'story' ? 330 : 440)
   const cssH = (cssW * spec.height) / spec.width
   const hasUltra = design === 'deep'
   // Only some designs offer the solid backgrounds; elsewhere a solid pick falls back to its textured twin
@@ -107,15 +135,30 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     return () => canvas.removeEventListener('contextrestored', back)
   }, [])
 
+  // Phones open on the vinyl, the design the record is named for. Only once, and only over the
+  // page's default, so a design you or another card picked stays picked.
+  const defaulted = useRef(false)
   useEffect(() => {
+    if (!inCards || defaulted.current) return
+    defaulted.current = true
+    if (design === 'deep') onDesign('record')
+  }, [inCards, design, onDesign])
+
+  // What the preview was last drawn from, so coming back to an unchanged poster doesn't draw it again
+  const drawn = useRef<unknown[]>([])
+  useEffect(() => {
+    if (!showing) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
+    const inputs = [data, design, activePaper, cssW, cssH, fontsReady, restored]
+    if (inputs.every((v, i) => drawn.current[i] === v)) return
+    drawn.current = inputs
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     canvas.width = Math.round(cssW * dpr)
     canvas.height = Math.round(cssH * dpr)
     renderPoster(ctx, canvas.width, canvas.height, data, { design, paper: activePaper, title: TITLE })
-  }, [data, design, activePaper, cssW, cssH, fontsReady, restored])
+  }, [showing, data, design, activePaper, cssW, cssH, fontsReady, restored])
 
   const fullSize = useCallback(
     async (scales: number[] = FULL_SCALES): Promise<Blob | null> => {
@@ -139,7 +182,10 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   )
 
   useEffect(() => {
-    if (!(canShare || COARSE) || !fontsReady) return
+    if (!(canShare || COARSE) || !fontsReady || !showing) return
+    // Already made for these options (the card was left and came back)
+    const ready = readyBlob.current
+    if (ready && ready.key === optionsKey && ready.data === data) return
     let live = true
     const timer = setTimeout(async () => {
       const blob = await fullSize()
@@ -151,7 +197,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
       live = false
       clearTimeout(timer)
     }
-  }, [canShare, fontsReady, fullSize, optionsKey, data])
+  }, [canShare, fontsReady, fullSize, optionsKey, data, showing])
 
   const pressUrl = pressImage?.url
   useEffect(() => {
@@ -226,20 +272,149 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     }
   }
 
+  function openSheet() {
+    setSheet(true)
+    // After it renders, so there's a button to land on
+    requestAnimationFrame(() => doneRef.current?.focus())
+  }
+
+  function closeSheet() {
+    setSheet(false)
+    requestAnimationFrame(() => optionsRef.current?.focus())
+  }
+
+  const onSheetKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return
+    e.stopPropagation()
+    closeSheet()
+  }
+
+  const preview = (
+    <div className="studio__preview" ref={wrapRef}>
+      <div className="studio__poster" style={{ width: cssW, height: cssH }}>
+        <canvas
+          ref={canvasRef}
+          className="studio__canvas"
+          style={{ width: cssW, height: cssH }}
+          role="img"
+          aria-label={`Preview of your ${design} poster`}
+        />
+        {pressReady && <img className="studio__press" src={pressReady} alt="" />}
+      </div>
+    </div>
+  )
+
+  /*
+   * A phone's card: the poster as big as the card allows, a row of designs and
+   * one button that hands the picture to the share sheet (or downloads it where
+   * there isn't one). Size, background and Ultra HD wait in a sheet that takes
+   * the controls' place, so the poster stays in view and changes as you pick.
+   */
+  if (inCards) {
+    return (
+      <div className={sheet ? 'studio studio--card is-sheet' : 'studio studio--card'}>
+        {preview}
+        {short && (
+          <p className="studio__notice" role="status">
+            {short.made ? `This phone could only make it ${short.made.width} × ${short.made.height} px.` : 'This phone couldn’t make the image. Try again.'}
+          </p>
+        )}
+        {sheet ? (
+          <div className="studio__sheet" role="group" aria-label="Poster options" onKeyDown={onSheetKey}>
+            <div className="studio__row">
+              <span className="studio__label">Size</span>
+              {sizes.length > 1 && (
+                <Segmented
+                  className="studio__sizes"
+                  label="Poster size"
+                  value={activeSize}
+                  onChange={setSize}
+                  options={sizes.map((key) => ({ value: key, label: `${POSTER_SIZES[key].label} ${POSTER_SIZES[key].ratio}` }))}
+                />
+              )}
+              <span className="studio__note">
+                {sizes.length > 1 ? `${spec.note}, ` : `${spec.label} ${spec.ratio} only, for ${spec.note}: `}
+                {spec.width} × {spec.height} px.
+                {hasUltra && ` Ultra HD goes up to ${spec.width * ULTRA_SCALES[0]} × ${spec.height * ULTRA_SCALES[0]}.`}
+              </span>
+            </div>
+            <div className="studio__row">
+              <span className="studio__label">Background</span>
+              <div className="studio__papers" role="group" aria-label="Background">
+                {papers.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    className="studio__paper"
+                    aria-label={p.label}
+                    aria-pressed={activePaper === p.value}
+                    onClick={() => setPaper(p.value)}
+                  >
+                    <i style={{ background: DOTS[p.value] }} />
+                  </button>
+                ))}
+                <span className="studio__paper-name" aria-hidden="true">
+                  {papers.find((p) => p.value === activePaper)?.label}
+                </span>
+              </div>
+            </div>
+            <div className="studio__bar">
+              {canShare && (
+                <button type="button" className="button button--ghost studio__more" onClick={download} disabled={busy !== null}>
+                  {busy === 'download' ? 'Rendering…' : 'Download'}
+                </button>
+              )}
+              {hasUltra &&
+                (ultraReady ? (
+                  <button type="button" className="button button--ghost studio__more" onClick={() => shareUltra(ultraReady)}>
+                    {mobile ? 'Share Ultra HD' : 'Save Ultra HD'}
+                  </button>
+                ) : (
+                  <button type="button" className="button button--ghost studio__more" onClick={downloadUltra} disabled={busy !== null}>
+                    {busy === 'ultra' ? 'Rendering…' : mobile ? 'Make Ultra HD' : 'Ultra HD'}
+                  </button>
+                ))}
+              <button type="button" className="button studio__done" ref={doneRef} onClick={closeSheet}>
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <Segmented className="studio__designs" label="Poster design" value={design} onChange={onDesign} options={CARD_DESIGNS} />
+            <div className="studio__bar">
+              <button
+                type="button"
+                className="button button--ghost studio__options"
+                ref={optionsRef}
+                onClick={openSheet}
+              >
+                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                  <path d="M3 6h8M15 6h2M3 14h2M9 14h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <circle cx="13" cy="6" r="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                  <circle cx="7" cy="14" r="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+                Options
+              </button>
+              <button type="button" className="button studio__share" onClick={canShare ? share : download} disabled={busy !== null}>
+                {canShare && (
+                  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                    <path d="M10 2.5v10M6.2 6.2 10 2.5l3.8 3.7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6.5 9.5H5a1.5 1.5 0 0 0-1.5 1.5v5A1.5 1.5 0 0 0 5 17.5h10a1.5 1.5 0 0 0 1.5-1.5v-5A1.5 1.5 0 0 0 15 9.5h-1.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                )}
+                {busy === 'share' || busy === 'download' ? 'Rendering…' : canShare ? 'Share' : 'Download PNG'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="studio">
-      <div className="studio__preview" ref={wrapRef}>
-        <div className="studio__poster" style={{ width: cssW, height: cssH }}>
-          <canvas
-            ref={canvasRef}
-            className="studio__canvas"
-            style={{ width: cssW, height: cssH }}
-            role="img"
-            aria-label={`Preview of your ${design} poster`}
-          />
-          {pressReady && <img className="studio__press" src={pressReady} alt="" />}
-        </div>
-      </div>
+      {preview}
 
       <div className="studio__controls">
         <div className="field">
