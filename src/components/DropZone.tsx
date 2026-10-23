@@ -66,8 +66,8 @@ export function DropZone({ onFiles }: Props) {
           ) : (
             <>
               {/* Phones can't drag files, so there it's a tap */}
-              {COARSE ? 'Add your' : 'Drop your'}
-              <br />
+              {COARSE ? 'Add your' : 'Drop your'}{' '}
+              <br className="sleeve__break" />
               Spotify export
               <br />
               <em>here.</em>
@@ -75,8 +75,11 @@ export function DropZone({ onFiles }: Props) {
           )}
         </p>
         <p className="sleeve__hint">
-          The <code>.zip</code> Spotify emailed you, the folder inside it, or the <code>Streaming_History_Audio_*.json</code>{' '}
-          files.
+          The <code>.zip</code> Spotify emailed you
+          <span className="landing__more">
+            , the folder inside it, or the <code>Streaming_History_Audio_*.json</code> files
+          </span>
+          .
         </p>
         <span className="sleeve__cta" aria-hidden="true">
           <b>

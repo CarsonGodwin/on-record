@@ -20,3 +20,10 @@ export function resolveStop(stops: string[], id: string, order: string[]): numbe
   const next = stops.findIndex((s) => order.indexOf(s) > rank)
   return next >= 0 ? next : stops.length - 1
 }
+
+/**
+ * True on a phone held upright, where the record is a deck of cards: one
+ * track fills the screen at a time and nothing scrolls. Charts use it to
+ * fit their card instead of growing down the page.
+ */
+export const InCards = createContext(false)

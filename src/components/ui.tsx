@@ -78,6 +78,8 @@ interface ChapterProps {
   num: string
   title: string
   lede?: ReactNode
+  /** On a phone's card, a line that stands in for the lede: what to do here, in a few words */
+  hint?: ReactNode
   /** Extra controls in the header */
   actions?: ReactNode
   /** If given, adds a "Show table" toggle that swaps the visual for this table */
@@ -86,7 +88,7 @@ interface ChapterProps {
 }
 
 /** One section of the dashboard, styled like a track on a record */
-export function Chapter({ id, num, title, lede, actions, table, children }: ChapterProps) {
+export function Chapter({ id, num, title, lede, hint, actions, table, children }: ChapterProps) {
   const [showTable, setShowTable] = useState(false)
   // Offstage chapters stay mounted and laid out at full width, so they keep their state and show up ready
   const stage = useContext(OnStage)
@@ -100,6 +102,7 @@ export function Chapter({ id, num, title, lede, actions, table, children }: Chap
         <div className="chapter__titles">
           <h2 id={`${id}-title`}>{title}</h2>
           {lede && <p className="chapter__lede">{lede}</p>}
+          {hint && <p className="chapter__hint">{hint}</p>}
         </div>
         {(actions || table) && (
           <div className="chapter__actions">
@@ -112,7 +115,9 @@ export function Chapter({ id, num, title, lede, actions, table, children }: Chap
           </div>
         )}
       </header>
-      <Offstage value={offstage}>{showTable && table ? <div className="table-wrap">{table()}</div> : children}</Offstage>
+      <Offstage value={offstage}>
+        <div className="chapter__body">{showTable && table ? <div className="table-wrap">{table()}</div> : children}</div>
+      </Offstage>
     </section>
   )
 }

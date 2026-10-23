@@ -1,9 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { fromDayNumber } from '../data/stats'
-import { formatDuration, formatHour, formatLongDate, formatNumber, formatTime } from '../lib/format'
-import { useMediaQuery, useSeen, useWidth } from '../lib/hooks'
-import { COARSE, useHoldDrag } from '../lib/pointer'
+import { useCloseOnBack } from '../lib/back'
+import { formatDuration, formatHour, formatLongDate, formatNumber, formatShortDate, formatTime } from '../lib/format'
+import { useMediaQuery, useSeen, useSize, useWidth } from '../lib/hooks'
+import { COARSE, useFingerDrag, useHoldDrag } from '../lib/pointer'
+import { InCards } from '../lib/stage'
 import { IDENTITY, usePanZoom, type View } from '../lib/zoom'
 import type { Play } from '../types'
 import {
@@ -29,6 +31,10 @@ import { ZoomControls } from './ZoomControls'
  * On a phone the deck splits in two: the readout sits above the record, where
  * a thumb on the record doesn't cover it, and the controls go below. Touch
  * and hold the record, then drag, to skim it the way a mouse does by hovering.
+ *
+ * On a phone's card nothing scrolls, so the needle is the finger's straight
+ * away: put a finger down and the needle jumps there and follows it. Two
+ * fingers pinch and pan, and a double tap zooms in on that spot.
  */
 
 interface Props {
@@ -56,12 +62,17 @@ const STRIP_OTHER = 'rgba(244, 241, 234, 0.42)'
 
 /** Matches the CSS breakpoint where the record and deck stack */
 const STACKED = '(max-width: 900px)'
+/** On a card one finger always belongs to the needle, so panning the record takes two */
+const NEEDLE_FINGER = { current: true }
 export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPoster, learned, onLearned }: Props) {
+  const inCards = useContext(InCards)
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const width = useWidth(stageRef, 560)
-  // Leave room on the right for the tonearm
-  const size = Math.min(Math.round(width * 0.86), 600)
+  const stage = useSize(stageRef, { width: 560, height: 560 })
+  const width = stage.width
+  // Leave room on the right for the tonearm; on a card, as big as the space between the readout and the key allows,
+  // less a little at the top where the arm's counterweight swings up past the record's square
+  const size = inCards ? Math.max(160, Math.min(Math.round(width * 0.9), Math.round(stage.height * 0.92))) : Math.min(Math.round(width * 0.86), 600)
   const g = recordGeometry(size, model.days)
   // Deep enough that a single day's groove gets about 10px wide
   const maxZoom = Math.min(100, Math.max(6, 10 / g.ring))
@@ -81,7 +92,9 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
   const [tip, setTip] = useState(false)
 
   // Hold and drag with a finger: skims the record like a hovering mouse, and lands where you let go
-  const holding = useHoldDrag(platterRef, {
+  const holding = useHoldDrag(
+    platterRef,
+    {
     onStart: (e) => {
       setScrubbing(true)
       setTouched(true)
@@ -95,8 +108,10 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
       setPinned(true)
       if (!learned) onLearned()
     },
-  })
-  const zoom = usePanZoom(platterRef, { width: size, height: size, max: maxZoom, busy: holding })
+    },
+    !inCards,
+  )
+  const zoom = usePanZoom(platterRef, { width: size, height: size, max: maxZoom, busy: inCards ? NEEDLE_FINGER : holding })
   const view = zoom.view
   const zoomed = view.s > 1.01
   // The view the canvas was last drawn at; between redraws a CSS transform stretches it to the live view
@@ -115,7 +130,53 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
     return best
   }, [model])
 
-  const coach = COARSE && seen && !learned && !touched && !zoomed
+  const coach = !inCards && COARSE && seen && !learned && !touched && !zoomed
+
+  // Where the needle was before a touch, in case the touch turns out to be a pinch, and before the touch
+  // ahead of it, since a double tap means zoom: neither of its taps should have moved the needle
+  const beforeTouch = useRef<{ needle: Needle | null; pinned: boolean } | null>(null)
+  const beforeLastTouch = useRef<{ needle: Needle | null; pinned: boolean } | null>(null)
+  // After a double tap the finger is zooming, not steering, until it lifts
+  const zoomingTap = useRef(false)
+  useFingerDrag(
+    platterRef,
+    {
+      onStart: (e) => {
+        beforeLastTouch.current = beforeTouch.current
+        beforeTouch.current = { needle, pinned }
+        setScrubbing(true)
+        pick(e, false)
+      },
+      onMove: (e) => {
+        if (!zoomingTap.current) pick(e, false)
+      },
+      onEnd: () => {
+        zoomingTap.current = false
+        setScrubbing(false)
+        setPinned(true)
+        if (!learned) onLearned()
+      },
+      onCancel: () => {
+        setScrubbing(false)
+        const was = beforeTouch.current
+        if (!was) return
+        setNeedle(was.needle)
+        setPinned(was.pinned)
+      },
+      onDoubleTap: (e) => {
+        zoomingTap.current = true
+        const was = beforeLastTouch.current
+        if (was) {
+          setNeedle(was.needle)
+          setPinned(was.pinned)
+        }
+        const r = platterRef.current!.getBoundingClientRect()
+        if (zoomed) zoom.reset()
+        else zoom.zoomTo(Math.min(4, maxZoom), e.clientX - r.left, e.clientY - r.top)
+      },
+    },
+    inCards,
+  )
 
   useEffect(() => {
     if (!pinned) return
@@ -347,6 +408,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
 
   const strip = (
     <DayStrip
+      height={inCards ? 30 : COARSE ? 54 : 46}
       arcs={day.arcs}
       model={model}
       color={stripColor}
@@ -433,6 +495,142 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
     </>
   )
 
+  const platter = (
+    <div
+      className={zoomed ? 'vinyl__platter is-zoomed' : 'vinyl__platter'}
+      ref={platterRef}
+      style={{ width: size, height: size }}
+      data-drag={inCards ? '' : undefined}
+    >
+      <canvas
+        ref={canvasRef}
+        style={{ width: size, height: size }}
+        role="img"
+        aria-label={`Your listening as a vinyl record: ${model.days} grooves, one per day. Use the controls next to it to explore one day at a time.`}
+        onPointerMove={(e) => {
+          if (e.pointerType !== 'mouse' || pinned || e.buttons !== 0) return
+          setScrubbing(true)
+          pick(e, false)
+        }}
+        onPointerLeave={() => setScrubbing(false)}
+        onClick={(e) => {
+          setScrubbing(false)
+          setTouched(true)
+          pick(e, true)
+        }}
+      />
+      <div
+        className="vinyl__sheen"
+        style={{ inset: size * 0.045, transform: zoomed ? `translate(${view.x}px, ${view.y}px) scale(${view.s})` : undefined }}
+        aria-hidden="true"
+      />
+      <svg className={['vinyl__overlay', scrubbing && 'is-scrubbing', pinned && 'is-pinned'].filter(Boolean).join(' ')} width={size} height={size} aria-hidden="true">
+        {grooveOnScreen >= 5 ? (
+          // Zoomed in far enough to see the groove itself: bracket it instead of drawing over it
+          <>
+            <circle cx={cx} cy={cy} r={ringOnScreen - grooveOnScreen / 2 - 1} className="vinyl__ring vinyl__ring--edge" />
+            <circle cx={cx} cy={cy} r={ringOnScreen + grooveOnScreen / 2 + 1} className="vinyl__ring vinyl__ring--edge" />
+          </>
+        ) : (
+          <circle cx={cx} cy={cy} r={ringOnScreen} className="vinyl__ring" />
+        )}
+        <circle cx={cx + ringOnScreen * Math.sin(angle)} cy={cy - ringOnScreen * Math.cos(angle)} r={5} className="vinyl__needle" />
+        {!zoomed && <Tonearm size={size} radius={ringR} />}
+      </svg>
+      {coach && <Coach size={size} radius={(g.inner + g.outer) / 2} />}
+      {tip &&
+        createPortal(
+          <div className="scrub-tip" aria-hidden="true">
+            <span className="scrub-tip__when">
+              {formatLongDate(date)} · {formatTime(at)}
+            </span>
+            <span className="scrub-tip__what">{playing ? `${playing.title} · ${playing.artist}` : 'Nothing playing'}</span>
+          </div>,
+          document.body,
+        )}
+    </div>
+  )
+
+  const legendItems = [
+    ...legend.map((artist, i) => (
+      <li key={artist}>
+        <button type="button" className="legend__item" aria-pressed={focus === i} onClick={() => setFocus(focus === i ? null : i)}>
+          <span className="legend__dot" style={{ background: slotColors[i] }} />
+          {artist}
+        </button>
+      </li>
+    )),
+    <li key="everyone" className="legend__item legend__item--static">
+      <span className="legend__dot" style={{ background: GROOVE }} />
+      Everyone else
+    </li>,
+    ...(hasPodcasts
+      ? [
+          <li key="podcasts" className="legend__item legend__item--static">
+            <span className="legend__dot" style={{ background: PODCAST }} />
+            Podcasts
+          </li>,
+        ]
+      : []),
+  ]
+
+  if (inCards) {
+    return (
+      <div className="vinyl vinyl--card" ref={rootRef}>
+        <div className="vinyl__readout" aria-live="polite">
+          <div className="vinyl__day">
+            <p className="vinyl__date">
+              <strong>{formatShortDate(date)}</strong>
+              {model.dayMinutes[ring] > 0 ? (
+                <span>
+                  {formatDuration(model.dayMinutes[ring] * 60_000)}, {formatNumber(day.plays)} plays
+                  {ring === biggest && <em> Biggest day</em>}
+                </span>
+              ) : (
+                <span>Nothing played</span>
+              )}
+            </p>
+            <div className="vinyl__steps">
+              <StepButton label="Previous day" disabled={ring <= 0} onStep={() => goTo(ring - 1)}>
+                <path d="M15 5l-7 7 7 7" />
+              </StepButton>
+              <button type="button" className="vinyl__step" aria-label="A random day" onClick={randomDay}>
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path d="M4 7h3.5c4 0 5 10 9 10H20M4 17h3.5c1.8 0 3-2 4-4.2M14.4 9.2c.9-1.3 1.9-2.2 3.1-2.2H20M17.5 4.5 20 7l-2.5 2.5M17.5 14.5 20 17l-2.5 2.5" />
+                </svg>
+              </button>
+              <StepButton label="Next day" disabled={ring >= model.days - 1} onStep={() => goTo(ring + 1)}>
+                <path d="M9 5l7 7-7 7" />
+              </StepButton>
+            </div>
+          </div>
+          <p className="vinyl__now">
+            <span className="vinyl__time">{formatTime(at)}</span>
+            {playing ? (
+              <span className="vinyl__track">
+                <strong>{playing.title}</strong> {playing.artist}
+              </span>
+            ) : (
+              <span className="vinyl__track is-quiet">{next ? `Quiet until ${next.title}` : 'Quiet'}</span>
+            )}
+          </p>
+          {strip}
+        </div>
+
+        <div className="vinyl__stage" ref={stageRef}>
+          {platter}
+          {zoomed && (
+            <button type="button" className="chip-button vinyl__unzoom" onClick={zoom.reset}>
+              Zoom out
+            </button>
+          )}
+        </div>
+
+        <CardLegend items={legendItems} />
+      </div>
+    )
+  }
+
   return (
     <div className="vinyl" ref={rootRef}>
       {/* Stacked, this holds the readout, the record and its controls */}
@@ -447,54 +645,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
         )}
 
         <div className="vinyl__stage" ref={stageRef}>
-          <div className={zoomed ? 'vinyl__platter is-zoomed' : 'vinyl__platter'} ref={platterRef} style={{ width: size, height: size }}>
-            <canvas
-              ref={canvasRef}
-              style={{ width: size, height: size }}
-              role="img"
-              aria-label={`Your listening as a vinyl record: ${model.days} grooves, one per day. Use the controls next to it to explore one day at a time.`}
-              onPointerMove={(e) => {
-                if (e.pointerType !== 'mouse' || pinned || e.buttons !== 0) return
-                setScrubbing(true)
-                pick(e, false)
-              }}
-              onPointerLeave={() => setScrubbing(false)}
-              onClick={(e) => {
-                setScrubbing(false)
-                setTouched(true)
-                pick(e, true)
-              }}
-            />
-            <div
-              className="vinyl__sheen"
-              style={{ inset: size * 0.045, transform: zoomed ? `translate(${view.x}px, ${view.y}px) scale(${view.s})` : undefined }}
-              aria-hidden="true"
-            />
-            <svg className={['vinyl__overlay', scrubbing && 'is-scrubbing', pinned && 'is-pinned'].filter(Boolean).join(' ')} width={size} height={size} aria-hidden="true">
-              {grooveOnScreen >= 5 ? (
-                // Zoomed in far enough to see the groove itself: bracket it instead of drawing over it
-                <>
-                  <circle cx={cx} cy={cy} r={ringOnScreen - grooveOnScreen / 2 - 1} className="vinyl__ring vinyl__ring--edge" />
-                  <circle cx={cx} cy={cy} r={ringOnScreen + grooveOnScreen / 2 + 1} className="vinyl__ring vinyl__ring--edge" />
-                </>
-              ) : (
-                <circle cx={cx} cy={cy} r={ringOnScreen} className="vinyl__ring" />
-              )}
-              <circle cx={cx + ringOnScreen * Math.sin(angle)} cy={cy - ringOnScreen * Math.cos(angle)} r={5} className="vinyl__needle" />
-              {!zoomed && <Tonearm size={size} radius={ringR} />}
-            </svg>
-            {coach && <Coach size={size} radius={(g.inner + g.outer) / 2} />}
-            {tip &&
-              createPortal(
-                <div className="scrub-tip" aria-hidden="true">
-                  <span className="scrub-tip__when">
-                    {formatLongDate(date)} · {formatTime(at)}
-                  </span>
-                  <span className="scrub-tip__what">{playing ? `${playing.title} · ${playing.artist}` : 'Nothing playing'}</span>
-                </div>,
-                document.body,
-              )}
-          </div>
+          {platter}
           <ZoomControls zoom={zoom} className="vinyl__zoom" />
         </div>
         {stacked && <div className="deck deck--controls">{controls}</div>}
@@ -511,29 +662,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
         )}
 
         <ul className="legend" aria-label="Artist colors">
-          {legend.map((artist, i) => (
-            <li key={artist}>
-              <button
-                type="button"
-                className="legend__item"
-                aria-pressed={focus === i}
-                onClick={() => setFocus(focus === i ? null : i)}
-              >
-                <span className="legend__dot" style={{ background: slotColors[i] }} />
-                {artist}
-              </button>
-            </li>
-          ))}
-          <li className="legend__item legend__item--static">
-            <span className="legend__dot" style={{ background: GROOVE }} />
-            Everyone else
-          </li>
-          {hasPodcasts && (
-            <li className="legend__item legend__item--static">
-              <span className="legend__dot" style={{ background: PODCAST }} />
-              Podcasts
-            </li>
-          )}
+          {legendItems}
         </ul>
         <p className="hint">
           {COARSE
@@ -566,6 +695,8 @@ function Coach({ size, radius }: { size: number; radius: number }) {
 }
 
 interface StripProps {
+  /** The bar's height, without the hour labels under it */
+  height: number
   arcs: number[]
   model: RecordModel
   color: (slot: number) => string
@@ -574,11 +705,9 @@ interface StripProps {
 }
 
 /** One day, unrolled: a 24-hour bar with every play on it. Drag along it to move the needle. */
-function DayStrip({ arcs, model, color, minute, onMinute }: StripProps) {
+function DayStrip({ height: h, arcs, model, color, minute, onMinute }: StripProps) {
   const ref = useRef<HTMLDivElement>(null)
   const w = useWidth(ref, 300)
-  // Taller for fingers
-  const h = COARSE ? 54 : 46
   const x = (m: number) => (m / MINUTES) * w
 
   function fromEvent(e: PointerEvent<SVGSVGElement>) {
@@ -587,7 +716,7 @@ function DayStrip({ arcs, model, color, minute, onMinute }: StripProps) {
   }
 
   return (
-    <div className="strip" ref={ref}>
+    <div className="strip" ref={ref} data-drag="">
       <svg
         width={w}
         height={h + 20}
@@ -620,7 +749,7 @@ function DayStrip({ arcs, model, color, minute, onMinute }: StripProps) {
           <text
             key={hr}
             x={x(hr * 60)}
-            y={h + 17}
+            y={h + 16}
             className="axis-label"
             textAnchor={hr === 0 ? 'start' : hr === 24 ? 'end' : 'middle'}
           >
@@ -659,5 +788,117 @@ function Tonearm({ size: S, radius }: { size: number; radius: number }) {
       </g>
       <circle cx={px} cy={py} r={0.018 * S} className="tonearm__cap" />
     </g>
+  )
+}
+
+/** A day stepper: tap for one day, hold to run through them */
+function StepButton({ label, disabled, onStep, children }: { label: string; disabled: boolean; onStep: () => void; children: ReactNode }) {
+  const timer = useRef(0)
+  const step = useRef(onStep)
+  useLayoutEffect(() => {
+    step.current = onStep
+  })
+  const stop = () => window.clearTimeout(timer.current)
+  useEffect(() => stop, [])
+  // Disabled at the first or last day: stop running, or the timer would keep firing into nothing
+  useEffect(() => {
+    if (disabled) stop()
+  }, [disabled])
+  return (
+    <button
+      type="button"
+      className="vinyl__step"
+      aria-label={label}
+      disabled={disabled}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        step.current()
+        const run = (delay: number) => {
+          timer.current = window.setTimeout(() => {
+            step.current()
+            run(Math.max(45, delay * 0.82))
+          }, delay)
+        }
+        run(380)
+      }}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          step.current()
+        }
+      }}
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        {children}
+      </svg>
+    </button>
+  )
+}
+
+/**
+ * The record's key on a card: as many artists as fit on two lines, and the
+ * rest a tap away, opening over the record rather than pushing it smaller.
+ */
+function CardLegend({ items }: { items: ReactNode[] }) {
+  const measureRef = useRef<HTMLUListElement>(null)
+  const [fit, setFit] = useState(Infinity)
+  const [open, setOpen] = useState(false)
+  // It opens over the record, so back closes it rather than leaving the card (on the first card, the record)
+  useCloseOnBack(open, () => setOpen(false))
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  // A hidden copy of the whole key, measured at the card's width: everything on its first two lines fits
+  useLayoutEffect(() => {
+    const list = measureRef.current
+    if (!list) return
+    const measure = () => {
+      const items = [...list.children] as HTMLElement[]
+      const tops = [...new Set(items.map((li) => li.offsetTop))].sort((a, b) => a - b)
+      if (tops.length <= 2) return setFit(Infinity)
+      const onTwo = items.filter((li) => li.offsetTop <= tops[1]).length
+      // Room for the "+n" on the second line
+      setFit(Math.max(1, onTwo - 1))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(list)
+    return () => observer.disconnect()
+  }, [items.length])
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: globalThis.PointerEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [open])
+
+  const hiddenCount = Number.isFinite(fit) ? Math.max(0, items.length - fit) : 0
+
+  return (
+    <div className="legend-fit" ref={wrapRef}>
+      <ul className="legend legend--card legend-fit__measure" ref={measureRef} aria-hidden="true">
+        {items}
+      </ul>
+      <ul className="legend legend--card" aria-label="Artist colors">
+        {hiddenCount > 0 ? items.slice(0, fit) : items}
+        {hiddenCount > 0 && (
+          <li>
+            <button type="button" className="legend__item legend__more" aria-expanded={open} onClick={() => setOpen(!open)}>
+              {open ? 'Less' : `+${hiddenCount} more`}
+            </button>
+          </li>
+        )}
+      </ul>
+      {open && (
+        <ul className="legend legend--card legend-fit__all" aria-label="All artist colors">
+          {items}
+        </ul>
+      )}
+    </div>
   )
 }
