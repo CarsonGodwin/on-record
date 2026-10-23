@@ -243,7 +243,10 @@ describe('drawRecord', () => {
   const draw = (m: RecordModel, o?: Partial<DrawOptions>) => render(m, o).strokes
 
   it('glows the top artists on a record of up to GLOW_MAX plays', () => {
-    const strokes = draw(model(GLOW_MAX, 0))
+    const m = model(GLOW_MAX, 0)
+    m.slot.fill(SLOT_OTHER, 0, 10)
+    m.slot.fill(SLOT_PODCAST, 10, 20)
+    const strokes = draw(m)
     const top = strokes.filter((s) => s.style === 'slot0')
     expect(top).toHaveLength(1)
     expect(top[0].blur).toBeGreaterThan(0)
@@ -265,13 +268,24 @@ describe('drawRecord', () => {
     expect(strokes.map((s) => s.arcs)).toEqual([ARCS_PER_STROKE, ARCS_PER_STROKE, count - 2 * ARCS_PER_STROKE])
   })
 
-  it('keeps a glowing slot in one stroke, in focus or not, so its glow does not show seams', () => {
+  it('keeps a glowing slot in one stroke, so its glow does not show seams', () => {
     const count = ARCS_PER_STROKE * 2
     const glowing = draw(model(count, 0), { glow: true }).filter((s) => s.style === 'slot0')
     expect(glowing.map((s) => s.arcs)).toEqual([count])
-    const dimmed = render(model(count, 0), { glow: true, focus: 1 })
-    expect(dimmed.strokes.filter((s) => s.style === 'slot0').map((s) => [s.arcs, s.alpha])).toEqual([[count, DIMMED]])
-    expect(dimmed.laid).toEqual([])
+    const focused = render(model(count, 0), { glow: true, focus: 0 })
+    expect(focused.strokes.filter((s) => s.style === 'slot0').map((s) => [s.arcs, s.alpha])).toEqual([[count, 1]])
+    expect(focused.strokes[0].blur).toBeGreaterThan(0)
+  })
+
+  it('lets go of the glow out of focus, drawing the slot solid and in pieces on the layer', () => {
+    const count = ARCS_PER_STROKE * 2
+    const { strokes, layer, laid } = render(model(count, 0), { glow: true, focus: 1 })
+    expect(strokes.filter((s) => s.style === 'slot0')).toEqual([])
+    expect(layer.map((s) => [s.style, s.arcs, s.blur, s.alpha])).toEqual([
+      ['slot0', ARCS_PER_STROKE, 0, 1],
+      ['slot0', ARCS_PER_STROKE, 0, 1],
+    ])
+    expect(laid).toEqual([DIMMED])
   })
 
   it('draws a big see-through slot solid and in pieces on a layer, then lays it down see-through in one go', () => {
@@ -286,9 +300,22 @@ describe('drawRecord', () => {
     expect(strokes.filter((s) => s.style === `slot${SLOT_OTHER}`)).toEqual([])
   })
 
-  it('strokes a small see-through slot straight onto the canvas', () => {
-    const { strokes, layer, laid } = render(model(100, SLOT_OTHER), { focus: 0 })
-    expect(strokes.filter((s) => s.style === `slot${SLOT_OTHER}`)).toEqual([{ style: `slot${SLOT_OTHER}`, arcs: 100, blur: 0, alpha: DIMMED }])
+  it('lays every slot out of focus down together, under the one in focus', () => {
+    const m = model(300, SLOT_OTHER)
+    m.slot.fill(0, 0, 100)
+    m.slot.fill(1, 100, 200)
+    const { strokes, layer, laid } = render(m, { glow: true, focus: 1 })
+    expect(layer.map((s) => [s.style, s.arcs, s.blur])).toEqual([
+      [`slot${SLOT_OTHER}`, 100, 0],
+      ['slot0', 100, 0],
+    ])
+    expect(laid).toEqual([DIMMED])
+    expect(strokes.map((s) => [s.style, s.arcs, s.alpha])).toEqual([['slot1', 100, 1]])
+  })
+
+  it('needs no layer when every play is in focus', () => {
+    const { strokes, layer, laid } = render(model(100, 0), { focus: 0 })
+    expect(strokes.map((s) => [s.style, s.arcs, s.alpha])).toEqual([['slot0', 100, 1]])
     expect(layer).toEqual([])
     expect(laid).toEqual([])
   })
