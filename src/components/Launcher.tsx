@@ -171,7 +171,7 @@ function LauncherBody({
         group: 'Go to…',
         label: t.title,
         hint: t.num,
-        shortcut: i < 9 ? `${MOD}${i + 1}` : undefined,
+        shortcut: i < 9 && !COARSE ? `${MOD}${i + 1}` : undefined,
         terms: `${t.num} side ${t.num[0]} ${sides[t.num[0]] ?? ''}`,
         run: () => onJump(t.id),
       })),
@@ -327,8 +327,11 @@ function LauncherBody({
         ) : listing ? (
           <span>
             {pool.length > MAX_ARTISTS && query === '' ? `Top ${MAX_ARTISTS} of ${pool.length}. Type to find the rest. ` : ''}
-            {mode === 'hide' && hidden.length > 0 ? `${hidden.length} hidden. ` : ''}Press Enter to {verb}. Hold Shift + ↑ ↓ to select several.
+            {mode === 'hide' && hidden.length > 0 ? `${hidden.length} hidden. ` : ''}
+            {COARSE ? `Tap an artist to ${verb}.` : `Press Enter to ${verb}. Hold Shift + ↑ ↓ to select several.`}
           </span>
+        ) : COARSE ? (
+          <span>Tap a row to pick it, or tap outside to close.</span>
         ) : (
           <span>
             <kbd>↑</kbd> <kbd>↓</kbd> to move · <kbd>↵</kbd> to pick · <kbd>Esc</kbd> to close
@@ -371,6 +374,8 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
               <li>Drop the .zip onto the record sleeve.</li>
             </ol>
 
+            {!COARSE && (
+              <>
             <h3>Keyboard</h3>
             <dl className="help__keys">
               <dt>
@@ -398,6 +403,8 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
               </dt>
               <dd>Step through The Long Play</dd>
             </dl>
+              </>
+            )}
           </>
         ) : (
           <>
@@ -425,11 +432,13 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
         )}
       </div>
 
-      <footer className="launcher__foot">
-        <span>
-          <kbd>Esc</kbd> to go back
-        </span>
-      </footer>
+      {!COARSE && (
+        <footer className="launcher__foot">
+          <span>
+            <kbd>Esc</kbd> to go back
+          </span>
+        </footer>
+      )}
     </>
   )
 }
