@@ -4951,13 +4951,19 @@ kbd {
   color: var(--muted);
 }
 
-.launcher__action {
+.launcher__item.is-hidden .launcher__label {
+  color: var(--muted);
+}
+
+.launcher__tag {
   flex-shrink: 0;
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
+  align-self: center;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .launcher__title {
