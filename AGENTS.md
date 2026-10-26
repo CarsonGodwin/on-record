@@ -4,7 +4,7 @@ Guidance for coding agents working in this repo. The [README](README.md) covers 
 
 ## What this is
 
-On Record is a client-only React 19 + Vite + TypeScript app that visualizes a Spotify Extended Streaming History export. There is no backend. Data is parsed, aggregated and drawn entirely in the browser, and the built site's CSP sets `connect-src 'none'`.
+My Listening Record is a client-only React 19 + Vite + TypeScript app that visualizes a Spotify Extended Streaming History export. There is no backend. Data is parsed, aggregated and drawn entirely in the browser, and the built site's CSP sets `connect-src 'none'`.
 
 ## Commands
 

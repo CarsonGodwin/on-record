@@ -1,4 +1,4 @@
-# On Record
+# My Listening Record
 
 **React + Vite app that visualizes your Spotify listening history.**
 
@@ -87,4 +87,4 @@ src/
 
 ## Disclaimer
 
-On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a trademark of Spotify AB.
+My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a trademark of Spotify AB.

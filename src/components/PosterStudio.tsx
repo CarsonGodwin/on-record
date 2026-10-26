@@ -35,7 +35,7 @@ const IOS = COARSE && typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Maci
 const SAVE_LABEL = IOS ? 'Save to Photos' : 'Save or share…'
 
 /** Every poster carries the same title */
-const TITLE = 'On Record'
+const TITLE = 'My Listening Record'
 
 /** Deep dive can also come out this many times bigger, so a single day's groove gets real pixels */
 const ULTRA_SCALES = [4, 3, 2]
@@ -111,7 +111,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   // Only some designs offer the solid backgrounds; elsewhere a solid pick falls back to its textured twin
   const papers = SOLID_PAPER_DESIGNS.includes(design) ? [...PAPERS, ...SOLID_PAPERS] : PAPERS
   const activePaper = papers.some((p) => p.value === paper) ? paper : isDarkPaper(paper) ? 'midnight' : 'cream'
-  const fileName = `on-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
+  const fileName = `my-listening-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
   const optionsKey = `${design}|${activeSize}|${activePaper}`
 
   useEffect(() => {

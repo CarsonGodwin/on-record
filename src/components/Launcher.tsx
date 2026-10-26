@@ -70,7 +70,7 @@ const TITLES: Record<LauncherMode, string> = {
   hide: 'Hide artists',
   manage: 'Hidden artists',
   help: 'Help',
-  about: 'About On Record',
+  about: 'About My Listening Record',
 }
 
 export function Launcher(props: Props) {
@@ -409,7 +409,7 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
         ) : (
           <>
             <p>
-              On Record was created by{' '}
+              My Listening Record was created by{' '}
               <a href="https://github.com/CarsonGodwin" target="_blank" rel="noreferrer">
                 Carson Godwin
               </a>

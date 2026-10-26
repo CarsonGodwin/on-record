@@ -64,7 +64,7 @@ export default function App() {
 
       <header className="landing__top">
         <span className="brand">
-          On Record<span className="brand__dot" aria-hidden="true" />
+          My Listening Record<span className="brand__dot" aria-hidden="true" />
         </span>
         <span className="landing__tag">A Spotify history visualizer</span>
       </header>
@@ -73,9 +73,9 @@ export default function App() {
         <div className="landing__copy">
           <p className="eyebrow">An in-depth analysis of your entire Spotify history</p>
           <h1 className="landing__title">
-            Your life,
+            My life,
             <br />
-            <em>on record.</em>
+            <em>my listening record.</em>
           </h1>
           <p className="landing__lede">
             Drop in your Spotify export and get every day of your listening pressed into vinyl.
@@ -157,7 +157,7 @@ export default function App() {
       </details>
 
       <p className="colophon">
-        On Record is open source.{' '}
+        My Listening Record is open source.{' '}
         <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
           Star it, report a bug or support it on GitHub
         </a>
@@ -165,7 +165,7 @@ export default function App() {
       </p>
 
       <p className="disclaimer">
-        On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
+        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
         trademark of Spotify AB.
       </p>
     </div>

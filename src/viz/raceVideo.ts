@@ -200,11 +200,12 @@ export function makeRaceFilm({ bins, race, colors, covers }: RaceScene): RaceFil
       ctx.globalAlpha = 1
     }
 
-    ctx.textAlign = 'left'
+    // A faint watermark, so the video still says where it came from once it's reshared
+    ctx.textAlign = 'center'
     ctx.textBaseline = 'alphabetic'
-    ctx.fillStyle = soft
-    ctx.font = font(700, 3 * u)
-    ctx.fillText('On Record', pad, H - 6 * u)
+    ctx.fillStyle = 'rgba(244, 241, 234, 0.34)'
+    ctx.font = font(600, 2.6 * u)
+    ctx.fillText('mylisteningrecord', W / 2, H - 6 * u)
     ctx.restore()
   }
 
@@ -243,7 +244,7 @@ export async function makeRaceVideo(scene: RaceScene, onProgress: (fraction: num
     const { blob, type } = mode === 'encode' ? await encode(canvas, ctx, film, onProgress, signal) : await record(canvas, ctx, film, onProgress, signal)
     onProgress(1)
     const { first: yearA, last: yearB } = raceYears(scene.bins)
-    const name = `on-record-${yearA === yearB ? yearA : `${yearA}-${yearB}`}-race.${type === 'video/mp4' ? 'mp4' : 'webm'}`
+    const name = `my-listening-record-${yearA === yearB ? yearA : `${yearA}-${yearB}`}-race.${type === 'video/mp4' ? 'mp4' : 'webm'}`
     return new File([blob], name, { type })
   } finally {
     canvas.width = canvas.height = 0
