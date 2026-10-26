@@ -361,8 +361,7 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
   fitText(ctx, o.title, c, c - lr * 0.3, lr * 1.45, lr * 0.44, `800 {px}px ${DISPLAY}`)
   ctx.font = `500 ${lr * 0.11}px ${MONO}`
   ctx.fillText(o.subtitle, c, c + lr * 0.36)
-  ctx.font = `italic ${lr * 0.17}px ${SERIF}`
-  ctx.fillText('on record', c, c + lr * 0.6)
+  fitText(ctx, 'my listening record', c, c + lr * 0.6, lr * 1.45, lr * 0.17, `italic {px}px ${SERIF}`)
   ctx.beginPath()
   ctx.arc(c, c, lr * 0.065, 0, TAU)
   ctx.fill()

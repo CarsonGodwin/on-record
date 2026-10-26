@@ -490,14 +490,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         <a
           className="brand"
           href="#top"
-          aria-label={cards ? 'On Record, back to the first track' : 'On Record, back to the top'}
+          aria-label={cards ? 'My Listening Record, back to the first track' : 'My Listening Record, back to the top'}
           onClick={(e) => {
             if (!cards) return
             e.preventDefault()
             setCardStep(0)
           }}
         >
-          <span className="brand__name">On Record</span>
+          <span className="brand__name">My Listening Record</span>
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
@@ -736,14 +736,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                   </ul>
                 </details>
                 <p className="colophon">
-                  On Record is open source.{' '}
+                  My Listening Record is open source.{' '}
                   <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
                     Star it, report a bug or support it on GitHub
                   </a>
                   .
                 </p>
                 <p className="disclaimer">
-                  On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
+                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
                   trademark of Spotify AB.
                 </p>
               </footer>
