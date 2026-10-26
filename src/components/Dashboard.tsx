@@ -164,8 +164,6 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   // Every music artist, most-listened first, ranked once. The launcher's lists split it by what's hidden,
   // which stays quick with thousands of artists.
   const musicArtists = useMemo(() => topItems(result.plays, 'artist', 'time', Infinity), [result.plays])
-  const shownArtists = useMemo(() => musicArtists.filter((a) => !hidden.has(a.label)), [musicArtists, hidden])
-  const hiddenArtists = useMemo(() => musicArtists.filter((a) => hidden.has(a.label)), [musicArtists, hidden])
   const hiddenPlays = useMemo(
     () => (applied.filter.hidden.size === 0 ? 0 : result.plays.filter((p) => p.kind === 'track' && applied.filter.hidden.has(p.artist)).length),
     [result.plays, applied.filter.hidden],
@@ -679,7 +677,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             </Chapter>
 
             <Chapter id="charts" num="C3" title="The Charts" hint="Your rankings." lede="The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.">
-              <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('manage')} />
+              <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('artists')} />
             </Chapter>
 
             <Side label="Side D" title={SIDES.D} />
@@ -773,8 +771,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         years={years}
         year={year}
         musicOnly={chosen.musicOnly}
-        artists={shownArtists}
-        hidden={hiddenArtists}
+        artists={musicArtists}
+        hidden={hidden}
         onJump={jumpTo}
         onYear={pickYear}
         onHide={hideArtists}
