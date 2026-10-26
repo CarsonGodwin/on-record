@@ -33,7 +33,7 @@ export function LinerNotes({ takes, fun, rec, summary, devices, topArtists, hour
     <div className="liner">
       <article className="backcover">
         <header className="backcover__top">
-          <span>On Record · {period}</span>
+          <span>My Listening Record · {period}</span>
           <span>Liner notes</span>
         </header>
         <Headline takes={takes} />

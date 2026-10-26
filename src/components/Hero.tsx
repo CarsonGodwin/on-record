@@ -47,7 +47,7 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
           {formatNumber(count)}
         </h1>
         <p className="hero__unit">
-          hours <em>on record</em>
+          hours in <em>my listening record</em>
         </p>
         <p className="hero__eq">
           That’s <b>{formatNumber(eq.days)} days</b> of sound. <b>{formatNumber(eq.flights)} flights</b> from New York to Tokyo.{' '}

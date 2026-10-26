@@ -164,8 +164,6 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   // Every music artist, most-listened first, ranked once. The launcher's lists split it by what's hidden,
   // which stays quick with thousands of artists.
   const musicArtists = useMemo(() => topItems(result.plays, 'artist', 'time', Infinity), [result.plays])
-  const shownArtists = useMemo(() => musicArtists.filter((a) => !hidden.has(a.label)), [musicArtists, hidden])
-  const hiddenArtists = useMemo(() => musicArtists.filter((a) => hidden.has(a.label)), [musicArtists, hidden])
   const hiddenPlays = useMemo(
     () => (applied.filter.hidden.size === 0 ? 0 : result.plays.filter((p) => p.kind === 'track' && applied.filter.hidden.has(p.artist)).length),
     [result.plays, applied.filter.hidden],
@@ -490,14 +488,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         <a
           className="brand"
           href="#top"
-          aria-label={cards ? 'On Record, back to the first track' : 'On Record, back to the top'}
+          aria-label={cards ? 'My Listening Record, back to the first track' : 'My Listening Record, back to the top'}
           onClick={(e) => {
             if (!cards) return
             e.preventDefault()
             setCardStep(0)
           }}
         >
-          <span className="brand__name">On Record</span>
+          <span className="brand__name">My Listening Record</span>
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
@@ -679,7 +677,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             </Chapter>
 
             <Chapter id="charts" num="C3" title="The Charts" hint="Your rankings." lede="The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.">
-              <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('manage')} />
+              <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('artists')} />
             </Chapter>
 
             <Side label="Side D" title={SIDES.D} />
@@ -736,14 +734,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                   </ul>
                 </details>
                 <p className="colophon">
-                  On Record is open source.{' '}
+                  My Listening Record is open source.{' '}
                   <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
                     Star it, report a bug or support it on GitHub
                   </a>
                   .
                 </p>
                 <p className="disclaimer">
-                  On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
+                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
                   trademark of Spotify AB.
                 </p>
               </footer>
@@ -773,8 +771,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         years={years}
         year={year}
         musicOnly={chosen.musicOnly}
-        artists={shownArtists}
-        hidden={hiddenArtists}
+        artists={musicArtists}
+        hidden={hidden}
         onJump={jumpTo}
         onYear={pickYear}
         onHide={hideArtists}

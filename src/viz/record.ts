@@ -54,13 +54,6 @@ function scratchLayer(ctx: CanvasRenderingContext2D): Context2D | null {
   return scratch
 }
 
-/** Whether a slot has more than `n` arcs */
-function slotOver(model: RecordModel, slot: number, n: number): boolean {
-  let count = 0
-  for (let k = 0; k < model.count; k++) if (model.slot[k] === slot && ++count > n) return true
-  return false
-}
-
 /** Every play split at midnight into per-day arcs, in flat arrays so 100k+ plays stay quick */
 export interface RecordModel {
   firstDay: number
@@ -293,35 +286,41 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
         arcs = 0
       }
     }
-    target.stroke()
+    if (arcs > 0) target.stroke()
   }
-  for (const slot of DRAW_ORDER) {
-    const dimmed = o.focus !== null && o.focus !== slot
-    // Top artists glow a little, like ink under blacklight
-    const glows = glow && slot < SLOT_OTHER
-    // Separate see-through strokes would double up where they overlap, showing as seams. So a big
-    // see-through slot is drawn solid, in pieces, on a scratch layer, then laid down see-through in one go
-    const layer = dimmed && !glows && slotOver(model, slot, ARCS_PER_STROKE) ? scratchLayer(ctx) : null
-    if (layer) {
-      layer.setTransform(ctx.getTransform())
-      layer.lineCap = 'butt'
-      layer.lineWidth = lineWidth
+  // Separate see-through strokes would double up where they overlap, showing as seams. So with an artist in
+  // focus, every slot out of focus is drawn solid, in pieces and without glow, on a scratch layer, then laid
+  // down see-through in one go under the one in focus. A glow at 8% barely shows, and blurring see-through
+  // paths for each artist is what a phone's GPU canvas gives up on, leaving the record as it was.
+  const dimming = o.focus !== null
+  const layer = dimming && model.slot.subarray(0, model.count).some((slot) => slot !== o.focus) ? scratchLayer(ctx) : null
+  if (layer) {
+    layer.setTransform(ctx.getTransform())
+    layer.lineCap = 'butt'
+    layer.lineWidth = lineWidth
+    for (const slot of DRAW_ORDER) {
+      if (slot === o.focus) continue
       layer.strokeStyle = o.colors[slot]
       strokeSlot(layer, slot, ARCS_PER_STROKE)
-      ctx.save()
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.globalAlpha = DIMMED
-      ctx.shadowColor = 'transparent'
-      ctx.shadowBlur = 0
-      ctx.drawImage(layer.canvas, 0, 0)
-      ctx.restore()
-      continue
     }
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalAlpha = DIMMED
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
+    ctx.drawImage(layer.canvas, 0, 0)
+    ctx.restore()
+  }
+  for (const slot of DRAW_ORDER) {
+    const dimmed = dimming && o.focus !== slot
+    if (dimmed && layer) continue
+    // Top artists glow a little, like ink under blacklight
+    const glows = glow && slot < SLOT_OTHER && !dimmed
     ctx.globalAlpha = dimmed ? DIMMED : 1
     ctx.strokeStyle = o.colors[slot]
     ctx.shadowColor = glows ? o.colors[slot] : 'transparent'
     ctx.shadowBlur = glows ? o.size * 0.007 : 0
-    // A glow's pieces would seam the same way, so a glowing slot stays whole, as does a small see-through one
+    // A glow's pieces would seam the same way, so a glowing slot stays whole, as does a see-through one with no layer to go on
     strokeSlot(ctx, slot, glows || dimmed ? Infinity : ARCS_PER_STROKE)
   }
   ctx.globalAlpha = 1
@@ -362,8 +361,7 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
   fitText(ctx, o.title, c, c - lr * 0.3, lr * 1.45, lr * 0.44, `800 {px}px ${DISPLAY}`)
   ctx.font = `500 ${lr * 0.11}px ${MONO}`
   ctx.fillText(o.subtitle, c, c + lr * 0.36)
-  ctx.font = `italic ${lr * 0.17}px ${SERIF}`
-  ctx.fillText('on record', c, c + lr * 0.6)
+  fitText(ctx, 'my listening record', c, c + lr * 0.6, lr * 1.45, lr * 0.17, `italic {px}px ${SERIF}`)
   ctx.beginPath()
   ctx.arc(c, c, lr * 0.065, 0, TAU)
   ctx.fill()

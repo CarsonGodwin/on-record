@@ -1,4 +1,4 @@
-# On Record
+# My Listening Record
 
 **React + Vite app that visualizes your Spotify listening history.**
 
@@ -58,6 +58,7 @@ src/
   data/parse.ts         Turns one raw row into a Play
   data/load.ts          Reads zip/JSON files, validates, dedupes
   data/sample.ts        Seeded fake history in Spotify's raw format
+  data/sampleWords.ts   Invented artist, song, show and book names the sample is built from
   data/stats.ts         Summary numbers, rankings, streaks
   data/insights.ts      Time bins, eras, race frames, sessions, artist graph, listener profile
   data/dayparts.ts      Day and night, and who you lean on in each part of the day
@@ -86,4 +87,4 @@ src/
 
 ## Disclaimer
 
-On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a trademark of Spotify AB.
+My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a trademark of Spotify AB.

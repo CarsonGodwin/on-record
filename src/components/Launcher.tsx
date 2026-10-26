@@ -10,14 +10,14 @@ import type { Track } from './TrackMenu'
 
 /*
  * The ⌘K launcher: one search box over the commands, the tracklist and the
- * years, with pages stacked under it: picking artists to hide, managing the
- * hidden ones, Help and About. Escape steps back up to the main list before it
+ * years, with pages stacked under it: the artists, where picking one hides
+ * or unhides them, Help and About. Escape steps back up to the main list before it
  * closes. Focus stays in the box; the arrow keys move a highlight through the
  * results. In the artist lists, Shift with the arrows (or a Shift-click)
  * stretches the highlight over a run of artists, and Enter acts on them all.
  */
 
-export type LauncherMode = 'root' | 'hide' | 'manage' | 'help' | 'about'
+export type LauncherMode = 'root' | 'artists' | 'help' | 'about'
 
 interface Item {
   key: string
@@ -52,10 +52,9 @@ interface Props {
   year: number | null
   /** Whether podcasts and audiobooks are left out, shown beside Settings */
   musicOnly: boolean
-  /** Music artists still showing, most-listened first */
+  /** Every music artist, hidden ones too, most-listened first */
   artists: Ranked[]
-  /** Hidden artists, most-listened first */
-  hidden: Ranked[]
+  hidden: ReadonlySet<string>
   onJump: (id: string) => void
   onYear: (year: number | null) => void
   /** Returns false when hiding them would leave nothing to show */
@@ -65,12 +64,20 @@ interface Props {
   onReset: () => void
 }
 
+/**
+ * What picking these artists does: when they're all hidden it unhides them, otherwise it hides the
+ * ones still showing, so a selection that's partly hidden ends up all hidden.
+ */
+function toggle(names: string[], hidden: ReadonlySet<string>): { verb: 'Hide' | 'Unhide'; going: string[] } {
+  const showing = names.filter((n) => !hidden.has(n))
+  return showing.length === 0 ? { verb: 'Unhide', going: names } : { verb: 'Hide', going: showing }
+}
+
 const TITLES: Record<LauncherMode, string> = {
   root: 'Launcher',
-  hide: 'Hide artists',
-  manage: 'Hidden artists',
+  artists: 'Hide artists',
   help: 'Help',
-  about: 'About On Record',
+  about: 'About My Listening Record',
 }
 
 export function Launcher(props: Props) {
@@ -110,7 +117,7 @@ function LauncherBody({
   onUnhide,
   onSettings,
   onReset,
-}: Props & { mode: 'root' | 'hide' | 'manage' }) {
+}: Props & { mode: 'root' | 'artists' }) {
   const [query, setQuery] = useState('')
   const [sel, setSel] = useState(NO_SELECTION)
   // What the last hide or unhide did. It goes once you type or move on, so the selection count can show.
@@ -125,24 +132,21 @@ function LauncherBody({
     if (COARSE) titleRef.current?.focus()
   }, [])
   const listing = mode !== 'root'
-  const verb = mode === 'manage' ? 'unhide' : 'hide'
-  const pool = mode === 'manage' ? hidden : artists
 
   const items = useMemo<Item[]>(() => {
     if (mode !== 'root') {
-      const found = pool.filter((a) => matches(query, a.label))
-      const listed: Item[] = found.slice(0, MAX_ARTISTS).map((a) => ({
-        key: `artist:${a.label}`,
-        group: mode === 'manage' ? 'Unhide an artist' : 'Hide an artist',
-        label: a.label,
-        hint: formatDuration(a.ms),
-      }))
+      const found = artists.filter((a) => matches(query, a.label))
+      // Past the cap only the hidden ones stay listed, so everything you've hidden is there to unhide
+      const listed: Item[] = found
+        .filter((a, i) => i < MAX_ARTISTS || hidden.has(a.label))
+        .map((a) => ({ key: `artist:${a.label}`, group: 'Artists', label: a.label, hint: formatDuration(a.ms) }))
       const q = query.trim()
-      if (found.length < 2 || (mode === 'hide' && q === '')) return listed
+      // Only for a search: there it's on top from the first keystroke, so it never pushes the artists down mid-click
+      if (found.length < 2 || q === '') return listed
       const all: Item = {
         key: 'all',
         group: 'Every match',
-        label: `${mode === 'manage' ? 'Unhide' : 'Hide'} all ${found.length}${q ? ` matching “${q}”` : ''}`,
+        label: `${toggle(found.map((a) => a.label), hidden).verb} all ${found.length} matching “${q}”`,
         hint: formatDuration(found.reduce((sum, a) => sum + a.ms, 0)),
         names: found.map((a) => a.label),
       }
@@ -150,20 +154,15 @@ function LauncherBody({
     }
     const all: Item[] = [
       { key: 'settings', group: 'Commands', label: 'Settings', hint: musicOnly ? 'Music only' : 'Music + Podcasts and Audiobooks', run: onSettings },
-      { key: 'hide', group: 'Commands', label: 'Hide Artists…', terms: 'exclude remove filter', run: () => onMode('hide') },
-      ...(hidden.length > 0
-        ? [
-            {
-              key: 'manage',
-              group: 'Commands',
-              label: 'Manage Hidden Artists…',
-              hint: `${hidden.length} hidden`,
-              terms: 'unhide show restore',
-              run: () => onMode('manage'),
-            },
-          ]
-        : []),
-      { key: 'help', group: 'Commands', label: 'Help', hint: 'Getting your data, keys', run: () => onMode('help') },
+      {
+        key: 'artists',
+        group: 'Commands',
+        label: 'Hide Artists…',
+        hint: hidden.size > 0 ? `${hidden.size} hidden` : undefined,
+        terms: 'exclude remove filter unhide show restore manage',
+        run: () => onMode('artists'),
+      },
+      { key: 'help', group: 'Commands', label: 'Help', hint: 'Getting your spotify data, keys', run: () => onMode('help') },
       { key: 'about', group: 'Commands', label: 'About', hint: 'Source, license, credits', run: () => onMode('about') },
       { key: 'reset', group: 'Commands', label: 'Clear Data', hint: 'Back to the start', terms: 'new load reset export file zip drop open', run: onReset },
       ...tracks.map((t, i) => ({
@@ -171,7 +170,7 @@ function LauncherBody({
         group: 'Go to…',
         label: t.title,
         hint: t.num,
-        shortcut: i < 9 ? `${MOD}${i + 1}` : undefined,
+        shortcut: i < 9 && !COARSE ? `${MOD}${i + 1}` : undefined,
         terms: `${t.num} side ${t.num[0]} ${sides[t.num[0]] ?? ''}`,
         run: () => onJump(t.id),
       })),
@@ -186,7 +185,7 @@ function LauncherBody({
     ]
     // The hint beside a command finds it too: "music" finds Settings, "license" finds About
     return all.filter((item) => matches(query, `${item.label} ${item.hint ?? ''} ${item.terms ?? ''}`))
-  }, [mode, query, pool, hidden, tracks, sides, years, year, musicOnly, onSettings, onReset, onMode, onJump, onYear])
+  }, [mode, query, artists, hidden, tracks, sides, years, year, musicOnly, onSettings, onReset, onMode, onJump, onYear])
 
   const firstPick = items[0]?.names ? 1 : 0
   const { current, from, to } = span(sel, items.length, firstPick)
@@ -195,12 +194,13 @@ function LauncherBody({
 
   /** The search stays, so the next match for the same word is right there */
   function act(names: string[]) {
-    const what = names.length === 1 ? names[0] : `${names.length} artists`
+    const { verb, going } = toggle(names, hidden)
+    const what = going.length === 1 ? going[0] : `${going.length} artists`
     // The page works its charts out again once, when the launcher closes, rather than after every pick
-    if (mode === 'manage') {
-      onUnhide(names)
+    if (verb === 'Unhide') {
+      onUnhide(going)
       setNote(`Unhid ${what}. The charts update when you close this.`)
-    } else setNote(onHide(names) ? `Hid ${what}. The charts update when you close this.` : `Can’t hide ${what}: at least one artist has to stay`)
+    } else setNote(onHide(going) ? `Hid ${what}. The charts update when you close this.` : `Can’t hide ${what}: at least one artist has to stay`)
     setSel(settle(sel, items.length, firstPick))
     // Not on a touch screen, where that would bring the keyboard back over the list
     if (!COARSE) inputRef.current?.focus()
@@ -265,8 +265,8 @@ function LauncherBody({
           aria-expanded="true"
           aria-controls="launcher-list"
           aria-activedescendant={items[current] ? `launcher-${items[current].key}` : undefined}
-          aria-label={mode === 'manage' ? 'Search hidden artists' : mode === 'hide' ? 'Search your artists' : 'Search sections, years and commands'}
-          placeholder={mode === 'manage' ? 'Search hidden artists…' : mode === 'hide' ? 'Search your artists…' : PHONE ? 'Jump to…' : 'Jump to a section or year, or run a command…'}
+          aria-label={listing ? 'Search your artists' : 'Search sections, years and commands'}
+          placeholder={listing ? 'Search your artists…' : PHONE ? 'Jump to…' : 'Jump to a section or year, or run a command…'}
           autoComplete="off"
           spellCheck={false}
           autoFocus={!COARSE}
@@ -283,11 +283,12 @@ function LauncherBody({
 
       <ul className="launcher__list" id="launcher-list" role="listbox" aria-multiselectable={listing || undefined} ref={listRef}>
         {items.length === 0 && (
-          <li className="launcher__empty">{mode === 'manage' && query === '' ? 'Nothing is hidden.' : `Nothing matches “${query}”`}</li>
+          <li className="launcher__empty">{listing && query === '' ? 'There are no music artists to hide.' : `Nothing matches “${query}”`}</li>
         )}
         {items.map((item, i) => {
           const header = item.group !== items[i - 1]?.group ? item.group : null
           const inPick = listing && picked.length > 1 && i >= from && i <= to && !item.names
+          const isHidden = listing && !item.names && hidden.has(item.label)
           return (
             <li key={item.key} role="presentation">
               {header && <p className="launcher__group">{header}</p>}
@@ -295,7 +296,7 @@ function LauncherBody({
                 id={`launcher-${item.key}`}
                 role="option"
                 aria-selected={i === current || inPick}
-                className={i === current ? 'launcher__item is-active' : 'launcher__item'}
+                className={`launcher__item${i === current ? ' is-active' : ''}${isHidden ? ' is-hidden' : ''}`}
                 // Focus (and so the arrows and Enter) stays in the search box, and a Shift-click doesn't select text
                 onMouseDown={(e) => e.preventDefault()}
                 onPointerMove={() => setSel((s) => hover(s, i))}
@@ -306,9 +307,9 @@ function LauncherBody({
                 }}
               >
                 <span className="launcher__label">{item.label}</span>
+                {isHidden && <span className="launcher__tag">Hidden</span>}
                 {item.hint && <span className="launcher__hint">{item.hint}</span>}
                 {item.shortcut && <kbd className="launcher__shortcut">{item.shortcut}</kbd>}
-                {mode === 'manage' && i === current && !item.names && <span className="launcher__action">Unhide</span>}
               </div>
             </li>
           )
@@ -322,13 +323,16 @@ function LauncherBody({
           </span>
         ) : picked.length > 1 ? (
           <span className="launcher__note">
-            {picked.length} selected. Press Enter to {verb} them all.
+            {picked.length} selected. Press Enter to {toggle(picked.map((p) => p.label), hidden).verb.toLowerCase()} them all.
           </span>
         ) : listing ? (
           <span>
-            {pool.length > MAX_ARTISTS && query === '' ? `Top ${MAX_ARTISTS} of ${pool.length}. Type to find the rest. ` : ''}
-            {mode === 'hide' && hidden.length > 0 ? `${hidden.length} hidden. ` : ''}Press Enter to {verb}. Hold Shift + ↑ ↓ to select several.
+            {artists.length > MAX_ARTISTS && query === '' ? `Top ${MAX_ARTISTS} of ${artists.length}. Type to find the rest. ` : ''}
+            {hidden.size > 0 ? `${hidden.size} hidden. ` : ''}
+            {COARSE ? 'Tap an artist to hide or unhide them.' : 'Press Enter to hide or unhide. Hold Shift + ↑ ↓ to select several.'}
           </span>
+        ) : COARSE ? (
+          <span>Tap a row to pick it, or tap outside to close.</span>
         ) : (
           <span>
             <kbd>↑</kbd> <kbd>↓</kbd> to move · <kbd>↵</kbd> to pick · <kbd>Esc</kbd> to close
@@ -371,6 +375,8 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
               <li>Drop the .zip onto the record sleeve.</li>
             </ol>
 
+            {!COARSE && (
+              <>
             <h3>Keyboard</h3>
             <dl className="help__keys">
               <dt>
@@ -398,11 +404,13 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
               </dt>
               <dd>Step through The Long Play</dd>
             </dl>
+              </>
+            )}
           </>
         ) : (
           <>
             <p>
-              On Record was created by{' '}
+              My Listening Record was created by{' '}
               <a href="https://github.com/CarsonGodwin" target="_blank" rel="noreferrer">
                 Carson Godwin
               </a>
@@ -425,11 +433,13 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
         )}
       </div>
 
-      <footer className="launcher__foot">
-        <span>
-          <kbd>Esc</kbd> to go back
-        </span>
-      </footer>
+      {!COARSE && (
+        <footer className="launcher__foot">
+          <span>
+            <kbd>Esc</kbd> to go back
+          </span>
+        </footer>
+      )}
     </>
   )
 }
