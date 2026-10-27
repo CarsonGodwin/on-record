@@ -1,4 +1,5 @@
 # My Listening Record
+[![Live site](https://img.shields.io/badge/live-mylisteningrecord.com-blue)](https://mylisteningrecord.com)
 
 **React + Vite app that visualizes your Spotify listening history.**
 
@@ -46,7 +47,7 @@ npm run build   # type-check, then build to dist/
 
 ## Deploying
 
-The site is hosted on Cloudflare, which builds and deploys from `main`. Connect the repo under **Workers & Pages** with build command `npm run build` and output directory `dist`. Every push and pull request also runs lint, audit, build and tests in [CI](.github/workflows/ci.yml).
+The site is hosted on Cloudflare at [mylisteningrecord.com](https://mylisteningrecord.com), which builds and deploys from `production`. Connect the repo under **Workers & Pages** with build command `npm run build` and output directory `dist`. Every push and pull request also runs lint, audit, build and tests in [CI](.github/workflows/ci.yml).
 
 The build emits `dist/_headers`, which Cloudflare applies as response headers: the Content Security Policy plus HSTS, framing and caching rules. The build uses relative asset paths, so `dist/` also works on any other static host, where the CSP meta tag in the page still applies.
 
