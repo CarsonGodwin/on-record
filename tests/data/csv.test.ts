@@ -39,6 +39,12 @@ describe('readCsv', () => {
     expect(rows('a,b\r1,2\r', ['b']).out).toEqual([{ b: '2' }])
   })
 
+  it('matches headers whatever their case, spacing or punctuation', () => {
+    const { out, found } = rows('MEDIA TYPE,song_name,\u200bArtist-Name\n1,2,3\n', ['Media Type', 'Song Name', 'Artist Name'])
+    expect(out).toEqual([{ 'Media Type': '1', 'Song Name': '2', 'Artist Name': '3' }])
+    expect(found).toEqual(['Artist Name', 'Media Type', 'Song Name'])
+  })
+
   it('strips a byte order mark and trims headers and values', () => {
     expect(rows('﻿ Song Name ,x\n  Blue  ,1\n', ['Song Name']).out).toEqual([{ 'Song Name': 'Blue' }])
   })
@@ -48,6 +54,11 @@ describe('readCsv', () => {
       { a: '1', b: '2' },
       { a: '', b: '' },
     ])
+  })
+
+  it('skips blank lines before the header without shifting the columns', () => {
+    expect(rows('\nSong Name,Album Name\nA,B\n', ['Song Name', 'Album Name']).out).toEqual([{ 'Song Name': 'A', 'Album Name': 'B' }])
+    expect(rows('\r\n\r\nSong Name,Album Name\r\nA,B\r\n', ['Song Name', 'Album Name']).out).toEqual([{ 'Song Name': 'A', 'Album Name': 'B' }])
   })
 
   it('copes with short rows, long rows and a trailing comma', () => {

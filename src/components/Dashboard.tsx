@@ -15,7 +15,21 @@ import {
   songStats,
   takes,
 } from '../data/insights'
-import { canHide, filterByYear, filterPlays, funStats, getYears, newArtistsIn, platforms, sameFilter, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
+import {
+  canHide,
+  filterByYear,
+  filterPlays,
+  funStats,
+  getYears,
+  newArtistsIn,
+  platforms,
+  sameFilter,
+  summarize,
+  topItems,
+  UNKNOWN_ARTIST,
+  wearOut,
+  weekHourGrid,
+} from '../data/stats'
 import { formatHour, formatNumber, historyName } from '../lib/format'
 import { useMediaQuery } from '../lib/hooks'
 import { isLaunchKey, LAUNCH_KEY } from '../lib/keys'
@@ -82,8 +96,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   // Music only and hidden artists come off before anything else, so every chart, color and poster leaves them out.
   // Neither is stored: they reset with the page, like everything else here.
   const [musicOnly, setMusicOnly] = useState(true)
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
+  // Apple Music plays with no artist in the export would rank as one big "Unknown artist" on the
+  // charts and the poster, so they start hidden, as long as some other artist is left (see canHide)
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() =>
+    result.unmatchedArtists > 0 && result.plays.some((p) => p.kind === 'track' && p.artist !== UNKNOWN_ARTIST) ? new Set([UNKNOWN_ARTIST]) : new Set(),
+  )
   const otherPlays = useMemo(() => result.plays.filter((p) => p.kind !== 'track').length, [result.plays])
+  // Older Apple Music rows don't say whether shuffle was on
+  const noShuffle = useMemo(() => result.plays.filter((p) => p.shuffle === null).length, [result.plays])
   const hasAnyMusic = otherPlays < result.plays.length
   const [launcher, setLauncher] = useState<LauncherMode | null>(null)
   // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
@@ -718,6 +738,15 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 <details className="load-details">
                   <summary>Load details</summary>
                   <ul>
+                    {result.sources.includes('apple') && (
+                      <li>
+                        Apple Music support is in beta. If something looks wrong,{' '}
+                        <a href="https://github.com/CarsonGodwin/on-record/issues" target="_blank" rel="noreferrer">
+                          report it on GitHub
+                        </a>{' '}
+                        with these details.
+                      </li>
+                    )}
                     <li>
                       {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
                     </li>
@@ -733,11 +762,15 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                     {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
                     {result.unmatchedArtists > 0 && (
                       <li>
-                        {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export, so they show as
-                        “Unknown artist”
+                        {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export.{' '}
+                        {applied.filter.hidden.has(UNKNOWN_ARTIST)
+                          ? `They’re hidden as “${UNKNOWN_ARTIST}”, and Hide Artists… shows them again.`
+                          : `They show as “${UNKNOWN_ARTIST}”.`}
                       </li>
                     )}
-                    {result.sources.includes('apple') && <li>Apple Music’s export doesn’t record shuffle, so shuffle stats leave those plays out</li>}
+                    {noShuffle > 0 && (
+                      <li>{formatNumber(noShuffle)} Apple Music plays don’t say whether shuffle was on, so shuffle stats leave them out</li>
+                    )}
                     {result.warnings.map((w) => (
                       <li key={w}>{w}</li>
                     ))}

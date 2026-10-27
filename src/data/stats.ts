@@ -10,6 +10,9 @@ import type { Play } from '../types'
 /** Spotify only counts a stream after 30 seconds of listening. Plays counts use the same rule. */
 export const COUNTED_PLAY_MS = 30_000
 
+/** The artist given to Apple Music plays the export never names one for */
+export const UNKNOWN_ARTIST = 'Unknown artist'
+
 const DAY_MS = 86_400_000
 
 export function startDate(p: Play): Date {
@@ -83,7 +86,7 @@ export interface Summary {
   activeDays: number
   /** Share of music plays that were skipped, 0–1 */
   skipRate: number
-  /** Share of music plays with shuffle on, 0–1, out of the plays that say; null when none do (Apple Music) */
+  /** Share of music plays with shuffle on, 0–1, out of the plays that say; null when none do (older Apple Music plays) */
   shuffleRate: number | null
   /** Share of listening time that was offline, 0–1 */
   offlineShare: number

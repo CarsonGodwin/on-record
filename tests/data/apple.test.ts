@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { appleDevice, loadApple, looseKey, splitDescription, titleKey, UNKNOWN_ARTIST } from '../../src/data/apple'
+import { appleDevice, loadApple, looseKey, parseDay, parseTime, splitDescription, titleKey } from '../../src/data/apple'
 import { appleFileKind, isAppleArchiveName, type AppleText } from '../../src/data/appleFiles'
-import { startDate } from '../../src/data/stats'
+import { dayNumber, startDate, summarize, UNKNOWN_ARTIST } from '../../src/data/stats'
+import type { Play } from '../../src/types'
 import { appleText, dailyTracks, library, playActivity, playRow, PLAY_ACTIVITY_COLUMNS, PRIVATE, recentlyPlayed, trackPlayHistory, ymd } from '../apple'
 import { at } from '../helpers'
 
@@ -26,6 +27,18 @@ describe('Apple file names', () => {
     ['__MACOSX/Apple Music Activity/._Apple Music Play Activity.csv', null],
     ['Stores Activity/Apple Pay Activity.csv', null],
     ['Apple Music Library Playlists.json', null],
+    // What an unzip tool, a second download or another export version might do to a name
+    ['APPLE MUSIC PLAY ACTIVITY.CSV', 'playActivity'],
+    ['Apple_Music_Play_Activity.csv', 'playActivity'],
+    ['Apple Music Play Activity (1).csv', 'playActivity'],
+    ['Apple Music Play Activity 2.csv', 'playActivity'],
+    ['Apple Music-Play History Daily Tracks.csv', 'dailyTracks'],
+    ['Apple Music – Track Play History.csv', 'trackHistory'],
+    ['Apple Music  Library Tracks.json', 'library'],
+    // ...but never a different name or type
+    ['Apple Music Play Activity.json', null],
+    ['Apple Music Play Activity Summary.csv', null],
+    ['Apple Music Library Tracks.json.zip', null],
   ])('%s → %s', (path, kind) => {
     expect(appleFileKind(path)).toBe(kind)
   })
@@ -35,6 +48,9 @@ describe('Apple file names', () => {
     expect(isAppleArchiveName('Apple Music Activity/Apple Music Library Tracks.json.zip')).toBe(true)
     expect(isAppleArchiveName('iCloud Photos.zip')).toBe(false)
     expect(isAppleArchiveName('__MACOSX/._Apple_Media_Services.zip')).toBe(false)
+    expect(isAppleArchiveName('Apple Media Services.zip')).toBe(true)
+    expect(isAppleArchiveName('Apple_Media_Services (1).zip')).toBe(true)
+    expect(isAppleArchiveName('Apple Music Library Tracks.json')).toBe(false)
   })
 })
 
@@ -107,6 +123,18 @@ describe('reading play activity', () => {
     expect(skippedRows).toBe(2)
   })
 
+  it('leaves out music videos, as Spotify’s video history is, and says so', () => {
+    const t = at(2024, 3, 14, 9).getTime()
+    const { plays, skippedRows, warnings } = load([
+      playRow(t, { 'Song Name': 'Clip', 'Media Type': 'VIDEO', 'Artist Name': 'A' }),
+      playRow(t + 600_000, { 'Song Name': 'Song', 'Artist Name': 'A' }),
+      playRow(t + 1_200_000, { 'Song Name': 'Clip', 'Media Type': 'VIDEO', 'Artist Name': 'A' }),
+    ])
+    expect(plays.map((p) => p.title)).toEqual(['Song'])
+    expect(skippedRows).toBe(0)
+    expect(warnings).toEqual(['2 Apple Music video plays left out (video history isn’t supported yet)'])
+  })
+
   it('works out a missing start time or duration from the others', () => {
     const t = at(2024, 3, 14, 9).getTime()
     const { plays } = load([
@@ -123,6 +151,21 @@ describe('reading play activity', () => {
     expect(plays[0].msPlayed).toBe(60_000)
     // Without a duration, the event's span stands in
     expect(plays[1].msPlayed).toBe(180_000)
+  })
+
+  it('finds columns whatever their case or punctuation', () => {
+    const t = at(2024, 3, 14, 9).getTime()
+    const columns = PLAY_ACTIVITY_COLUMNS.map((c) => c.toLowerCase().replaceAll(' ', '_'))
+    const row = Object.fromEntries(Object.entries(playRow(t, { 'Song Name': 'Blue', 'Artist Name': 'A' })).map(([k, v]) => [k.toLowerCase().replaceAll(' ', '_'), v]))
+    const warnings: string[] = []
+    const { plays } = loadApple([appleText('playActivity', playActivity([row], columns))], warnings)
+    expect(plays.map((p) => [p.title, p.artist, startDate(p).getTime()])).toEqual([['Blue', 'A', t]])
+    expect(warnings).toEqual([])
+  })
+
+  it('reads library keys whatever their case', () => {
+    const rows = [playRow(at(2024, 3, 14, 9), { 'Song Name': 'Blue' })]
+    expect(artistsOf(rows, [appleText('library', JSON.stringify([{ title: 'Blue', ARTIST: 'Lumen Kid', album: 'Sky' }]))])).toEqual(['Blue: Lumen Kid'])
   })
 
   it('reads timestamps without a zone as UTC, not local time', () => {
@@ -148,6 +191,27 @@ describe('reading play activity', () => {
       ['endplay', false],
       ['scrub_end', false],
     ])
+  })
+
+  it('reads shuffle where the row records it, and leaves it unknown where it doesn’t', () => {
+    const t = at(2024, 3, 14, 9).getTime()
+    const values = ['SHUFFLE_OFF', 'SHUFFLE_ON', 'shuffle_on_songs', '', 'SHUFFLE_UNKNOWN', 'N/A']
+    const { plays } = load(values.map((v, i) => playRow(t + i * 600_000, { 'Song Name': `S${i}`, 'Shuffle Play': v, 'Artist Name': 'A' })))
+    expect(plays.map((p) => p.shuffle)).toEqual([false, true, true, null, null, null])
+  })
+
+  it('names the device from what older rows record when Build Version is empty', () => {
+    const t = at(2024, 3, 14, 9).getTime()
+    const devices: Row[] = [
+      { 'Device Type': 'IPHONE', 'Device OS Name': 'iOS', 'Source Type': 'ORIGINATING_DEVICE' },
+      { 'Device Type': 'MACINTOSH', 'Device OS Name': 'macOS' },
+      { 'Device Type': 'APPLE_TV' },
+      { 'Device Type': 'UNKNOWN_DEVICE', 'Device OS Name': 'Unidentified OS', 'Source Type': 'AMAZON' },
+      { 'Device Type': 'UNKNOWN_DEVICE', 'Device OS Name': 'Unidentified OS', 'Source Type': 'ORIGINATING_DEVICE' },
+      { 'Build Version': 'Music/1.3 macOS/13.0.1 build/22A400 model/MacBookPro18,1', 'Device Type': 'IPHONE' },
+    ]
+    const rows = devices.map((d, i) => playRow(t + i * 600_000, { 'Song Name': `S${i}`, 'Artist Name': 'A', 'Build Version': '', ...d }))
+    expect(load(rows).plays.map((p) => p.platform)).toEqual(['iOS', 'macOS', 'Apple TV', 'Speakers & cast', 'Unknown', 'macOS'])
   })
 
   it('warns when the export doesn’t record end reasons', () => {
@@ -182,6 +246,12 @@ describe('joining split listens', () => {
     const { plays } = load([part(t, 60_000, 0), part(t + 85_000, 60_000, 60_000)])
     expect(startDate(plays[0]).getTime()).toBe(t)
     expect(plays[0].msPlayed).toBe(120_000)
+  })
+
+  it('takes shuffle from the part that started the listen', () => {
+    const { plays } = load([part(t, 60_000, 0, { 'Shuffle Play': 'SHUFFLE_ON' }), part(t + 65_000, 60_000, 60_000)])
+    expect(plays).toHaveLength(1)
+    expect(plays[0].shuffle).toBe(true)
   })
 
   it('takes the skip from the part that ended the listen', () => {
@@ -277,6 +347,41 @@ describe('finding artists', () => {
     expect(artistsOf(rows, [daily('Yung Lean - Blue Plastic')])).toEqual(['Blue Plastic: Yung Lean'])
   })
 
+  it('tries a looser title match before an album artist the other files never name', () => {
+    const rows = [song('Fade (feat. Someone)', 0, { 'Container Artist Name': 'Some Curator' })]
+    expect(artistsOf(rows, [daily('Copper Kites - Fade')])).toEqual(['Fade (feat. Someone): Copper Kites'])
+  })
+
+  it('takes the row’s album artist over a lone match when the rest of the album agrees', () => {
+    // The other files only have M83's "Intro", but this one is on The xx's album
+    const rows = [song('Crystalised', 0, { 'Album Name': 'xx', 'Container Artist Name': 'The xx' }), song('Intro', 1, { 'Album Name': 'xx', 'Container Artist Name': 'The xx' })]
+    expect(artistsOf(rows, [daily('The xx - Crystalised', 'M83 - Intro')])).toEqual(['Crystalised: The xx', 'Intro: The xx'])
+  })
+
+  it('tells same-titled songs apart by the album Recently Played names', () => {
+    const rows = [song('Intro', 0, { 'Album Name': 'xx' }), song('Intro', 1, { 'Album Name': 'Hurry Up, We’re Dreaming' })]
+    const recent = appleText(
+      'recentlyPlayed',
+      recentlyPlayed([
+        { description: 'The xx - Intro', album: 'The xx - xx' },
+        { description: 'M83 - Intro', album: 'M83 - Hurry Up, We’re Dreaming' },
+      ]),
+    )
+    expect(artistsOf(rows, [recent])).toEqual(['Intro: The xx', 'Intro: M83'])
+  })
+
+  it('learns an album’s artist from Recently Played, for songs no file names', () => {
+    const rows = [song('Unlisted', 0, { 'Album Name': 'xx' })]
+    const recent = appleText('recentlyPlayed', recentlyPlayed([{ description: 'The xx - Crystalised', album: 'The xx - xx' }]))
+    expect(artistsOf(rows, [recent])).toEqual(['Unlisted: The xx'])
+  })
+
+  it('ignores a Recently Played album credited to someone other than the track’s artist', () => {
+    const rows = [song('Unlisted', 0, { 'Album Name': 'Hits' })]
+    const recent = appleText('recentlyPlayed', recentlyPlayed([{ description: 'Robyn - Dancing On My Own', album: 'Various Artists - Hits' }]))
+    expect(artistsOf(rows, [recent])).toEqual([`Unlisted: ${UNKNOWN_ARTIST}`])
+  })
+
   it('uses the album artist when nothing else names one, unless it’s a placeholder', () => {
     const rows = [song('Rare B-Side', 0, { 'Container Artist Name': 'Juniper Vale' }), song('Compilation Track', 1, { 'Container Artist Name': 'Various Artists' })]
     expect(artistsOf(rows)).toEqual(['Rare B-Side: Juniper Vale', `Compilation Track: ${UNKNOWN_ARTIST}`])
@@ -338,6 +443,11 @@ describe('finding artists', () => {
     expect(artistsOf(rows, [daily('Counting Crows - One', 'Counting Crows - Two')])[2]).toBe('Hidden Track: Counting Crows')
   })
 
+  it('looks up the artist when the row names a placeholder like Various Artists', () => {
+    const rows = [song('Compilation Track', 0, { 'Artist Name': 'Various Artists' }), song('Other', 1, { 'Artist Name': 'Apple Music' })]
+    expect(artistsOf(rows, [daily('Juniper Vale - Compilation Track')])).toEqual(['Compilation Track: Juniper Vale', `Other: ${UNKNOWN_ARTIST}`])
+  })
+
   it('doesn’t fill in from an album several artists share', () => {
     const rows = [song('One', 0, { 'Album Name': 'Greatest Hits' }), song('Two', 1, { 'Album Name': 'Greatest Hits' }), song('Hidden Track', 2, { 'Album Name': 'Greatest Hits' })]
     expect(artistsOf(rows, [daily('Queen - One', 'ABBA - Two')])[2]).toBe(`Hidden Track: ${UNKNOWN_ARTIST}`)
@@ -348,13 +458,26 @@ describe('finding artists', () => {
     expect(plays.map((p) => p.artist)).toEqual([UNKNOWN_ARTIST, 'Someone'])
     expect(unmatchedArtists).toBe(1)
     expect(warnings).toEqual([
-      '50% of Apple Music plays had no artist anywhere in the export, so they show as “Unknown artist”. Artists come from the export’s other Apple Music files, so drop the whole zip rather than the play activity alone.',
+      '50% of Apple Music plays had no artist anywhere in the export. Artists come from the export’s other Apple Music files, so drop the whole zip rather than the play activity alone.',
     ])
   })
 
   it('doesn’t warn when nearly every play has an artist', () => {
     const rows = Array.from({ length: 20 }, (_, i) => song(i === 0 ? 'Mystery' : 'Known', i))
     expect(load(rows, [daily('Someone - Known')]).warnings).toEqual([])
+  })
+
+  it('spells each artist one way, the library’s first, so case doesn’t split them', () => {
+    const rows = [song('Blinding Lights', 0), song('Starboy', 1), song('Save Your Tears', 2, { 'Artist Name': 'THE WEEKND' })]
+    const extra = [daily('the weeknd - Starboy'), appleText('library', library([{ Title: 'Blinding Lights', Artist: 'The Weeknd' }]))]
+    expect(new Set(artistsOf(rows, extra).map((a) => a.split(': ')[1]))).toEqual(new Set(['The Weeknd']))
+  })
+
+  it('otherwise spells an artist the way the export does most', () => {
+    const rows = [song('Starboy', 0), song('Blinding Lights', 1)]
+    const extra = [daily('the weeknd - Starboy', 'the weeknd - Starboy'), appleText('trackHistory', trackPlayHistory(['The Weeknd - Blinding Lights']))]
+    expect(artistsOf(rows, extra)).toEqual(['Starboy: the weeknd', 'Blinding Lights: the weeknd'])
+    expect(artistsOf(rows, [...extra].reverse())).toEqual(['Starboy: the weeknd', 'Blinding Lights: the weeknd'])
   })
 
   it('gives the same answer whatever order the files come in', () => {
@@ -410,6 +533,13 @@ describe('appleDevice', () => {
     ['TVMusic/1.0 tvOS/17.4 model/AppleTV11,1', 'Apple TV'],
     ['Music/1.0 audioOS/17.4 model/AudioAccessory6,1', 'Speakers & cast'],
     ['MusicKit JS/3 (Chrome 124; macOS 14)', 'Web'],
+    // As real exports write them
+    ['Music/3.1 iOS/12.0 model/iPhone11,6 hwp/t8020 build/16A366 (6; dt:189)', 'iOS'],
+    ['Music/3.1 iOS/11.3 model/iPad7,3 hwp/t8011 build/15E216 (5; dt:168)', 'iOS'],
+    ['Music/1.0.3 macOS/10.15.3 build/19D76 model/MacBookPro11,3', 'macOS'],
+    ['iTunes/12.7.0.166 (Macintosh; OS X 10.12.6) AppleWebKit/603.3.8', 'macOS'],
+    ['iTunes/12.8.0.150 macOS/10.13.6 build/17G65 model/MacBookPro14,3', 'macOS'],
+    ['Music/3.3 Android/8.0.0 model/samsungSMG965U build/G965USQU2ARC6 (dt:66)', 'Android'],
     ['', 'Unknown'],
     ['Something/1.0', 'Other'],
   ])('%s → %s', (build, family) => {
@@ -426,6 +556,42 @@ describe('loadApple', () => {
     expect(warnings).toEqual([
       'Apple Music Play Activity.csv wasn’t found, and it’s the file that holds your plays. Drop the whole Apple Media Services zip (every part, if it came in several).',
     ])
+  })
+
+  it('doesn’t ask for the play activity when the loader already said it was too large', () => {
+    const warnings: string[] = []
+    const result = loadApple([appleText('dailyTracks', dailyTracks([{ description: 'A - B', date: '20240101' }]))], warnings, { skippedFiles: true })
+    expect(result.plays).toEqual([])
+    expect(warnings).toEqual([])
+  })
+
+  it('counts a song played on Spotify and Apple Music as one song', () => {
+    const spotifyPlay = (uri: string, artist = 'Marlowe Fox'): Play => ({
+      endTime: at(2023, 1, 1).getTime(),
+      msPlayed: 200_000,
+      kind: 'track',
+      title: 'Old Favourite',
+      artist,
+      album: 'Album',
+      uri,
+      platform: 'Android',
+      country: 'US',
+      reasonStart: 'trackdone',
+      reasonEnd: 'trackdone',
+      shuffle: true,
+      skipped: false,
+      offline: false,
+      incognito: false,
+    })
+    // The album version is played more, so it's the one Apple's plays join
+    const spotify = [spotifyPlay('spotify:track:single'), spotifyPlay('spotify:track:album'), spotifyPlay('spotify:track:album'), spotifyPlay('spotify:track:x', 'Someone Else')]
+    const rows = [
+      playRow(at(2024, 1, 1), { 'Song Name': 'Old Favourite', 'Artist Name': 'marlowe fox' }),
+      playRow(at(2024, 1, 2), { 'Song Name': 'Apple Only', 'Artist Name': 'Marlowe Fox' }),
+    ]
+    const { plays } = loadApple([appleText('playActivity', playActivity(rows))], [], { spotify })
+    expect(plays.map((p) => p.uri)).toEqual(['spotify:track:album', ''])
+    expect(summarize([...spotify.slice(1, 3), plays[0]]).tracks).toBe(1)
   })
 
   it('warns about files that aren’t what their name says', () => {
@@ -446,5 +612,45 @@ describe('loadApple', () => {
       'Apple Music Library Tracks.json: doesn’t look like the Apple Music file it’s named after',
       'Apple Music - Play History Daily Tracks.csv: doesn’t look like the Apple Music file it’s named after',
     ])
+  })
+})
+
+describe('reading times', () => {
+  const nine = Date.UTC(2024, 2, 14, 9, 0, 0)
+
+  it.each([
+    ['2024-03-14T09:00:00Z', nine],
+    ['2024-03-14T09:00:00.000Z', nine],
+    ['2024-03-14T09:00:00.123456Z', nine + 123],
+    ['2024-03-14t09:00:00z', nine],
+    ['2024-03-14 09:00:00', nine],
+    ['2024-03-14 09:00', nine],
+    ['2024-03-14 09:00:00 UTC', nine],
+    ['2024-03-14T09:00:00+00:00', nine],
+    ['2024-03-14T09:00:00+0000', nine],
+    ['2024-03-14T10:30:00+01:30', nine],
+    ['2024-03-14T02:00:00-07:00', nine],
+    ['2024-03-14T02:00:00-07', nine],
+    [' 2024-03-14T09:00:00Z ', nine],
+    [String(nine), nine],
+    [String(nine / 1000), nine],
+    ['Thu, 14 Mar 2024 09:00:00 GMT', nine],
+  ])('%s', (s, expected) => {
+    expect(parseTime(s)).toBe(expected)
+  })
+
+  it.each(['', 'garbage', '2024-03-14', '2024-13-14T09:00:00Z', '2024-02-30T09:00:00Z', '2024-03-14T25:00:00Z', '03/14/2024 09:00:00', '12345'])(
+    'reads %j as no time, rather than guessing a zone or a day order',
+    (s) => {
+      expect(parseTime(s)).toBeNull()
+    },
+  )
+
+  it('reads Daily Tracks dates in any of the usual forms, as a local day', () => {
+    const day = dayNumber(at(2024, 3, 14))
+    for (const s of ['20240314', '2024-03-14', '2024/03/14', '2024/3/14', '2024.03.14', '2024-03-14T00:00:00Z', ' 20240314 ']) {
+      expect(parseDay(s)).toBe(day)
+    }
+    for (const s of ['', '2024031', '202403140', '2024-02-30', '14/03/2024']) expect(parseDay(s)).toBeNull()
   })
 })

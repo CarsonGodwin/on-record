@@ -24,7 +24,7 @@ const DAILY = dailyTracks([
   { description: 'Bladee - Reality Surf', date: ymd(day) },
 ])
 const LIBRARY = library([{ Title: 'Intro', Artist: 'The xx', Album: 'xx' }])
-const PRIVATE_FILE = `Merchant,Card,Amount\nCoffee,${PRIVATE['Apple Id Number']},4.50\n`
+const PRIVATE_FILE = `Merchant,Card,Amount\nCoffee,${PRIVATE['Apple ID Number']},4.50\n`
 
 function file(name: string, body: BlobPart): File {
   return new File([body], name)
@@ -60,7 +60,7 @@ describe('loading an Apple Music export', () => {
     expect(result.filesRead).toEqual([FILE_NAMES.playActivity, FILE_NAMES.dailyTracks, FILE_NAMES.library])
     expect(result.warnings).toEqual([])
     expect(result.unmatchedArtists).toBe(0)
-    expect(JSON.stringify(result)).not.toContain(PRIVATE['Apple Id Number'])
+    expect(JSON.stringify(result)).not.toContain(PRIVATE['Apple ID Number'])
     expect(JSON.stringify(result)).not.toContain(PRIVATE['Client IP Address'])
   })
 
@@ -118,6 +118,19 @@ describe('loading an Apple Music export', () => {
     const result = await loadFiles([file('deep.zip', await zipBytes({ 'Apple_Media_Services.zip': level2 }))])
     expect(result.plays).toEqual([])
     expect(result.warnings).toEqual(['deep.zip: no streaming history files found inside'])
+  })
+
+  it('opens only a few nested zips, however many a zip holds', async () => {
+    // Each nested zip gets its own song, so the plays say how many were opened
+    const nested: Record<string, ArrayBuffer> = {}
+    for (let i = 0; i < 10; i++) {
+      nested[`copy ${i}/Apple_Media_Services.zip`] = await zipBytes({
+        [FILE_NAMES.playActivity]: playActivity([playRow(t + i * 600_000, { 'Song Name': `Song ${i}`, 'Artist Name': 'A' })]),
+      })
+    }
+    const result = await loadFiles([file('many.zip', await zipBytes(nested))])
+    expect(result.plays.length).toBeGreaterThan(0)
+    expect(result.plays.length).toBeLessThan(10)
   })
 })
 

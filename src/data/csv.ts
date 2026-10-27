@@ -8,7 +8,9 @@ const CR = 13
  * line breaks), calling `onRow` with the asked-for columns of each record.
  *
  * Columns are found by their header, since Apple adds and reorders columns
- * between export versions. Only the columns asked for are ever copied out of
+ * between export versions, and a header matches whatever its case, spacing or
+ * punctuation ("Media Type", "Media type", "media_type"), since Apple's own files
+ * don't agree on those. Only the columns asked for are ever copied out of
  * the text, so the rest of a row (an IP address, an account number) never
  * becomes a string the app holds on to. A column missing from the file reads
  * as ''. Returns the asked-for columns the header actually had.
@@ -27,6 +29,7 @@ export function readCsv<C extends string>(
   const slots: (C | undefined)[] = []
   const found = new Set<C>()
   const blank = () => Object.fromEntries(columns.map((c) => [c, ''])) as Record<C, string>
+  const byKey = new Map(columns.map((c) => [headerKey(c), c]))
 
   let row = blank()
   let field = 0
@@ -45,7 +48,7 @@ export function readCsv<C extends string>(
   const endRecord = (blankLine: boolean) => {
     if (inHeader && !blankLine) {
       header.forEach((name, h) => {
-        const col = columns.find((c) => c === name)
+        const col = byKey.get(headerKey(name))
         // The first column with a name wins, if a header ever repeats one
         if (col !== undefined && !found.has(col)) {
           slots[h] = col
@@ -53,6 +56,9 @@ export function readCsv<C extends string>(
         }
       })
       inHeader = false
+    } else if (inHeader) {
+      // A blank line before the header stored one empty name, which would shift every column
+      header.length = 0
     } else if (!blankLine) {
       onRow(row)
     }
@@ -128,4 +134,9 @@ function nextBreak(text: string, i: number): number {
     i++
   }
   return n
+}
+
+/** A header with case, spacing, punctuation and invisible characters left out */
+export function headerKey(name: string): string {
+  return name.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
 }

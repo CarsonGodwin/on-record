@@ -155,7 +155,16 @@ export default function App() {
           <li>Wait for the download link. Spotify says it takes up to 30 days, but it’s often faster.</li>
           <li>Add the zip file on the sleeve above.</li>
         </ol>
-        <h3>Apple Music</h3>
+        <h3>
+          Apple Music <span className="beta">Beta</span>
+        </h3>
+        <p className="how-to__note">
+          Apple Music support is new, and Apple’s export changes between versions. If something looks wrong,{' '}
+          <a href="https://github.com/CarsonGodwin/on-record/issues" target="_blank" rel="noreferrer">
+            report it on GitHub
+          </a>{' '}
+          with what Load details says (it lists file names and counts, never your listening).
+        </p>
         <ol>
           <li>
             Go to{' '}

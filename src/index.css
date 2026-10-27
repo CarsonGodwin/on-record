@@ -954,6 +954,24 @@ th {
   color: var(--text);
 }
 
+.how-to__note {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+}
+
+/* Marks Apple Music support as new; plain text in a thin outline, so it reads as a note rather than a sticker */
+.beta {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  vertical-align: 0.1em;
+}
+
 .landing__less {
   display: none;
 }

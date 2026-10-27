@@ -292,7 +292,7 @@ function Habits({ summary }: { summary: Summary }) {
   const habits: Habit[] = [
     { key: 'skip', question: 'How many songs do you skip?', value: summary.skipRate, note: 'Songs you skipped before they ended' },
   ]
-  // Apple Music's export doesn't record shuffle
+  // Only newer Apple Music plays record shuffle, so an Apple-only history may have none
   if (summary.shuffleRate !== null) {
     habits.push({ key: 'shuffle', question: 'How often is shuffle on?', value: summary.shuffleRate, note: 'Songs played with shuffle on' })
   }

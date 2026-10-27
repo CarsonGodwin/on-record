@@ -34,7 +34,7 @@ Every view follows the year picker at the top.
 2. Confirm the email, then wait for the download link (up to 30 days).
 3. Drop the `.zip` onto the record sleeve.
 
-**Apple Music**
+**Apple Music** (beta: support is new, so please [report anything that looks wrong](https://github.com/CarsonGodwin/on-record/issues))
 
 1. Go to [privacy.apple.com](https://privacy.apple.com/), choose **Request a copy of your data** and check **Apple Media Services information**.
 2. Wait for the email (Apple says up to a week).
@@ -50,13 +50,14 @@ Both exports become the same plays, so every view works with either. Apple's exp
 
 | | Spotify | Apple Music |
 |---|---|---|
-| **Artist** | In every row | Not in the play activity. Matched by song title from the export's other Apple Music files (and the library), using the album and the day played to tell apart songs that share a title. Songs with no match show as "Unknown artist", and Load details counts them. |
-| **Shuffle** | Recorded | Not recorded. The shuffle question and shuffle facts are left out. With both services, shuffle stats use the Spotify plays only. |
+| **Artist** | In every row | Not in the play activity. Matched by song title from the export's other Apple Music files (and the library), using the album (from the library and Recently Played) and the day played to tell apart songs that share a title, and spelled the way the export spells that artist most (the library's spelling first). Songs with no match become "Unknown artist", hidden to start with (Hide Artists… shows them), and Load details counts them. |
+| **Shuffle** | Recorded | Recorded only on newer plays. Shuffle stats leave out the plays that don't say, and Load details counts them; with none at all, the shuffle question and shuffle facts are left out. |
 | **Podcasts and audiobooks** | Included | Not in Apple Music's export, so the podcast views stay empty. |
 | **Skips** | `skipped` flag and end reason | From Apple's end reason (skipped forward). |
 | **Plays** | One row per stream | Apple splits a listen whenever you pause or seek; parts of the same song within 30 seconds are joined back into one play. A song on repeat stays separate plays. |
-| **Songs** | Told apart by Spotify's track ID | No track IDs, so songs are told apart by artist and title. A single and its album version count as one song. |
-| **Devices** | Phone, computer, web, speakers | The same families, plus Apple Watch and Apple TV; HomePod counts as a speaker. |
+| **Songs** | Told apart by Spotify's track ID | No track IDs, so songs are told apart by artist and title. A single and its album version count as one song. Dropped with a Spotify export, a song with the same artist and title shares Spotify's ID, so it counts as one song across both. |
+| **Videos** | Video history files are skipped | Music video plays are left out, and Load details counts them |
+| **Devices** | Phone, computer, web, speakers | The same families, plus Apple Watch and Apple TV; HomePod and Alexa count as speakers. Older plays that don't name the app fall back to the device type they record. |
 
 On the Deep dive poster, the credit line names whichever export the data came from.
 

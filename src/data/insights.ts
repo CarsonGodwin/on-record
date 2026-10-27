@@ -700,7 +700,7 @@ export function takes(plays: Play[], summary: Summary, rec: Records, fun: FunSta
     })
   }
 
-  // Apple Music's export doesn't record shuffle, so there's nothing to say
+  // Older Apple Music plays don't record shuffle, so there may be nothing to say
   const shuffle = summary.shuffleRate
   if (shuffle !== null && (shuffle >= 0.85 || (shuffle <= 0.1 && summary.musicMs > 0))) {
     const on = shuffle >= 0.85

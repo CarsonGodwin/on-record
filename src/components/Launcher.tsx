@@ -162,7 +162,7 @@ function LauncherBody({
         terms: 'exclude remove filter unhide show restore manage',
         run: () => onMode('artists'),
       },
-      { key: 'help', group: 'Commands', label: 'Help', hint: 'Getting your spotify data, keys', run: () => onMode('help') },
+      { key: 'help', group: 'Commands', label: 'Help', hint: 'Getting your data, keys', terms: 'spotify apple music export download', run: () => onMode('help') },
       { key: 'about', group: 'Commands', label: 'About', hint: 'Source, license, credits', run: () => onMode('about') },
       { key: 'reset', group: 'Commands', label: 'Clear Data', hint: 'Back to the start', terms: 'new load reset export file zip drop open', run: onReset },
       ...tracks.map((t, i) => ({
@@ -362,7 +362,7 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
       <div className="launcher__page">
         {mode === 'help' ? (
           <>
-            <h3>Getting your data</h3>
+            <h3>Getting your Spotify data</h3>
             <ol>
               <li>
                 Go to{' '}
@@ -373,6 +373,21 @@ function LauncherPage({ mode, onBack }: { mode: 'help' | 'about'; onBack: () => 
               </li>
               <li>Confirm the email, then wait for the download link (up to 30 days).</li>
               <li>Drop the .zip onto the record sleeve.</li>
+            </ol>
+
+            <h3>
+              Getting your Apple Music data <span className="beta">Beta</span>
+            </h3>
+            <ol>
+              <li>
+                Go to{' '}
+                <a href="https://privacy.apple.com/" target="_blank" rel="noreferrer">
+                  privacy.apple.com
+                </a>{' '}
+                and request a copy of your <strong>Apple Media Services information</strong>.
+              </li>
+              <li>Wait for the email saying it’s ready (up to a week).</li>
+              <li>Drop every part of the download onto the record sleeve.</li>
             </ol>
 
             {!COARSE && (

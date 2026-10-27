@@ -61,7 +61,7 @@ export interface Play {
   /** Spotify's reason_start / reason_end vocabulary ("trackdone", "fwdbtn", ...); Apple's end reasons are mapped onto it */
   reasonStart: string
   reasonEnd: string
-  /** null when the export doesn't say (Apple Music's doesn't) */
+  /** null when the export doesn't say (older Apple Music rows don't) */
   shuffle: boolean | null
   skipped: boolean
   offline: boolean

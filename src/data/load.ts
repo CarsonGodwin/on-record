@@ -14,6 +14,21 @@ interface Batch {
 interface Found {
   spotify: Batch[]
   apple: AppleText[]
+  /** An Apple Music file or archive was skipped for its size, which has already been explained */
+  appleTooLarge: boolean
+}
+
+function nothing(): Found {
+  return { spotify: [], apple: [], appleTooLarge: false }
+}
+
+/**
+ * What one dropped zip may still open, shared with the zips nested in it, so nesting
+ * can't multiply the caps: a zip of 200 zips of 200 zips would otherwise read 200³ entries.
+ */
+interface ZipBudget {
+  entries: number
+  archives: number
 }
 
 /** Plays from one service, before they're merged, deduped and sorted with the rest */
@@ -57,6 +72,8 @@ const MAX_ENTRIES = 200
 const MAX_FILES = 500
 /** Apple nests zips two deep: the download, Apple_Media_Services.zip, then the zipped library file */
 const MAX_ZIP_DEPTH = 2
+/** Zips opened inside one dropped zip. Apple's download needs two (Apple_Media_Services.zip and the zipped library). */
+const MAX_NESTED_ZIPS = 4
 
 /** Reads dropped or picked files (.zip, .json or Apple's .csv) entirely in the browser. */
 export async function loadFiles(files: File[]): Promise<LoadResult> {
@@ -72,7 +89,10 @@ export async function loadFiles(files: File[]): Promise<LoadResult> {
   )
   const appleFiles = found.flatMap((f) => f.apple)
   // The Apple parser only downloads for people who drop an Apple export
-  const apple = appleFiles.length > 0 ? (await import('./apple')).loadApple(appleFiles, warnings) : null
+  const apple =
+    appleFiles.length > 0
+      ? (await import('./apple')).loadApple(appleFiles, warnings, { spotify: spotify.plays, skippedFiles: found.some((f) => f.appleTooLarge) })
+      : null
   return collect({ spotify, apple }, warnings)
 }
 
@@ -83,10 +103,11 @@ export function loadSample(): LoadResult {
 
 async function readFile(file: File, warnings: string[]): Promise<Found> {
   const lower = file.name.toLowerCase()
-  const found: Found = { spotify: [], apple: [] }
+  const found = nothing()
 
   if (file.size > MAX_FILE_BYTES) {
     warnings.push(`${file.name}: skipped (too large to open safely in the browser)`)
+    found.appleTooLarge = appleFileKind(file.name) !== null
     return found
   }
 
@@ -98,8 +119,8 @@ async function readFile(file: File, warnings: string[]): Promise<Found> {
       warnings.push(`${file.name}: couldn't open this zip file`)
       return found
     }
-    const inside = await readZip(zip, warnings, 0)
-    if (inside.spotify.length === 0 && inside.apple.length === 0) {
+    const inside = await readZip(zip, warnings, 0, { entries: MAX_ENTRIES, archives: MAX_NESTED_ZIPS })
+    if (inside.spotify.length === 0 && inside.apple.length === 0 && !inside.appleTooLarge) {
       warnings.push(`${file.name}: no streaming history files found inside`)
     }
     return inside
@@ -129,48 +150,62 @@ async function readFile(file: File, warnings: string[]): Promise<Found> {
 }
 
 /** Reads the history files in a zip, opening the zips Apple nests inside its export */
-async function readZip(zip: JSZip, warnings: string[], depth: number): Promise<Found> {
-  const entries = Object.values(zip.files)
-    .filter((e) => !e.dir && (isHistoryFileName(e.name) || appleFileKind(e.name) !== null || (depth < MAX_ZIP_DEPTH && isAppleArchiveName(e.name))))
-    .slice(0, MAX_ENTRIES)
-    .filter((e) => {
-      // The declared size isn't in JSZip's public types, and a lying header only
-      // delays the check, so treat a missing value as unknown rather than unsafe
-      const size = (e as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize
-      const limit = isAppleArchiveName(e.name) ? MAX_FILE_BYTES : MAX_ENTRY_BYTES
-      if (typeof size === 'number' && size > limit) {
-        warnings.push(`${baseName(e.name)}: skipped (unusually large once unzipped)`)
-        return false
-      }
-      return true
-    })
+async function readZip(zip: JSZip, warnings: string[], depth: number, budget: ZipBudget): Promise<Found> {
+  const found = nothing()
+  const entries: JSZip.JSZipObject[] = []
+  for (const e of Object.values(zip.files)) {
+    if (budget.entries === 0) break
+    if (e.dir) continue
+    const kind = isHistoryFileName(e.name) ? 'spotify' : appleFileKind(e.name)
+    const archive = kind === null && depth < MAX_ZIP_DEPTH && isAppleArchiveName(e.name)
+    if (kind === null && !archive) continue
+    if (archive && budget.archives === 0) continue
+    budget.entries--
+    if (archive) budget.archives--
+
+    // The declared size isn't in JSZip's public types, and a lying header only
+    // delays the check, so treat a missing value as unknown rather than unsafe.
+    // Apple keeps all its plays in one file, so that one gets the whole-file limit.
+    const size = (e as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize
+    const limit = archive || kind === 'playActivity' ? MAX_FILE_BYTES : MAX_ENTRY_BYTES
+    if (typeof size === 'number' && size > limit) {
+      warnings.push(`${baseName(e.name)}: skipped (unusually large once unzipped)`)
+      if (kind !== 'spotify') found.appleTooLarge = true
+      continue
+    }
+    entries.push(e)
+  }
 
   // Each entry gives its own Found, so results keep the zip's order however the reads finish
   const results = await Promise.all(
     entries.map(async (e): Promise<Found> => {
       const name = baseName(e.name)
       if (isHistoryFileName(e.name)) {
-        return { spotify: [{ name, rows: parseJson(await e.async('string'), name, warnings) }], apple: [] }
+        return { ...nothing(), spotify: [{ name, rows: parseJson(await e.async('string'), name, warnings) }] }
       }
       const kind = appleFileKind(e.name)
-      if (kind) return { spotify: [], apple: [{ kind, name, text: await e.async('string') }] }
+      if (kind) return { ...nothing(), apple: [{ kind, name, text: await e.async('string') }] }
 
       const bytes = await e.async('uint8array')
       if (bytes.byteLength > MAX_FILE_BYTES) {
         warnings.push(`${name}: skipped (unusually large once unzipped)`)
-        return { spotify: [], apple: [] }
+        return { ...nothing(), appleTooLarge: true }
       }
       let inner: JSZip
       try {
         inner = await JSZip.loadAsync(bytes)
       } catch {
         warnings.push(`${name}: couldn't open this zip file`)
-        return { spotify: [], apple: [] }
+        return nothing()
       }
-      return readZip(inner, warnings, depth + 1)
+      return readZip(inner, warnings, depth + 1, budget)
     }),
   )
-  return { spotify: results.flatMap((r) => r.spotify), apple: results.flatMap((r) => r.apple) }
+  return {
+    spotify: results.flatMap((r) => r.spotify),
+    apple: results.flatMap((r) => r.apple),
+    appleTooLarge: found.appleTooLarge || results.some((r) => r.appleTooLarge),
+  }
 }
 
 function parseJson(text: string, name: string, warnings: string[]): unknown {
