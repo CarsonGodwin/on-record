@@ -24,16 +24,17 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
   const eq = equivalents(summary.totalMs)
   const peak = hours.reduce((best, h) => (h.ms > best.ms ? h : best), hours[0])
 
-  const ticker = [
-    `${formatNumber(summary.streams)} streams`,
-    `${formatNumber(summary.artists)} artists`,
-    `${formatNumber(summary.tracks)} songs`,
-    `${formatNumber(summary.activeDays)} days with music`,
-    `${formatDuration(summary.totalMs / Math.max(summary.activeDays, 1))} a day`,
-    ...(newArtists !== null ? [`${formatNumber(newArtists)} new artists`] : []),
-    `peak hour ${formatHour(peak.hour)}`,
-    ...(topArtist ? [`#1 ${topArtist.label}`] : []),
-    `${formatPercent(summary.skipRate)} skipped`,
+  // [before, figure, after]: the figure is set bold so the row reads at a glance
+  const stats: [string, string, string][] = [
+    ['', formatNumber(summary.streams), ' streams'],
+    ['', formatNumber(summary.artists), ' artists'],
+    ['', formatNumber(summary.tracks), ' songs'],
+    ['', formatNumber(summary.activeDays), ' days with music'],
+    ['', formatDuration(summary.totalMs / Math.max(summary.activeDays, 1)), ' a day'],
+    ...(newArtists !== null ? [['', formatNumber(newArtists), ' new artists'] as [string, string, string]] : []),
+    ['Peak hour ', formatHour(peak.hour), ''],
+    ...(topArtist ? [['#1 ', topArtist.label, ''] as [string, string, string]] : []),
+    ['', formatPercent(summary.skipRate), ' skipped'],
   ]
 
   return (
@@ -41,7 +42,8 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
       <section className="hero" ref={ref} id="top">
         <div className="hero__rings" aria-hidden="true" />
         <p className="hero__eyebrow">
-          {isSample ? 'Sample record' : 'Your record'} <span>·</span> {year ?? span}
+          {isSample ? 'Sample record' : 'Your record'}
+          <span>{year ?? span}</span>
         </p>
         <h1 className="hero__number" aria-label={`${formatNumber(total)} hours`}>
           {formatNumber(count)}
@@ -63,23 +65,13 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
         </div>
       </section>
 
-      <div className="ticker" aria-hidden="true">
-        <div className="ticker__track">
-          {[0, 1].map((copy) => (
-            <span key={copy} className="ticker__set">
-              {ticker.map((t) => (
-                <span key={t}>
-                  {t}
-                  <i>✦</i>
-                </span>
-              ))}
-            </span>
-          ))}
-        </div>
-      </div>
-      <ul className="sr-only">
-        {ticker.map((t) => (
-          <li key={t}>{t}</li>
+      <ul className="ticker" aria-label="At a glance">
+        {stats.map(([before, figure, after]) => (
+          <li key={before + after}>
+            {before}
+            <b>{figure}</b>
+            {after}
+          </li>
         ))}
       </ul>
     </>

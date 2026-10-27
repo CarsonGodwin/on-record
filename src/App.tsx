@@ -56,12 +56,6 @@ export default function App() {
 
   return (
     <div className="landing">
-      <div className="landing__glow" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </div>
-
       <header className="landing__top">
         <span className="brand">
           My Listening Record<span className="brand__dot" aria-hidden="true" />

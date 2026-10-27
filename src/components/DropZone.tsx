@@ -55,7 +55,15 @@ export function DropZone({ onFiles }: Props) {
         <span className="sleeve__label" />
       </div>
       <div className="sleeve__cover">
-        <span className="sleeve__kicker">{dragging ? 'Let go' : 'Side A · Your data'}</span>
+        <span className="sleeve__kicker">
+          {dragging ? (
+            'Let go'
+          ) : (
+            <>
+              Side A <span>Your data</span>
+            </>
+          )}
+        </span>
         <p className="sleeve__title">
           {dragging ? (
             <>
