@@ -26,7 +26,7 @@ import {
   sameFilter,
   summarize,
   topItems,
-  UNKNOWN_ARTIST,
+  UNMATCHED_ARTIST,
   wearOut,
   weekHourGrid,
 } from '../data/stats'
@@ -96,10 +96,11 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   // Music only and hidden artists come off before anything else, so every chart, color and poster leaves them out.
   // Neither is stored: they reset with the page, like everything else here.
   const [musicOnly, setMusicOnly] = useState(true)
-  // Apple Music plays with no artist in the export would rank as one big "Unknown artist" on the
-  // charts and the poster, so they start hidden, as long as some other artist is left (see canHide)
+  // Apple Music plays with no artist in the export would rank as one big unknown artist on the
+  // charts and the poster, so they start hidden, as long as some other artist is left (see canHide).
+  // They have their own name, so Spotify's tracks without an artist stay put.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() =>
-    result.unmatchedArtists > 0 && result.plays.some((p) => p.kind === 'track' && p.artist !== UNKNOWN_ARTIST) ? new Set([UNKNOWN_ARTIST]) : new Set(),
+    result.unmatchedArtists > 0 && result.plays.some((p) => p.kind === 'track' && p.artist !== UNMATCHED_ARTIST) ? new Set([UNMATCHED_ARTIST]) : new Set(),
   )
   const otherPlays = useMemo(() => result.plays.filter((p) => p.kind !== 'track').length, [result.plays])
   // Older Apple Music rows don't say whether shuffle was on
@@ -763,9 +764,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                     {result.unmatchedArtists > 0 && (
                       <li>
                         {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export.{' '}
-                        {applied.filter.hidden.has(UNKNOWN_ARTIST)
-                          ? `They’re hidden as “${UNKNOWN_ARTIST}”, and Hide Artists… shows them again.`
-                          : `They show as “${UNKNOWN_ARTIST}”.`}
+                        {applied.filter.hidden.has(UNMATCHED_ARTIST)
+                          ? `They’re hidden as “${UNMATCHED_ARTIST}”, and Hide Artists… shows them again.`
+                          : `They show as “${UNMATCHED_ARTIST}”.`}
                       </li>
                     )}
                     {noShuffle > 0 && (

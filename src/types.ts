@@ -78,7 +78,7 @@ export interface LoadResult {
   skippedRows: number
   /** Rows seen more than once, e.g. the same file dropped twice */
   duplicateRows: number
-  /** Apple Music plays whose artist couldn't be found anywhere in the export, kept as "Unknown artist" */
+  /** Apple Music plays whose artist couldn't be found anywhere in the export, kept as UNMATCHED_ARTIST (data/stats.ts) */
   unmatchedArtists: number
   warnings: string[]
 }

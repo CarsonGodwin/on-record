@@ -1,7 +1,8 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import { isHistoryFileName, isImportFileName, loadFiles } from '../../src/data/load'
-import { summarize } from '../../src/data/stats'
+import { UNKNOWN_ARTIST } from '../../src/data/parse'
+import { filterPlays, summarize, UNMATCHED_ARTIST } from '../../src/data/stats'
 import { dailyTracks, FILE_NAMES, library, playActivity, playRow, PRIVATE, ymd } from '../apple'
 import { at } from '../helpers'
 
@@ -135,33 +136,45 @@ describe('loading an Apple Music export', () => {
 })
 
 describe('loading Spotify and Apple Music together', () => {
-  const spotify = JSON.stringify([
-    {
-      ts: new Date(t - 86_400_000).toISOString(),
-      platform: 'android',
-      ms_played: 200_000,
-      conn_country: 'US',
-      master_metadata_track_name: 'Old Favourite',
-      master_metadata_album_artist_name: 'Marlowe Fox',
-      master_metadata_album_album_name: 'Album',
-      spotify_track_uri: 'spotify:track:old',
-      episode_name: null,
-      episode_show_name: null,
-      spotify_episode_uri: null,
-      reason_start: 'trackdone',
-      reason_end: 'trackdone',
-      shuffle: true,
-      skipped: false,
-      offline: false,
-      incognito_mode: false,
-    },
-  ])
+  const row = {
+    ts: new Date(t - 86_400_000).toISOString(),
+    platform: 'android',
+    ms_played: 200_000,
+    conn_country: 'US',
+    master_metadata_track_name: 'Old Favourite',
+    master_metadata_album_artist_name: 'Marlowe Fox',
+    master_metadata_album_album_name: 'Album',
+    spotify_track_uri: 'spotify:track:old',
+    episode_name: null,
+    episode_show_name: null,
+    spotify_episode_uri: null,
+    reason_start: 'trackdone',
+    reason_end: 'trackdone',
+    shuffle: true,
+    skipped: false,
+    offline: false,
+    incognito_mode: false,
+  }
+  const spotify = JSON.stringify([row])
 
   it('merges both into one timeline', async () => {
     const result = await loadFiles([await appleDownload(), file('Streaming_History_Audio_2024.json', spotify)])
     expect(result.sources).toEqual(['spotify', 'apple'])
     expect(result.plays.map((p) => p.title)).toEqual(['Old Favourite', 'Blue Plastic', 'Intro', 'Reality Surf'])
     expect(result.filesRead[0]).toBe('Streaming_History_Audio_2024.json')
+  })
+
+  it('hides Apple Music’s unmatched plays without hiding Spotify’s tracks that have no artist', async () => {
+    const noArtist = JSON.stringify([{ ...row, master_metadata_track_name: 'Bootleg', master_metadata_album_artist_name: null, spotify_track_uri: 'spotify:track:bootleg' }])
+    // Without the library file, Intro's artist can't be found
+    const result = await loadFiles([
+      file('Apple_Media_Services.zip', await zipBytes({ [`${DIR}/${FILE_NAMES.playActivity}`]: PLAYS, [`${DIR}/${FILE_NAMES.dailyTracks}`]: DAILY })),
+      file('Streaming_History_Audio_2024.json', noArtist),
+    ])
+    expect(result.unmatchedArtists).toBe(1)
+    expect(summaryOf(result.plays)).toEqual([`Bootleg: ${UNKNOWN_ARTIST}`, 'Blue Plastic: Yung Lean', `Intro: ${UNMATCHED_ARTIST}`, 'Reality Surf: Bladee (skipped)'])
+    const shown = filterPlays(result.plays, { musicOnly: true, hidden: new Set([UNMATCHED_ARTIST]) })
+    expect(shown.map((p) => p.title)).toEqual(['Bootleg', 'Blue Plastic', 'Reality Surf'])
   })
 
   it('works out the shuffle rate from the plays that record it', async () => {

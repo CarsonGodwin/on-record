@@ -10,8 +10,12 @@ import type { Play } from '../types'
 /** Spotify only counts a stream after 30 seconds of listening. Plays counts use the same rule. */
 export const COUNTED_PLAY_MS = 30_000
 
-/** The artist given to Apple Music plays the export never names one for */
-export const UNKNOWN_ARTIST = 'Unknown artist'
+/**
+ * The artist given to Apple Music plays the export never names one for. Kept apart from
+ * Spotify's UNKNOWN_ARTIST (data/parse.ts) because these start hidden, and in a history
+ * with Spotify in it too that mustn't hide Spotify's own tracks.
+ */
+export const UNMATCHED_ARTIST = 'Unknown artist (Apple Music)'
 
 const DAY_MS = 86_400_000
 

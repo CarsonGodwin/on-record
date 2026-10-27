@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { appleDevice, loadApple, looseKey, parseDay, parseTime, splitDescription, titleKey } from '../../src/data/apple'
 import { appleFileKind, isAppleArchiveName, type AppleText } from '../../src/data/appleFiles'
-import { dayNumber, startDate, summarize, UNKNOWN_ARTIST } from '../../src/data/stats'
+import { dayNumber, startDate, summarize, UNMATCHED_ARTIST } from '../../src/data/stats'
 import type { Play } from '../../src/types'
 import { appleText, dailyTracks, library, playActivity, playRow, PLAY_ACTIVITY_COLUMNS, PRIVATE, recentlyPlayed, trackPlayHistory, ymd } from '../apple'
 import { at } from '../helpers'
@@ -379,12 +379,12 @@ describe('finding artists', () => {
   it('ignores a Recently Played album credited to someone other than the track’s artist', () => {
     const rows = [song('Unlisted', 0, { 'Album Name': 'Hits' })]
     const recent = appleText('recentlyPlayed', recentlyPlayed([{ description: 'Robyn - Dancing On My Own', album: 'Various Artists - Hits' }]))
-    expect(artistsOf(rows, [recent])).toEqual([`Unlisted: ${UNKNOWN_ARTIST}`])
+    expect(artistsOf(rows, [recent])).toEqual([`Unlisted: ${UNMATCHED_ARTIST}`])
   })
 
   it('uses the album artist when nothing else names one, unless it’s a placeholder', () => {
     const rows = [song('Rare B-Side', 0, { 'Container Artist Name': 'Juniper Vale' }), song('Compilation Track', 1, { 'Container Artist Name': 'Various Artists' })]
-    expect(artistsOf(rows)).toEqual(['Rare B-Side: Juniper Vale', `Compilation Track: ${UNKNOWN_ARTIST}`])
+    expect(artistsOf(rows)).toEqual(['Rare B-Side: Juniper Vale', `Compilation Track: ${UNMATCHED_ARTIST}`])
   })
 
   it('settles a shared title by the library’s album', () => {
@@ -445,17 +445,17 @@ describe('finding artists', () => {
 
   it('looks up the artist when the row names a placeholder like Various Artists', () => {
     const rows = [song('Compilation Track', 0, { 'Artist Name': 'Various Artists' }), song('Other', 1, { 'Artist Name': 'Apple Music' })]
-    expect(artistsOf(rows, [daily('Juniper Vale - Compilation Track')])).toEqual(['Compilation Track: Juniper Vale', `Other: ${UNKNOWN_ARTIST}`])
+    expect(artistsOf(rows, [daily('Juniper Vale - Compilation Track')])).toEqual(['Compilation Track: Juniper Vale', `Other: ${UNMATCHED_ARTIST}`])
   })
 
   it('doesn’t fill in from an album several artists share', () => {
     const rows = [song('One', 0, { 'Album Name': 'Greatest Hits' }), song('Two', 1, { 'Album Name': 'Greatest Hits' }), song('Hidden Track', 2, { 'Album Name': 'Greatest Hits' })]
-    expect(artistsOf(rows, [daily('Queen - One', 'ABBA - Two')])[2]).toBe(`Hidden Track: ${UNKNOWN_ARTIST}`)
+    expect(artistsOf(rows, [daily('Queen - One', 'ABBA - Two')])[2]).toBe(`Hidden Track: ${UNMATCHED_ARTIST}`)
   })
 
   it('keeps plays with no artist anywhere, and counts and warns about them', () => {
     const { plays, unmatchedArtists, warnings } = load([song('Mystery', 0), song('Known', 1)], [daily('Someone - Known')])
-    expect(plays.map((p) => p.artist)).toEqual([UNKNOWN_ARTIST, 'Someone'])
+    expect(plays.map((p) => p.artist)).toEqual([UNMATCHED_ARTIST, 'Someone'])
     expect(unmatchedArtists).toBe(1)
     expect(warnings).toEqual([
       '50% of Apple Music plays had no artist anywhere in the export. Artists come from the export’s other Apple Music files, so drop the whole zip rather than the play activity alone.',

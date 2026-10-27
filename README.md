@@ -50,7 +50,7 @@ Both exports become the same plays, so every view works with either. Apple's exp
 
 | | Spotify | Apple Music |
 |---|---|---|
-| **Artist** | In every row | Not in the play activity. Matched by song title from the export's other Apple Music files (and the library), using the album (from the library and Recently Played) and the day played to tell apart songs that share a title, and spelled the way the export spells that artist most (the library's spelling first). Songs with no match become "Unknown artist", hidden to start with (Hide Artists… shows them), and Load details counts them. |
+| **Artist** | In every row | Not in the play activity. Matched by song title from the export's other Apple Music files (and the library), using the album (from the library and Recently Played) and the day played to tell apart songs that share a title, and spelled the way the export spells that artist most (the library's spelling first). Songs with no match become "Unknown artist (Apple Music)", hidden to start with (Hide Artists… shows them), and Load details counts them. |
 | **Shuffle** | Recorded | Recorded only on newer plays. Shuffle stats leave out the plays that don't say, and Load details counts them; with none at all, the shuffle question and shuffle facts are left out. |
 | **Podcasts and audiobooks** | Included | Not in Apple Music's export, so the podcast views stay empty. |
 | **Skips** | `skipped` flag and end reason | From Apple's end reason (skipped forward). |

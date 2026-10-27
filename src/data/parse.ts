@@ -1,5 +1,11 @@
 import type { Play, PlayKind, RawStreamRecord } from '../types'
 
+/**
+ * The artist given to Spotify tracks that come without one. It lives here rather than in
+ * data/stats.ts so the landing page, which parses Spotify's files, doesn't load stats too.
+ */
+export const UNKNOWN_ARTIST = 'Unknown artist'
+
 export function isStreamRecord(row: unknown): row is RawStreamRecord {
   return (
     typeof row === 'object' &&
@@ -28,7 +34,7 @@ export function toPlay(r: RawStreamRecord): Play | null {
   if (r.master_metadata_track_name) {
     kind = 'track'
     title = r.master_metadata_track_name
-    artist = r.master_metadata_album_artist_name ?? 'Unknown artist'
+    artist = r.master_metadata_album_artist_name ?? UNKNOWN_ARTIST
     album = r.master_metadata_album_album_name ?? ''
     uri = r.spotify_track_uri ?? ''
   } else if (r.episode_name) {

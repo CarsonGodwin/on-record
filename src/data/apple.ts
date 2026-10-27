@@ -2,7 +2,7 @@ import { formatNumber, formatPercent } from '../lib/format'
 import type { Play } from '../types'
 import type { AppleText } from './appleFiles'
 import { headerKey, readCsv } from './csv'
-import { dayNumber, UNKNOWN_ARTIST } from './stats'
+import { dayNumber, UNMATCHED_ARTIST } from './stats'
 
 /*
  * Turns an Apple Music privacy export into the same Play[] a Spotify export gives.
@@ -377,7 +377,7 @@ function buildPlays(parts: AppleParts): { plays: Play[]; duplicateRows: number; 
   const plays = listens.map((l, i) => {
     const artist = artists[i]
     if (artist === null) unmatchedArtists++
-    return listenToPlay(l, artist ?? UNKNOWN_ARTIST)
+    return listenToPlay(l, artist ?? UNMATCHED_ARTIST)
   })
   return { plays, duplicateRows: duplicates, unmatchedArtists }
 }
