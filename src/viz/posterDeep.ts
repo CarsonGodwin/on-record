@@ -579,7 +579,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillStyle = soft
   ctx.font = font(500, 1.25 * u)
   ctx.textAlign = 'left'
-  ctx.fillText(`Data: my Spotify Extended Streaming History, ${formatDate(firstDate)} – ${formatDate(lastDate)}.`, pad, H - 1.8 * u)
+  ctx.fillText(`Data: my ${data.source}, ${formatDate(firstDate)} – ${formatDate(lastDate)}.`, pad, H - 1.8 * u)
   ctx.textAlign = 'right'
   ctx.fillText('Made using mylisteningrecord.com', W - pad, H - 1.8 * u)
   ctx.textAlign = 'left'

@@ -1,4 +1,4 @@
-import { isHistoryFileName } from '../data/load'
+import { isImportFileName } from '../data/load'
 
 /**
  * Collects files from a drop event, walking into folders. Safari unzips
@@ -22,8 +22,10 @@ export function filesFromDrop(dt: DataTransfer): Promise<File[]> {
 
 async function walk(entry: FileSystemEntry, out: File[], insideFolder: boolean): Promise<void> {
   if (entry.isFile) {
-    // Inside a folder, keep only history files so the readme etc. don't produce warnings
-    if (insideFolder && !isHistoryFileName(entry.fullPath)) return
+    // Inside a folder, keep only history files so the readme etc. don't produce warnings.
+    // Apple's export unzips to a folder holding a lot more than music, so this also keeps
+    // the rest of it out of the page.
+    if (insideFolder && !isImportFileName(entry.fullPath)) return
     out.push(await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject)))
     return
   }

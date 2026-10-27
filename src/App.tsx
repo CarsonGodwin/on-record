@@ -66,19 +66,19 @@ export default function App() {
         <span className="brand">
           My Listening Record<span className="brand__dot" aria-hidden="true" />
         </span>
-        <span className="landing__tag">A Spotify history visualizer</span>
+        <span className="landing__tag">A Spotify &amp; Apple Music history visualizer</span>
       </header>
 
       <main className="landing__main">
         <div className="landing__copy">
-          <p className="eyebrow">An in-depth analysis of your entire Spotify history</p>
+          <p className="eyebrow">An in-depth analysis of your entire Spotify or Apple Music history</p>
           <h1 className="landing__title">
             My life,
             <br />
             <em>my listening record.</em>
           </h1>
           <p className="landing__lede">
-            Drop in your Spotify export and get every day of your listening pressed into vinyl.
+            Drop in your Spotify or Apple Music export and get every day of your listening pressed into vinyl.
             {/* A phone's first screen keeps to the one sentence, so the sleeve and the demo fit on it too */}
             <span className="landing__more">
               {' '}
@@ -138,7 +138,8 @@ export default function App() {
       </ul>
 
       <details className="how-to">
-        <summary>How to get your Extended Streaming History</summary>
+        <summary>How to get your listening history</summary>
+        <h3>Spotify</h3>
         <ol>
           <li>
             Go to{' '}
@@ -154,6 +155,30 @@ export default function App() {
           <li>Wait for the download link. Spotify says it takes up to 30 days, but it’s often faster.</li>
           <li>Add the zip file on the sleeve above.</li>
         </ol>
+        <h3>
+          Apple Music <span className="beta">Beta</span>
+        </h3>
+        <p className="how-to__note">
+          Apple Music support is new, and Apple’s export changes between versions. If something looks wrong,{' '}
+          <a href="https://github.com/CarsonGodwin/on-record/issues" target="_blank" rel="noreferrer">
+            report it on GitHub
+          </a>{' '}
+          with what Load details says (it lists file names and counts, never your listening).
+        </p>
+        <ol>
+          <li>
+            Go to{' '}
+            <a href="https://privacy.apple.com/" target="_blank" rel="noreferrer">
+              privacy.apple.com
+            </a>{' '}
+            and sign in with your Apple Account.
+          </li>
+          <li>
+            Choose <strong>Request a copy of your data</strong>, then check <strong>Apple Media Services information</strong>.
+          </li>
+          <li>Wait for the email saying it’s ready. Apple says it can take up to a week.</li>
+          <li>Download every part (big exports come in several zips) and add them all on the sleeve above.</li>
+        </ol>
       </details>
 
       <p className="colophon">
@@ -165,8 +190,8 @@ export default function App() {
       </p>
 
       <p className="disclaimer">
-        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
-        trademark of Spotify AB.
+        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
+        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
       </p>
     </div>
   )

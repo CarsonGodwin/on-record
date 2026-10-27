@@ -1,9 +1,9 @@
 # My Listening Record
 [![Live site](https://img.shields.io/badge/live-mylisteningrecord.com-blue)](https://mylisteningrecord.com)
 
-**React + Vite app that visualizes your Spotify listening history.**
+**React + Vite app that visualizes your Spotify or Apple Music listening history.**
 
-Drop in your **Extended Streaming History** export and get your listening pressed into vinyl, plus a dozen other ways to look at it.
+Drop in your Spotify **Extended Streaming History** or your Apple Music **privacy export** and get your listening pressed into vinyl, plus a dozen other ways to look at it.
 
 Everything runs in your browser. There's no server, and your data is never uploaded. Even the cover art is generated from names rather than fetched. The built site ships with a Content Security Policy that blocks all network requests (`connect-src 'none'`), so the browser itself enforces that.
 
@@ -29,11 +29,38 @@ Every view follows the year picker at the top.
 
 ## Getting your data
 
+**Spotify**
+
 1. Go to [spotify.com/account/privacy](https://www.spotify.com/account/privacy/) and request **Extended streaming history**.
 2. Confirm the email, then wait for the download link (up to 30 days).
 3. Drop the `.zip` onto the record sleeve.
 
+**Apple Music** (beta: support is new, so please [report anything that looks wrong](https://github.com/CarsonGodwin/on-record/issues))
+
+1. Go to [privacy.apple.com](https://privacy.apple.com/), choose **Request a copy of your data** and check **Apple Media Services information**.
+2. Wait for the email (Apple says up to a week).
+3. Download every part and drop them all onto the record sleeve. The zips, the folder they unzip to, or the `Apple Music*.csv`/`.json` files all work. Only the Apple Music files are opened; the rest of the export (purchases, Apple Pay and so on) is never read.
+
+You can drop a Spotify export and an Apple Music export together to get one timeline, for example if you switched services.
+
 No data yet? Use **Try the demo**.
+
+## Spotify vs. Apple Music
+
+Both exports become the same plays, so every view works with either. Apple's export records less than Spotify's, so a few things differ:
+
+| | Spotify | Apple Music |
+|---|---|---|
+| **Artist** | In every row | Not in the play activity. Matched by song title from the export's other Apple Music files (and the library), using the album (from the library and Recently Played) and the day played to tell apart songs that share a title, and spelled the way the export spells that artist most (the library's spelling first). Songs with no match become "Unknown artist (Apple Music)", hidden to start with (Hide Artists… shows them), and Load details counts them. |
+| **Shuffle** | Recorded | Recorded only on newer plays. Shuffle stats leave out the plays that don't say, and Load details counts them; with none at all, the shuffle question and shuffle facts are left out. |
+| **Podcasts and audiobooks** | Included | Not in Apple Music's export, so the podcast views stay empty. |
+| **Skips** | `skipped` flag and end reason | From Apple's end reason (skipped forward). |
+| **Plays** | One row per stream | Apple splits a listen whenever you pause or seek; parts of the same song within 30 seconds are joined back into one play. A song on repeat stays separate plays. |
+| **Songs** | Told apart by Spotify's track ID | No track IDs, so songs are told apart by artist and title. A single and its album version count as one song. Dropped with a Spotify export, a song with the same artist and title shares Spotify's ID, so it counts as one song across both. |
+| **Videos** | Video history files are skipped | Music video plays are left out, and Load details counts them |
+| **Devices** | Phone, computer, web, speakers | The same families, plus Apple Watch and Apple TV; HomePod and Alexa count as speakers. Older plays that don't name the app fall back to the device type they record. |
+
+On the Deep dive poster, the credit line names whichever export the data came from.
 
 ## Development
 
@@ -56,8 +83,11 @@ The build emits `dist/_headers`, which Cloudflare applies as response headers: t
 ```
 src/
   types.ts              Raw Spotify row type and the cleaned-up Play type
-  data/parse.ts         Turns one raw row into a Play
-  data/load.ts          Reads zip/JSON files, validates, dedupes
+  data/parse.ts         Turns one raw Spotify row into a Play
+  data/load.ts          Reads zip/JSON/CSV files (including Apple's zips within zips), validates, dedupes
+  data/appleFiles.ts    Which files in Apple's privacy export hold Apple Music history
+  data/apple.ts         Apple Music's export to Plays: joins split listens, finds artists by title
+  data/csv.ts           A small CSV reader that copies out only the columns asked for
   data/sample.ts        Seeded fake history in Spotify's raw format
   data/sampleWords.ts   Invented artist, song, show and book names the sample is built from
   data/stats.ts         Summary numbers, rankings, streaks
@@ -88,4 +118,4 @@ src/
 
 ## Disclaimer
 
-My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a trademark of Spotify AB.
+My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc. Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.

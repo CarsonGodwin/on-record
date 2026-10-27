@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { equivalents, formatHour } from '../../src/lib/format'
+import { equivalents, formatHour, historyName } from '../../src/lib/format'
 
 describe('formatHour', () => {
   it('uses a 12-hour clock', () => {
@@ -20,5 +20,14 @@ describe('equivalents', () => {
 
   it('is zero for no listening', () => {
     expect(equivalents(0)).toEqual({ days: 0, flights: 0, marathons: 0 })
+  })
+})
+
+describe('historyName', () => {
+  it('names the export the data came from', () => {
+    expect(historyName(['spotify'])).toBe('Spotify Extended Streaming History')
+    expect(historyName(['apple'])).toBe('Apple Music listening history')
+    expect(historyName(['spotify', 'apple'])).toBe('Spotify and Apple Music listening history')
+    expect(historyName([])).toBe('Spotify Extended Streaming History')
   })
 })

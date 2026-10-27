@@ -400,6 +400,10 @@ describe('takes', () => {
     expect(run(plays, { shuffleRate: 0.9 }).map((t) => t.text)).toContain('Lets shuffle pick 90% of the time.')
     expect(run(plays, { shuffleRate: 0.05 }).map((t) => t.text)).toContain('Shuffle? Only 5% of the time. You pick the order.')
   })
+
+  it('says nothing about shuffle when the export doesn’t record it', () => {
+    expect(run(split(1, 1), { shuffleRate: null }).some((t) => /shuffle/i.test(t.text))).toBe(false)
+  })
 })
 
 describe('topEntries', () => {

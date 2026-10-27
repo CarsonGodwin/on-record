@@ -291,8 +291,11 @@ const CLOSE = 5
 function Habits({ summary }: { summary: Summary }) {
   const habits: Habit[] = [
     { key: 'skip', question: 'How many songs do you skip?', value: summary.skipRate, note: 'Songs you skipped before they ended' },
-    { key: 'shuffle', question: 'How often is shuffle on?', value: summary.shuffleRate, note: 'Songs played with shuffle on' },
   ]
+  // Only newer Apple Music plays record shuffle, so an Apple-only history may have none
+  if (summary.shuffleRate !== null) {
+    habits.push({ key: 'shuffle', question: 'How often is shuffle on?', value: summary.shuffleRate, note: 'Songs played with shuffle on' })
+  }
   if (summary.artists > 0) {
     habits.push({ key: 'artists', question: 'How many different artists did you play?', value: summary.artists, note: 'Artists with at least one play', count: true })
   }

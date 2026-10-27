@@ -4,7 +4,7 @@ Guidance for coding agents working in this repo. The [README](README.md) covers 
 
 ## What this is
 
-My Listening Record is a client-only React 19 + Vite + TypeScript app that visualizes a Spotify Extended Streaming History export. There is no backend. Data is parsed, aggregated and drawn entirely in the browser, and the built site's CSP sets `connect-src 'none'`.
+My Listening Record is a client-only React 19 + Vite + TypeScript app that visualizes a Spotify Extended Streaming History export or an Apple Music privacy export (or both together). There is no backend. Data is parsed, aggregated and drawn entirely in the browser, and the built site's CSP sets `connect-src 'none'`.
 
 ## Commands
 
@@ -28,15 +28,17 @@ TZ=Pacific/Auckland npm test
 
 - **No network.** Never add `fetch`, external images, CDN fonts, analytics or anything else that leaves the page. Cover art is generated from names; fonts are bundled through `@fontsource`. The CSP in [vite.config.ts](vite.config.ts) blocks this anyway, so a change that needs a request will break in production even if it works in `npm run dev` (dev has no CSP).
 - **Nothing is stored.** The landing page promises nothing is uploaded or stored. Settings such as Music only and hidden artists live in React state and reset with the page; don't add `localStorage`, IndexedDB or cookies to keep them.
-- **Never commit real listening data.** `.gitignore` excludes Spotify exports; use `data/sample.ts` (seeded fake history) for demos and fixtures.
-- **Don't copy private fields.** `RawStreamRecord` leaves out `ip_addr`, `user_agent`, `username` etc. on purpose, and `toPlay()` must never copy them.
-- **Keep the loader's safety caps** (`MAX_FILE_BYTES`, `MAX_ENTRIES`, … in `data/load.ts`). They guard against zip bombs in the visitor's tab.
+- **Never commit real listening data.** `.gitignore` excludes Spotify and Apple Music exports; use `data/sample.ts` (seeded fake history) for demos and fixtures, and `tests/apple.ts` to build Apple-format fixtures.
+- **Don't copy private fields.** `RawStreamRecord` leaves out `ip_addr`, `user_agent`, `username` etc. on purpose, and `toPlay()` must never copy them. Apple's play activity also holds IP addresses and account and device IDs: `readCsv` only copies the columns in `PLAY_COLUMNS` (`data/apple.ts`), so never add a private column there.
+- **Only open Apple Music files.** Apple's export also holds purchases, Apple Pay activity and account details. `data/appleFiles.ts` matches files and nested zips by exact name; keep it an allowlist.
+- **Keep the loader's safety caps** (`MAX_FILE_BYTES`, `MAX_ENTRIES`, `MAX_ZIP_DEPTH`, `MAX_NESTED_ZIPS`, … in `data/load.ts`). They guard against zip bombs in the visitor's tab, and a zip's nested zips share its budget (`ZipBudget`) so nesting can't multiply them.
 - If you change the CSP, update both the meta tag and the `_headers` output in `vite.config.ts` (they share the `CSP` constant).
 
 ## Architecture
 
-- `src/types.ts`: `RawStreamRecord` (Spotify's row) and `Play` (the cleaned row every chart uses). `Play.endTime` is when playback **stopped**; use `startDate()` from `data/stats.ts` for the start.
-- `src/data/`: pure functions. `parse` → `load` (zip/JSON, validate, dedupe, sort by `endTime`) → `stats` / `insights` (aggregations). No React here.
+- `src/types.ts`: `RawStreamRecord` (Spotify's row) and `Play` (the cleaned row every chart uses, from either service). `Play.endTime` is when playback **stopped**; use `startDate()` from `data/stats.ts` for the start. `Play.shuffle` is `null` when the export doesn't record it (older Apple Music rows), and `Summary.shuffleRate` counts only the plays that say, so it's `null` when none do.
+- `src/data/`: pure functions. `parse` (Spotify rows) and `apple` (Apple Music files) → `load` (zip/JSON/CSV, validate, dedupe, sort by `endTime`) → `stats` / `insights` (aggregations). No React here. `load` imports `apple` dynamically so Spotify visitors never download it; it only needs `appleFiles` up front.
+- Apple Music differs from Spotify in what it records (no artist in the play activity, shuffle only on newer rows, no podcasts, listens split by pauses). The README's "Spotify vs. Apple Music" table lists the differences; keep it current when either side changes.
 - `src/viz/`: canvas/SVG drawing shared between on-screen charts, posters and the race video. `posterShared.ts` holds helpers for all posters and the video.
 - `src/lib/`: small shared utilities (formatting, palette, hooks, pointer/zoom, seeded random, the launcher's shortcut (`keys`), word-start search and list selection, the stage context and stop lookup shared by The Long Play and the phone deck, card swipes (`swipe`) and the back gesture (`back`)).
 - `src/components/`: one file per visualization, plus `Dashboard` (layout, filters and year picker), `Launcher` (the ⌘K launcher and its pages), `Panels` (the shared `<dialog>` `Modal` and Settings), `PosterStudio`, `DropZone` (landing), `Hero` (the summary at the top of the dashboard), `Tour` (The Long Play) and `CardNav` (the phone deck's bottom bar). `App.tsx` lazy-loads `Dashboard` so the landing page stays light.
@@ -62,6 +64,8 @@ TZ=Pacific/Auckland npm test
 
 - Vitest, under `tests/{data,lib,viz}`, mirroring `src/`. Components aren't unit-tested; keep logic in `data/`, `lib/` or `viz/` where it can be.
 - Build fixtures with `tests/helpers.ts`: `at(year, month, day, hour?, minute?)` (1-based month, local time), `play(start, overrides)` and `sorted(plays)`. Tests must pass in any time zone.
+- Apple fixtures come from `tests/apple.ts` (`playRow`, `dailyTracks`, `library`, …). `appleExportFrom` rewrites the demo as an Apple export, and `tests/data/appleParity.test.ts` checks both pipelines agree.
+- `tests/data/load.test.ts` pins down how Spotify exports load. If a change makes it fail, Spotify listeners would see something different: fix the change, not the test.
 
 ## Product and design taste
 
