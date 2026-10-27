@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canHide,
   dayNumber,
   filterByYear,
+  filterPlays,
   fromDayNumber,
   funStats,
   getYears,
   isSkip,
   newArtistsIn,
   platforms,
+  sameFilter,
   startDate,
   summarize,
   topItems,
@@ -291,5 +294,61 @@ describe('newArtistsIn', () => {
     ])
     expect(newArtistsIn(plays, 2024)).toBe(2)
     expect(newArtistsIn(plays, 2023)).toBe(1)
+  })
+})
+
+describe('filterPlays', () => {
+  const song = play(at(2024, 1, 1), { artist: 'Kept' })
+  const hiddenSong = play(at(2024, 1, 2), { artist: 'Gone' })
+  const episode = play(at(2024, 1, 3), { kind: 'episode', artist: 'A Show' })
+  const chapter = play(at(2024, 1, 4), { kind: 'audiobook', artist: 'A Book' })
+  const all = [song, hiddenSong, episode, chapter]
+
+  it('keeps everything with no filters on', () => {
+    expect(filterPlays(all, { musicOnly: false, hidden: new Set() })).toEqual(all)
+  })
+
+  it('drops podcasts and audiobooks when music only', () => {
+    expect(filterPlays(all, { musicOnly: true, hidden: new Set() })).toEqual([song, hiddenSong])
+  })
+
+  it('drops the songs of hidden artists', () => {
+    expect(filterPlays(all, { musicOnly: true, hidden: new Set(['Gone']) })).toEqual([song])
+  })
+
+  it('only hides music, even when a show shares the name', () => {
+    const sameName = play(at(2024, 1, 5), { kind: 'episode', artist: 'Gone' })
+    expect(filterPlays([hiddenSong, sameName], { musicOnly: false, hidden: new Set(['Gone']) })).toEqual([sameName])
+  })
+})
+
+describe('canHide', () => {
+  const artists = topItems([play(at(2024, 1, 1), { artist: 'A' }), play(at(2024, 1, 2), { artist: 'B' })], 'artist', 'time', Infinity)
+
+  it('hides while someone is left', () => {
+    expect(canHide(artists, new Set(), ['A'])).toBe(true)
+    expect(canHide(artists, new Set(['A']), [])).toBe(true)
+  })
+
+  it('refuses to hide the last artist showing', () => {
+    expect(canHide(artists, new Set(['A']), ['B'])).toBe(false)
+    expect(canHide(artists, new Set(), ['A', 'B'])).toBe(false)
+  })
+
+  it('doesn’t count a name that isn’t an artist as one left showing', () => {
+    expect(canHide(artists, new Set(['A']), ['B', 'Nobody'])).toBe(false)
+  })
+})
+
+describe('sameFilter', () => {
+  it('compares what is hidden, not which set holds it', () => {
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A', 'B']) }, { musicOnly: true, hidden: new Set(['B', 'A']) })).toBe(true)
+    expect(sameFilter({ musicOnly: true, hidden: new Set() }, { musicOnly: true, hidden: new Set() })).toBe(true)
+  })
+
+  it('tells filters apart', () => {
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: false, hidden: new Set(['A']) })).toBe(false)
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['B']) })).toBe(false)
+    expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['A', 'B']) })).toBe(false)
   })
 })

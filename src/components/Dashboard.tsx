@@ -15,28 +15,34 @@ import {
   songStats,
   takes,
 } from '../data/insights'
-import { filterByYear, funStats, getYears, newArtistsIn, platforms, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
+import { canHide, filterByYear, filterPlays, funStats, getYears, newArtistsIn, platforms, sameFilter, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
 import { formatHour, formatNumber, historyName } from '../lib/format'
-import { COARSE, PHONE } from '../lib/pointer'
+import { useMediaQuery } from '../lib/hooks'
+import { isLaunchKey, LAUNCH_KEY } from '../lib/keys'
+import { COARSE } from '../lib/pointer'
 import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
-import { OnStage } from '../lib/stage'
+import { InCards, OnStage, resolveStop } from '../lib/stage'
+import { closeTopmost, useCloseOnBack } from '../lib/back'
+import { useSwipe } from '../lib/swipe'
 import type { DataSource, LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
 import { posterMoments, type PosterData, type PosterDesign } from '../viz/poster'
 import { buildRecord, GROOVE, PODCAST } from '../viz/record'
 import { Calendar } from './Calendar'
+import { CardNav } from './CardNav'
 import { Clock, ClockTable } from './Clock'
 import { Constellation, ConstellationTable } from './Constellation'
 import { Hero } from './Hero'
+import { Launcher, type LauncherMode } from './Launcher'
 import { LinerNotes } from './LinerNotes'
 import { LoveHate, LoveHateTable } from './LoveHate'
-import { NeedleDrop } from './NeedleDrop'
+import { SettingsPanel } from './Panels'
 import { PosterStudio } from './PosterStudio'
 import { Pulse } from './Pulse'
 import { Race } from './Race'
 import { River, RiverTable } from './River'
 import { TopCharts } from './TopCharts'
-import { INTRO, Tour, UpNext } from './Tour'
+import { Tour, UpNext } from './Tour'
 import { TrackMenu, type Track } from './TrackMenu'
 import { Chapter, Segmented, Side } from './ui'
 import { Vinyl } from './Vinyl'
@@ -57,6 +63,15 @@ const TRACKS: Track[] = [
 
 const SIDES: Record<string, string> = { A: 'Time', B: 'Rhythm', C: 'Taste', D: 'Take it home' }
 
+/**
+ * A phone held upright gets the record as a deck of cards: one track fills the screen, nothing scrolls,
+ * and you deal the next one with a swipe or the bar at the bottom. Turned sideways it's the page again.
+ */
+const CARDS = '(pointer: coarse) and (max-width: 699px) and (orientation: portrait)'
+
+/** What a swipe can't start on: things you drag, and fields you type or slide in */
+const OWN_GESTURES = '[data-drag], input, select, textarea, .day-panel, .table-wrap'
+
 interface Props {
   result: LoadResult
   isSample: boolean
@@ -64,14 +79,61 @@ interface Props {
 }
 
 export function Dashboard({ result, isSample, onReset }: Props) {
-  const all = result.plays
+  // Music only and hidden artists come off before anything else, so every chart, color and poster leaves them out.
+  // Neither is stored: they reset with the page, like everything else here.
+  const [musicOnly, setMusicOnly] = useState(true)
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
+  const otherPlays = useMemo(() => result.plays.filter((p) => p.kind !== 'track').length, [result.plays])
+  const hasAnyMusic = otherPlays < result.plays.length
+  const [launcher, setLauncher] = useState<LauncherMode | null>(null)
+  // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  // A history with no music at all keeps its podcasts, or there would be nothing to show
+  const chosen = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden }), [musicOnly, hasAnyMusic, hidden])
+  /*
+   * The charts follow `applied`, which catches up with `chosen` once the launcher and Settings are
+   * closed and an "Updating" note has painted. Re-running every chart over a long history holds the
+   * page for a moment, so it happens once when you're done choosing, not once per artist, and never
+   * without saying so. `version` counts the changes that have reached the charts, for `viewKey`.
+   */
+  const [applied, setApplied] = useState({ filter: chosen, version: 0 })
+  const choosing = launcher !== null || settingsOpen
+  const updating = !choosing && !sameFilter(applied.filter, chosen)
+  useEffect(() => {
+    if (!updating) return
+    let timer = 0
+    // requestAnimationFrame runs just before the paint, so the timeout after it lands just after
+    const frame = requestAnimationFrame(() => {
+      timer = window.setTimeout(() => setApplied((a) => ({ filter: chosen, version: a.version + 1 })))
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [updating, chosen])
+  const all = useMemo(() => filterPlays(result.plays, applied.filter), [result.plays, applied.filter])
   const years = useMemo(() => getYears(all), [all])
-  const [year, setYear] = useState<number | null>(null)
+  const [pickedYear, setYear] = useState<number | null>(null)
+  // Hiding an artist can empty a year; the page then falls back to all time
+  const year = pickedYear !== null && years.includes(pickedYear) ? pickedYear : null
   const [posterDesign, setPosterDesign] = useState<PosterDesign>('deep')
   const [current, setCurrent] = useState<string | null>(null)
-  // Where The Long Play is: an index into the needle drop and the tracks, or null when it's put away
-  const [tourStep, setTourStep] = useState<number | null>(null)
-  const touring = tourStep !== null
+  // Where The Long Play is: the id of the stop on stage, or null when it's put away. An id, not an index,
+  // so hiding artists or switching years mid-tour (which can shorten the record) doesn't strand it.
+  const [tourAt, setTourAt] = useState<string | null>(null)
+  const cards = useMediaQuery(CARDS)
+  // The phone's deck can't be toured: it already is one card at a time
+  const touring = !cards && tourAt !== null
+  // The card on screen, by id for the same reason as the tour's stop
+  const [cardAt, setCardAt] = useState(TRACKS[0].id)
+  // Which way the last card was dealt, so the new one comes in from that side
+  const [dealt, setDealt] = useState<'next' | 'prev'>('next')
+  // Turning the phone upright again deals the card for the section you'd scrolled to on the page
+  const [wasCards, setWasCards] = useState(cards)
+  if (cards !== wasCards) {
+    setWasCards(cards)
+    if (cards && current !== null) setCardAt(current)
+  }
   // Once a finger has scrubbed the record, its how-to stays hidden until new data comes in
   const [scrubLearned, setScrubLearned] = useState(false)
   const topbarRef = useRef<HTMLElement>(null)
@@ -99,6 +161,13 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const graph = useMemo(() => artistGraph(plays, 36, 3), [plays])
 
   const firstHeard = useMemo(() => firstListens(all), [all])
+  // Every music artist, most-listened first, ranked once. The launcher's lists split it by what's hidden,
+  // which stays quick with thousands of artists.
+  const musicArtists = useMemo(() => topItems(result.plays, 'artist', 'time', Infinity), [result.plays])
+  const hiddenPlays = useMemo(
+    () => (applied.filter.hidden.size === 0 ? 0 : result.plays.filter((p) => p.kind === 'track' && applied.filter.hidden.has(p.artist)).length),
+    [result.plays, applied.filter.hidden],
+  )
   const pulseArtists = useMemo(
     () =>
       topArtists
@@ -127,6 +196,13 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     () => [...Array.from({ length: TOP_ARTISTS }, (_, i) => colors.get(legend[i]) ?? OTHER), GROOVE, PODCAST],
     [colors, legend],
   )
+  /*
+   * Charts that hold on to a groove, a pinned song or ridge, a hovered week or a finished video start
+   * over whenever their data is worked out again: a new year, or a filter change reaching the charts
+   * (hiding an artist can shift the days, the songs and the racers). One key for all of them can't
+   * miss an input the way a key per chart, listing what its state points into, can.
+   */
+  const viewKey = `${year ?? 'all'}|${applied.version}`
   const recordTitle = year === null ? 'ALL TIME' : String(year)
   const recordSubtitle = `${formatNumber(summary.totalMs / 3_600_000)} HRS  ·  ${formatNumber(summary.artists)} ARTISTS`
 
@@ -155,8 +231,16 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    * shorter record of what it can still draw.
    */
   const tourTracks = hasMusic ? TRACKS : TRACKS.filter((t) => t.id === 'charts' || t.id === 'notes' || t.id === 'poster')
-  const tourStops = [INTRO, ...tourTracks.map((t) => t.id)]
-  const onStage = tourStep === null ? null : tourStops[tourStep]
+  const tourStops = tourTracks.map((t) => t.id)
+  const tourStep = !touring || tourAt === null ? null : resolveStop(tourStops, tourAt, TRACKS.map((t) => t.id))
+  const setTourStep = (step: number | null) => setTourAt(step === null ? null : (tourStops[step] ?? null))
+  const cardStep = resolveStop(tourStops, cardAt, TRACKS.map((t) => t.id))
+  const setCardStep = (step: number) => {
+    const id = tourStops[Math.max(0, Math.min(tourStops.length - 1, step))]
+    setDealt(step < cardStep ? 'prev' : 'next')
+    setCardAt(id)
+  }
+  const onStage = cards ? tourStops[cardStep] : tourStep === null ? null : tourStops[tourStep]
   const tourTopRef = useRef<HTMLDivElement>(null)
 
   /*
@@ -176,7 +260,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   function openTour(fromGesture: boolean) {
     tourEntry.current = `${Date.now()}-${Math.random()}`
     if (!backPending.current) history.pushState({ longPlay: tourEntry.current }, '')
-    setTourStep(0)
+    setTourAt(tourStops[0])
     const root = document.documentElement
     if (fromGesture && COARSE && document.fullscreenEnabled && !document.fullscreenElement) {
       root
@@ -192,7 +276,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
   function closeTour(finished = false) {
     landAtTop.current = finished
-    setTourStep(null)
+    setTourAt(null)
     tourFullscreen.current = false
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
     const ours = tourEntry.current !== null && history.state?.longPlay === tourEntry.current
@@ -211,7 +295,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     const id = lastStop.current
     if (id === null) return
     lastStop.current = null
-    const target = landAtTop.current || id === INTRO ? null : document.getElementById(id)
+    const target = landAtTop.current ? null : document.getElementById(id)
     landAtTop.current = false
     if (target) target.scrollIntoView({ block: 'start', behavior: 'instant' })
     else window.scrollTo({ top: 0, behavior: 'instant' })
@@ -233,7 +317,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       if (tourEntry.current !== null && history.state?.longPlay === tourEntry.current) return
       tourEntry.current = null
       tourFullscreen.current = false
-      setTourStep(null)
+      setTourAt(null)
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
     }
     const onFullscreen = () => {
@@ -248,20 +332,128 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     }
   }, [])
 
-  // On a phone the tour is the way in: it opens as soon as the data is ready
-  const autoOpened = useRef(false)
+  // The deck owns the screen: the page behind it doesn't scroll or bounce. A layout effect, so that turning
+  // the phone sideways frees the page before it scrolls to the track you were on (see the effect on onStage).
+  useLayoutEffect(() => {
+    if (!cards) return
+    const root = document.documentElement
+    root.classList.add('cards-open')
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    return () => root.classList.remove('cards-open')
+  }, [cards])
+
+  /*
+   * Leaving the page loses the export (nothing is kept), so on the deck the back gesture
+   * (an edge swipe on iPhone, the back button on Android) steps back a card instead, and
+   * from the first card goes back to the start page rather than off the site.
+   */
+  const backTo = useRef({ stops: tourStops, step: cardStep, onReset })
+  useLayoutEffect(() => {
+    backTo.current = { stops: tourStops, step: cardStep, onReset }
+  })
   useEffect(() => {
-    if (!PHONE || autoOpened.current) return
-    autoOpened.current = true
-    openTour(false)
-  }, [])
+    if (!cards) return
+    // One entry for the deck, however often the phone turns back to it
+    if (!history.state?.onRecordCards) history.pushState({ onRecordCards: true }, '')
+    const onPop = () => {
+      // Something open over the card closes first, and the deck keeps its entry
+      if (closeTopmost()) return history.pushState({ onRecordCards: true }, '')
+      const { stops, step, onReset: reset } = backTo.current
+      if (step === 0) return reset()
+      history.pushState({ onRecordCards: true }, '')
+      setDealt('prev')
+      setCardAt(stops[step - 1])
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [cards])
+
+  useCloseOnBack(launcher !== null, () => setLauncher(null))
+  useCloseOnBack(settingsOpen, () => setSettingsOpen(false))
+
+  // Arrow keys deal cards too, except where a slider or the day details want them
+  useEffect(() => {
+    if (!cards) return
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
+      if ((e.target as Element).closest?.(OWN_GESTURES)) return
+      if (e.key === 'ArrowRight') setCardStep(cardStep + 1)
+      else if (e.key === 'ArrowLeft') setCardStep(cardStep - 1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  // A quick sideways swipe on a card deals the next one; drags on things that move stay theirs
+  const swipe = useSwipe((dir) => setCardStep(cardStep + dir), OWN_GESTURES)
+  const swipeHandlers = cards ? swipe : {}
 
   /** Jumps to the poster studio with a design picked (on the tour, its last stop) */
   function makePoster(design: PosterDesign) {
     setPosterDesign(design)
-    if (touring) setTourStep(tourStops.indexOf('poster'))
+    if (cards) setCardAt('poster')
+    else if (touring) setTourStep(tourStops.indexOf('poster'))
     else document.getElementById('poster')?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  /** Hides artists everywhere, but always leaves at least one (see canHide) */
+  function hideArtists(artists: string[]): boolean {
+    if (!canHide(musicArtists, hidden, artists)) return false
+    setHidden((prev) => new Set([...prev, ...artists]))
+    return true
+  }
+
+  function unhideArtists(artists: string[]) {
+    setHidden((prev) => {
+      const next = new Set(prev)
+      for (const a of artists) next.delete(a)
+      return next
+    })
+  }
+
+  /** From the launcher: on the tour, its stop for that chapter; otherwise a scroll */
+  function jumpTo(id: string) {
+    setLauncher(null)
+    if (cards) return setCardStep(resolveStop(tourStops, id, TRACKS.map((t) => t.id)))
+    if (touring) {
+      const stop = tourStops.indexOf(id)
+      if (stop >= 0) return setTourStep(stop)
+      // The shorter tour skips that chapter: put the tour away, and the page lands on it
+      lastStop.current = id
+      return closeTour()
+    }
+    // After the dialog closes and hands focus back, so that doesn't pull the page anywhere
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  function pickYear(y: number | null) {
+    setYear(y)
+    setLauncher(null)
+  }
+
+  /** Back to the landing page, putting the tour away first so its history entry and fullscreen go with it */
+  function clearData() {
+    setLauncher(null)
+    if (touring) closeTour()
+    onReset()
+  }
+
+  function openSettings() {
+    setLauncher(null)
+    setSettingsOpen(true)
+  }
+
+  // ⌘K (Ctrl K) opens the launcher from anywhere, the tour included, and closes it again
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!isLaunchKey(e)) return
+      e.preventDefault()
+      setSettingsOpen(false)
+      setLauncher((open) => (open ? null : 'root'))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Sticky things and jump targets sit just under the top bar, whose height changes with the screen.
   // While the tour is up, its bar stands in for the page's.
@@ -279,6 +471,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
   // Light up the current track in the side nav
   useEffect(() => {
+    if (cards) return
     const sections = TRACKS.map((t) => document.getElementById(t.id)).filter((el): el is HTMLElement => el !== null)
     const observer = new IntersectionObserver(
       (entries) => {
@@ -288,17 +481,26 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     )
     sections.forEach((s) => observer.observe(s))
     return () => observer.disconnect()
-  }, [hasMusic])
+  }, [hasMusic, cards])
 
   return (
-    <div className={touring ? 'dash is-touring' : 'dash'}>
+    <div className={['dash', touring && 'is-touring', cards && 'is-cards', updating && 'is-updating'].filter(Boolean).join(' ')}>
       <header className="topbar" ref={topbarRef}>
-        <a className="brand" href="#top" aria-label="On Record, back to the top">
-          <span className="brand__name">On Record</span>
+        <a
+          className="brand"
+          href="#top"
+          aria-label={cards ? 'My Listening Record, back to the first track' : 'My Listening Record, back to the top'}
+          onClick={(e) => {
+            if (!cards) return
+            e.preventDefault()
+            setCardStep(0)
+          }}
+        >
+          <span className="brand__name">My Listening Record</span>
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
-        <TrackMenu tracks={TRACKS} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />
+        {!cards && <TrackMenu tracks={TRACKS} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />}
         <Segmented
           className="topbar__years"
           label="Time period"
@@ -319,6 +521,19 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          className="topbar__launch"
+          aria-label={hidden.size > 0 ? `Open the launcher (${hidden.size} artist${hidden.size === 1 ? '' : 's'} hidden)` : 'Open the launcher'}
+          onClick={() => setLauncher('root')}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M10.4 10.4 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <kbd>{LAUNCH_KEY}</kbd>
+          {hidden.size > 0 && <span className="topbar__launch-dot" aria-hidden="true" />}
+        </button>
         <div className="topbar__actions">
           <button type="button" className="button button--small" onClick={() => makePoster(posterDesign)}>
             Poster
@@ -342,190 +557,255 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         </ol>
       </nav>
 
-      <OnStage value={onStage}>
-        <main className="dash__main">
-          {onStage === INTRO && (
-            <NeedleDrop model={record} slotColors={slotColors} period={year === null ? span : String(year)} hours={summary.totalMs / 3_600_000} />
-          )}
-
-          <Hero
-            summary={summary}
-            year={year}
-            span={span}
-            isSample={isSample}
-            topArtist={topArtists[0]}
-            hours={hours}
-            newArtists={newArtists}
-            onPlay={() => openTour(true)}
-            onPoster={() => makePoster(posterDesign)}
-          />
-
-          {!hasMusic && <p className="empty">There’s no music in this period, only podcasts. Most of the visuals below need songs.</p>}
-
-          <Side label="Side A" title={SIDES.A} />
-
-          <Chapter id="record" num="A1" title="The Record" lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
-            <Vinyl
-              key={year ?? 'all'}
-              plays={plays}
-              model={record}
-              slotColors={slotColors}
-              legend={legend}
-              title={recordTitle}
-              subtitle={recordSubtitle}
-              onPoster={() => makePoster('record')}
-              learned={scrubLearned}
-              onLearned={() => setScrubLearned(true)}
-            />
-          </Chapter>
-
-          <Chapter
-            id="eras"
-            num="A2"
-            title="Eras"
-            lede="Who ruled your listening, and when."
-            table={() => <RiverTable bins={bins} totals={totals} artists={legend} />}
-          >
-            {hasMusic ? <River bins={bins} totals={totals} eras={eras} artists={legend} colors={colors} /> : <NotEnough />}
-          </Chapter>
-
-          <Chapter
-            id="race"
-            num="A3"
-            title="The Race"
-            lede={`Total hours per artist, replayed ${bins.size} by ${bins.size}. Watch who pulls ahead.`}
-          >
-            {race.names.length > 1 ? <Race key={year ?? 'all'} bins={bins} race={race} colors={colors} /> : <NotEnough />}
-          </Chapter>
-
-          <Side label="Side B" title={SIDES.B} />
-
-          <Chapter
-            id="clock"
-            num="B1"
-            title="Around the Clock"
-            lede="When the music happens, and who you reach for at each hour. Midnight is at the top."
-            table={() => <ClockTable hours={hours} />}
-          >
-            <Clock hours={hours} parts={parts} grid={grid} />
-          </Chapter>
-
-          <Chapter id="days" num="B2" title="Every Day" lede="A square for every day. The brighter it glows, the longer you listened. Tap a day to see what you played.">
-            <Calendar days={days} years={year === null ? years : [year]} plays={plays} firstHeard={firstHeard} colors={colors} />
-          </Chapter>
-
-          <Chapter
-            id="lovehate"
-            num="B3"
-            title="Love / Hate"
-            lede={`Your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up). The lines mark the middle of the pack.`}
-            table={() => <LoveHateTable songs={songs} />}
-          >
-            {songs.length >= 5 ? <LoveHate songs={songs} skipRate={summary.skipRate} /> : <NotEnough />}
-          </Chapter>
-
-          <Side label="Side C" title={SIDES.C} />
-
-          <Chapter
-            id="constellation"
-            num="C1"
-            title="Constellation"
-            lede="Your top artists as stars, joined when you play one straight after the other. Clusters are your scenes."
-            table={() => <ConstellationTable links={graph.links} />}
-          >
-            {graph.nodes.length >= 3 ? <Constellation nodes={graph.nodes} links={graph.links} colors={colors} /> : <NotEnough />}
-          </Chapter>
-
-          <Chapter
-            id="pulse"
-            num="C2"
-            title="Pulse"
-            lede="Your top artists over time, one line each."
-          >
-            {pulseLines.length >= 2 ? (
-              <Pulse
-                bins={bins}
-                totals={totals}
-                artists={pulseLines}
-                firstHeard={firstHeard}
-                colors={colors}
+      <InCards value={cards}>
+        <OnStage value={onStage}>
+          {/* Turning a phone swaps the deck and the page, which lay their charts out differently: start them over */}
+          <main key={cards ? 'cards' : 'page'} className="dash__main" data-dealt={cards ? dealt : undefined} {...swipeHandlers}>
+            {!cards && (
+              <Hero
+                summary={summary}
+                year={year}
+                span={span}
+                isSample={isSample}
+                topArtist={topArtists[0]}
+                hours={hours}
+                newArtists={newArtists}
+                onPlay={() => openTour(true)}
+                onPoster={() => makePoster(posterDesign)}
               />
-            ) : (
-              <NotEnough />
             )}
-          </Chapter>
 
-          <Chapter id="charts" num="C3" title="The Charts" lede="The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.">
-            <TopCharts plays={plays} />
-          </Chapter>
+            {!hasMusic && <p className="empty">There’s no music in this period, only podcasts. Most of the visuals below need songs.</p>}
 
-          <Side label="Side D" title={SIDES.D} />
+            <Side label="Side A" title={SIDES.A} />
 
-          <Chapter id="notes" num="D1" title="Liner Notes" lede="The back of the sleeve: who played on this record, and how well you know your own habits.">
-            <LinerNotes
-              takes={lines}
-              fun={fun}
-              rec={rec}
-              summary={summary}
-              devices={devices}
-              topArtists={topArtists}
-              hours={hours}
-              period={year === null ? span : String(year)}
-              isAllTime={year === null}
-            />
-          </Chapter>
+            <Chapter id="record" num="A1" title="The Record" hint={`${formatNumber(summary.totalMs / 3_600_000)} hours, a ring for every day. Drag the needle, pinch to zoom.`} lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
+              <Vinyl
+                key={viewKey}
+                plays={plays}
+                model={record}
+                slotColors={slotColors}
+                legend={legend}
+                title={recordTitle}
+                subtitle={recordSubtitle}
+                onPoster={() => makePoster('record')}
+                learned={scrubLearned}
+                onLearned={() => setScrubLearned(true)}
+              />
+            </Chapter>
 
-          <Chapter
-            id="poster"
-            num="D2"
-            title="The Poster"
-            lede="Take it home. Pick a design, a size and a background, then download it or send it straight from your phone."
-          >
-            <PosterStudio data={posterData} design={posterDesign} onDesign={setPosterDesign} />
-          </Chapter>
+            <Chapter
+              id="eras"
+              num="A2"
+              title="Eras"
+              hint="Who ruled your listening, and when."
+              lede="Who ruled your listening, and when."
+              table={() => <RiverTable bins={bins} totals={totals} artists={legend} />}
+            >
+              {hasMusic ? <River key={viewKey} bins={bins} totals={totals} eras={eras} artists={legend} colors={colors} /> : <NotEnough />}
+            </Chapter>
 
-          {tourStep !== null && <UpNext tracks={tourTracks} sides={SIDES} step={tourStep} onStep={setTourStep} onFinish={() => closeTour(true)} />}
+            <Chapter
+              id="race"
+              num="A3"
+              title="The Race"
+              hint={`Hours per artist, raced ${bins.size} by ${bins.size}.`}
+              lede={`Total hours per artist, replayed ${bins.size} by ${bins.size}. Watch who pulls ahead.`}
+            >
+              {race.names.length > 1 ? <Race key={viewKey} bins={bins} race={race} colors={colors} /> : <NotEnough />}
+            </Chapter>
 
-          <footer className="dash__footer">
-            <p>
-              <strong>Pressed locally.</strong> Everything on this page was worked out inside this browser tab. Nothing was uploaded.
-            </p>
-            <details className="load-details">
-              <summary>Load details</summary>
-              <ul>
-                <li>
-                  {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
-                </li>
-                <li>
-                  {formatNumber(result.skippedRows)} rows without track info ignored ({skippedRowsHint(result.sources)})
-                </li>
-                {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
-                {result.unmatchedArtists > 0 && (
-                  <li>
-                    {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export, so they show as
-                    “Unknown artist”
-                  </li>
-                )}
-                {result.sources.includes('apple') && <li>Apple Music’s export doesn’t record shuffle, so shuffle stats leave those plays out</li>}
-                {result.warnings.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            </details>
-            <p className="colophon">
-              On Record is open source.{' '}
-              <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
-                Star it, report a bug or support it on GitHub
-              </a>
-              .
-            </p>
-            <p className="disclaimer">
-              On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
-              Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
-            </p>
-          </footer>
-        </main>
-      </OnStage>
+            <Side label="Side B" title={SIDES.B} />
+
+            <Chapter
+              id="clock"
+              num="B1"
+              title="Around the Clock"
+              hint="Drag across the clock or the dots to read any hour."
+              lede="When the music happens, and who you reach for at each hour. Midnight is at the top."
+              table={() => <ClockTable hours={hours} />}
+            >
+              <Clock hours={hours} parts={parts} grid={grid} plays={plays} />
+            </Chapter>
+
+            <Chapter id="days" num="B2" title="Every Day" hint="Tap a day to see everything you played." lede="A square for every day. The brighter it glows, the longer you listened. Tap a day to see what you played.">
+              <Calendar days={days} years={year === null ? years : [year]} plays={plays} firstHeard={firstHeard} colors={colors} />
+            </Chapter>
+
+            <Chapter
+              id="lovehate"
+              num="B3"
+              title="Love / Hate"
+              hint="The song you let play, and the one you skip."
+              lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
+              table={() => <LoveHateTable songs={songs} />}
+            >
+              {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
+            </Chapter>
+
+            <Side label="Side C" title={SIDES.C} />
+
+            <Chapter
+              id="constellation"
+              num="C1"
+              title="Constellation"
+              hint="Artists you play back to back, joined up. Tap a star, pinch to zoom."
+              lede="Your top artists as stars, joined when you play one straight after the other. Clusters are your scenes."
+              table={() => <ConstellationTable links={graph.links} />}
+            >
+              {graph.nodes.length >= 3 ? <Constellation nodes={graph.nodes} links={graph.links} colors={colors} /> : <NotEnough />}
+            </Chapter>
+
+            <Chapter
+              id="pulse"
+              num="C2"
+              title="Pulse"
+              hint="Your top artists over time, one line each. Tap a line."
+              lede="Your top artists over time, one line each."
+            >
+              {pulseLines.length >= 2 ? (
+                <Pulse
+                  key={viewKey}
+                  bins={bins}
+                  totals={totals}
+                  artists={pulseLines}
+                  firstHeard={firstHeard}
+                  colors={colors}
+                />
+              ) : (
+                <NotEnough />
+              )}
+            </Chapter>
+
+            <Chapter id="charts" num="C3" title="The Charts" hint="Your rankings." lede="The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.">
+              <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('artists')} />
+            </Chapter>
+
+            <Side label="Side D" title={SIDES.D} />
+
+            <Chapter id="notes" num="D1" title="Liner Notes" hint="The small print: what you’d never have guessed." lede="The back of the sleeve: who played on this record, and how well you know your own habits.">
+              <LinerNotes
+                takes={lines}
+                fun={fun}
+                rec={rec}
+                summary={summary}
+                devices={devices}
+                topArtists={topArtists}
+                hours={hours}
+                wear={wear}
+                period={year === null ? span : String(year)}
+                isAllTime={year === null}
+              />
+            </Chapter>
+
+            <Chapter
+              id="poster"
+              num="D2"
+              title="The Poster"
+              hint="Touch and hold the poster to save it."
+              lede="Take it home. Pick a design, a size and a background, then download it or send it straight from your phone."
+            >
+              <PosterStudio data={posterData} design={posterDesign} onDesign={setPosterDesign} />
+            </Chapter>
+
+            {tourStep !== null && <UpNext tracks={tourTracks} sides={SIDES} step={tourStep} onStep={setTourStep} onFinish={() => closeTour(true)} />}
+
+            {!cards && (
+              <footer className="dash__footer">
+                <p>
+                  <strong>Pressed locally.</strong> Everything on this page was worked out inside this browser tab. Nothing was uploaded.
+                </p>
+                <details className="load-details">
+                  <summary>Load details</summary>
+                  <ul>
+                    <li>
+                      {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
+                    </li>
+                    <li>
+                      {formatNumber(result.skippedRows)} rows without track info ignored ({skippedRowsHint(result.sources)})
+                    </li>
+                    {applied.filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
+                    {applied.filter.hidden.size > 0 && (
+                      <li>
+                        {formatNumber(hiddenPlays)} plays by {applied.filter.hidden.size} hidden artist{applied.filter.hidden.size === 1 ? '' : 's'} left out
+                      </li>
+                    )}
+                    {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
+                    {result.unmatchedArtists > 0 && (
+                      <li>
+                        {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export, so they show as
+                        “Unknown artist”
+                      </li>
+                    )}
+                    {result.sources.includes('apple') && <li>Apple Music’s export doesn’t record shuffle, so shuffle stats leave those plays out</li>}
+                    {result.warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                </details>
+                <p className="colophon">
+                  My Listening Record is open source.{' '}
+                  <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
+                    Star it, report a bug or support it on GitHub
+                  </a>
+                  .
+                </p>
+                <p className="disclaimer">
+                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
+                  Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
+                </p>
+              </footer>
+            )}
+          </main>
+        </OnStage>
+      </InCards>
+
+      {cards && (
+        <CardNav
+          tracks={TRACKS}
+          sides={SIDES}
+          deck={tourTracks}
+          step={cardStep}
+          onStep={setCardStep}
+          onJump={jumpTo}
+          onPoster={() => makePoster(posterDesign)}
+          onReset={onReset}
+        />
+      )}
+
+      <Launcher
+        mode={launcher}
+        onMode={setLauncher}
+        tracks={TRACKS}
+        sides={SIDES}
+        years={years}
+        year={year}
+        musicOnly={chosen.musicOnly}
+        artists={musicArtists}
+        hidden={hidden}
+        onJump={jumpTo}
+        onYear={pickYear}
+        onHide={hideArtists}
+        onUnhide={unhideArtists}
+        onSettings={openSettings}
+        onReset={clearData}
+      />
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => {
+          setSettingsOpen(false)
+          setLauncher('root')
+        }}
+        onGone={() => setSettingsOpen(false)}
+        musicOnly={musicOnly}
+        onMusicOnly={setMusicOnly}
+        otherPlays={otherPlays}
+        hasAnyMusic={hasAnyMusic}
+      />
+      {/* Paints before the charts are worked out again, so the moment that takes doesn't look like a hang */}
+      <p className="dash__updating" role="status">
+        {updating ? 'Updating the charts…' : ''}
+      </p>
 
       {tourStep !== null && (
         <Tour

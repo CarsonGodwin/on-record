@@ -138,6 +138,9 @@ export function Cover({ name, size = 48, className }: Props) {
     }
   }
 
+  // The art fills the square as a pattern instead of being drawn on it directly. Shapes that run past
+  // the edge are cut off either way, but this way no part of a cover reports a box bigger than the
+  // cover itself, which is what layout checks (like the phone cards' overflow test) go by.
   return (
     <svg className={className ? `cover ${className}` : 'cover'} width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
       <defs>
@@ -145,9 +148,12 @@ export function Cover({ name, size = 48, className }: Props) {
           <stop offset="0" stopColor={inkA} />
           <stop offset="1" stopColor={ground} />
         </linearGradient>
+        <pattern id={`${id}p`} width="100" height="100" patternUnits="userSpaceOnUse">
+          <rect width="100" height="100" fill={ground} />
+          {art}
+        </pattern>
       </defs>
-      <rect width="100" height="100" fill={ground} />
-      {art}
+      <rect width="100" height="100" fill={`url(#${CSS.escape(id)}p)`} />
     </svg>
   )
 }

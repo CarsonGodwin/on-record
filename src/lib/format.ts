@@ -49,6 +49,7 @@ export function formatHour(hour: number): string {
 const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 const longDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 const monthYearShort = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short' })
+const shortDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
 
 /** "9:41 PM" */
 export function formatTime(d: number | Date): string {
@@ -58,6 +59,11 @@ export function formatTime(d: number | Date): string {
 /** "Tuesday, March 4, 2024" */
 export function formatLongDate(d: number | Date): string {
   return longDate.format(d)
+}
+
+/** "Tue, Mar 4, 2024": the long date for a phone's narrow card */
+export function formatShortDate(d: number | Date): string {
+  return shortDate.format(d)
 }
 
 /** "Mar 2024" */

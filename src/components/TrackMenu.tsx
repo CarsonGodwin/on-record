@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCloseOnBack } from '../lib/back'
 
 /*
  * The tracklist for phones, where the side nav doesn't fit: the top bar names
@@ -19,10 +20,17 @@ interface Props {
   current: string | null
   onPoster: () => void
   onReset: () => void
+  /** On the phone's deck of cards there's nothing to scroll to: picking a track deals its card instead */
+  onJump?: (id: string) => void
+  /** Opens upwards, for the bar at the bottom of the deck */
+  up?: boolean
+  /** What the button says, when something else already names the track */
+  label?: ReactNode
 }
 
-export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) {
+export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump, up, label }: Props) {
   const [open, setOpen] = useState(false)
+  useCloseOnBack(open, () => setOpen(false))
   const ref = useRef<HTMLDivElement>(null)
   const track = tracks.find((t) => t.id === current)
 
@@ -43,9 +51,11 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) 
   }, [open])
 
   return (
-    <div className="trackmenu" ref={ref}>
+    <div className={up ? 'trackmenu trackmenu--up' : 'trackmenu'} ref={ref}>
       <button type="button" className="trackmenu__button" aria-expanded={open} aria-controls="trackmenu-sheet" onClick={() => setOpen(!open)}>
-        {track ? (
+        {label ? (
+          <span className="trackmenu__title">{label}</span>
+        ) : track ? (
           <>
             <span className="trackmenu__num">{track.num}</span>
             <span className="trackmenu__title">{track.title}</span>
@@ -69,7 +79,16 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) 
                     .filter((t) => t.num.startsWith(side))
                     .map((t) => (
                       <li key={t.id}>
-                        <a href={`#${t.id}`} aria-current={t.id === current ? 'true' : undefined} onClick={() => setOpen(false)}>
+                        <a
+                          href={`#${t.id}`}
+                          aria-current={t.id === current ? 'true' : undefined}
+                          onClick={(e) => {
+                            setOpen(false)
+                            if (!onJump) return
+                            e.preventDefault()
+                            onJump(t.id)
+                          }}
+                        >
                           <span>{t.num}</span>
                           {t.title}
                         </a>
@@ -80,9 +99,11 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset }: Props) 
             ))}
           </div>
           <div className="trackmenu__foot">
-            <a href="#top" onClick={() => setOpen(false)}>
-              Back to the top
-            </a>
+            {!onJump && (
+              <a href="#top" onClick={() => setOpen(false)}>
+                Back to the top
+              </a>
+            )}
             <button type="button" className="button button--ghost button--small" onClick={onReset}>
               New data
             </button>

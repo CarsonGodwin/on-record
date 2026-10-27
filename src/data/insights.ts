@@ -179,10 +179,20 @@ export interface RaceData {
 
 export function raceFrames(totals: Map<string, number>[], topN: number): RaceData {
   const running = new Map<string, number>()
+  // When each artist was first heard, so ties rank the same way a stable sort of `running` would
+  const order = new Map<string, number>()
   const candidates = new Set<string>()
+  const rank = (a: string, b: string) => running.get(b)! - running.get(a)! || order.get(a)! - order.get(b)!
+  let top: string[] = []
   for (const bin of totals) {
-    for (const [artist, ms] of bin) running.set(artist, (running.get(artist) ?? 0) + ms)
-    for (const [artist] of topEntries(running, topN)) candidates.add(artist)
+    for (const [artist, ms] of bin) {
+      if (!order.has(artist)) order.set(artist, order.size)
+      running.set(artist, (running.get(artist) ?? 0) + ms)
+    }
+    // Totals only grow, so nobody outside the last top N can pass it without playing in this bin.
+    // Ranking just those keeps a long history with thousands of artists from sorting all of them every bin.
+    top = [...new Set([...top, ...bin.keys()])].sort(rank).slice(0, topN)
+    for (const artist of top) candidates.add(artist)
   }
 
   const names = [...candidates]

@@ -1,5 +1,5 @@
 /*
- * On Record: a dark, poster-like look. Near-black sleeve, warm paper text,
+ * My Listening Record: a dark, poster-like look. Near-black sleeve, warm paper text,
  * three faces (a chunky grotesque for display, an italic serif for voice, a
  * mono for data), and chart colors from lib/palette.ts.
  */
@@ -343,7 +343,6 @@ em {
 .float-tip--fixed {
   width: 260px;
 }
-
 
 .float-tip__line {
   overflow: hidden;
@@ -953,6 +952,101 @@ th {
   margin: 18px 0 0;
   font-size: 1rem;
   color: var(--text);
+}
+
+.landing__less {
+  display: none;
+}
+
+/*
+ * Phones: everything you need on the first screen (what it is, the sleeve, the demo and the promise that
+ * nothing leaves the phone), in shorter words; the how-to and the small print below. The list of charts
+ * goes, since the record itself is one tap away.
+ */
+@media (max-width: 560px) {
+  .landing {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    padding-bottom: 32px;
+  }
+
+  /* Big blurred blobs drifting forever cost a phone more than they give it */
+  .landing__glow i {
+    animation: none;
+  }
+
+  .landing__main {
+    gap: 22px;
+    margin-top: 22px;
+  }
+
+  .landing .eyebrow,
+  .landing__more,
+  .features {
+    display: none;
+  }
+
+  .landing__less {
+    display: inline;
+  }
+
+  .landing__title {
+    margin: 0 0 14px;
+    font-size: clamp(3rem, 15vw, 3.6rem);
+  }
+
+  .landing__lede {
+    font-size: 1.05rem;
+    color: var(--text);
+  }
+
+  .landing__import {
+    gap: 14px;
+  }
+
+  /* A wide, short sleeve with the record peeking out of its right edge */
+  .sleeve {
+    width: calc(100% - 44px);
+    height: 208px;
+    aspect-ratio: auto;
+  }
+
+  .sleeve__record {
+    inset: 3% auto 3% auto;
+    right: 0;
+    width: auto;
+    aspect-ratio: 1;
+    transform: translateX(22%) rotate(0deg);
+  }
+
+  .sleeve__cover {
+    gap: 8px;
+    padding: 24px 24px 22px;
+  }
+
+  .sleeve__title {
+    font-size: 1.75rem;
+  }
+
+  .sleeve__kicker,
+  .sleeve__break {
+    display: none;
+  }
+
+  .landing__demo {
+    flex-wrap: nowrap;
+    margin-top: 2px;
+  }
+
+  .privacy {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 0.88rem;
+  }
+
+  .how-to {
+    margin-top: 40px;
+  }
 }
 
 /* Loading */
@@ -2272,6 +2366,58 @@ th {
   text-underline-offset: 3px;
 }
 
+/* Making the video: how far along, and a way out */
+.race-export--busy {
+  flex-wrap: nowrap;
+  max-width: 460px;
+}
+
+.race-export__meter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.race-export__status {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.race-export__progress {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+
+.race-export__progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.25s linear;
+}
+
+.race-export__cancel {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .scrubber {
   flex: 1;
   appearance: none;
@@ -2844,7 +2990,7 @@ th {
 
 /* ---------- B3 Love / Hate ---------- */
 
-.lovehate svg {
+.lovehate__scatter > svg {
   display: block;
   overflow: visible;
 }
@@ -2886,11 +3032,9 @@ th {
 }
 
 .callout__tag {
-  fill: var(--text);
-  font-family: var(--mono);
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
   paint-order: stroke;
   stroke: var(--bg);
   stroke-width: 4px;
@@ -2906,50 +3050,153 @@ th {
   stroke-width: 4px;
 }
 
-.callout-cards {
+/* The head-to-head: most loved against most skipped. Side by side on the page, stacked on a card. */
+.duel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 10px;
-  margin: 24px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 40px;
+  margin: 0 0 36px;
+}
+
+@media (max-width: 720px) {
+  .duel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.duel__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.duel__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.duel__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.duel__hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.duel__cover {
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+}
+
+.duel__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.duel__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 1.3rem;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.duel__artist {
+  overflow: hidden;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-style: italic;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.duel__fact {
+  margin: 6px 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.duel__bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+}
+
+.duel__bar i {
+  flex-basis: 0;
+  min-width: 2px;
+  border-radius: 3px;
+}
+
+.duel__more {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.callout-cards li {
+.duel__more li {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.92rem;
 }
 
-.callout-cards__tag {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+.duel__song {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.duel__song-title {
+  font-weight: 600;
+}
+
+.duel__song-artist {
   color: var(--muted);
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-style: italic;
 }
 
-.callout-cards__tag::before {
-  content: '';
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--accent);
+.duel__count {
+  flex: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.callout-cards strong {
-  font-size: 1.1rem;
-}
-
-.callout-cards .muted {
-  font-size: 0.84rem;
+.duel__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 /* ---------- C1 Constellation ---------- */
@@ -3998,381 +4245,6 @@ a.button {
   font-size: 0.9rem;
 }
 
-/* Calendar on phones: one month at a time */
-.mcal {
-  padding: 14px 14px 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--surface);
-}
-
-.mcal__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.mcal__step {
-  flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 1px solid var(--line-strong);
-  background: transparent;
-  color: var(--text);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-.mcal__step:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-.mcal__title {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.mcal__month {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.mcal__title.is-static {
-  cursor: default;
-}
-
-/* The way back up to the overview, above the month's name */
-.mcal__up {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-}
-
-.mcal__sum {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.mcal__grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 5px;
-  touch-action: pan-y;
-}
-
-.mcal__weekday {
-  padding-bottom: 2px;
-  text-align: center;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--faint);
-}
-
-.mcal__day {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 4px 5px;
-  border: 0;
-  border-radius: 9px;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-
-.mcal__day.is-empty {
-  background: rgba(244, 241, 234, 0.05);
-  color: var(--faint);
-  cursor: default;
-}
-
-.mcal__day.is-bright,
-.mcal__pick.is-bright {
-  color: var(--accent-ink);
-}
-
-.mcal__day.is-max {
-  box-shadow: inset 0 0 0 2px var(--text);
-}
-
-.mcal__day.is-selected {
-  box-shadow: inset 0 0 0 2.5px var(--lime);
-}
-
-.mcal__picker {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.mcal__year {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.mcal__year-label {
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.mcal__year-months {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 5px;
-}
-
-.mcal__pick {
-  padding: 10px 0;
-  border: 0;
-  border-radius: 9px;
-  background: rgba(244, 241, 234, 0.05);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.mcal__pick:disabled {
-  color: var(--faint);
-  cursor: default;
-}
-
-.mcal__pick.is-current {
-  box-shadow: inset 0 0 0 2.5px var(--lime);
-}
-
-.mcal__legend {
-  margin-top: 12px;
-}
-
-.mcal__legend .scale-legend__button {
-  margin-left: auto;
-}
-
-/* Around the Clock on phones: one card, top to bottom */
-.clock--card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 18px 14px 14px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--surface);
-}
-
-.clock--card .clock__dial svg {
-  max-width: 330px;
-}
-
-.clock--card .clock__night {
-  fill: rgba(70, 87, 214, 0.2);
-}
-
-.clock--card .clock__day {
-  fill: rgba(255, 196, 61, 0.1);
-}
-
-.clock--card .clock__glyph {
-  font-size: 26px;
-}
-
-.clock--card .clock__glyph--moon {
-  fill: #8fa0ff;
-}
-
-.clock--card .clock__glyph--sun {
-  fill: #ffd23f;
-}
-
-.clock--card .clock__caption {
-  margin-top: 10px;
-  min-height: 3em;
-}
-
-.daynight {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 14px;
-}
-
-.daynight__labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.daynight__labels strong {
-  font-size: 1.15rem;
-  color: var(--text);
-}
-
-.daynight__day {
-  color: #ffd23f;
-}
-
-.daynight__night {
-  color: #8fa0ff;
-}
-
-.daynight__bar {
-  display: flex;
-  gap: 3px;
-  height: 10px;
-}
-
-.daynight__bar i {
-  flex-basis: 0;
-  border-radius: 5px;
-}
-
-.daynight__fill--day {
-  background: linear-gradient(90deg, #f2913d, #ffd23f);
-}
-
-.daynight__fill--night {
-  background: linear-gradient(90deg, #b04ad6, #4657d6);
-}
-
-.daynight__note {
-  align-self: center;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-}
-
-.dpline {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
-
-.dpline__row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.dpline__part {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-  padding-left: 9px;
-  border-left: 3px solid var(--sky);
-}
-
-.dpline__label {
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dpline__who {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.dpline__who > svg,
-.dpline__who > .cover {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-}
-
-.dpline__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.dpline__artist {
-  font-size: 0.92rem;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dpline__time {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.dpline__track {
-  display: flex;
-  gap: 3px;
-  height: 12px;
-  margin-top: 4px;
-}
-
-.dpline__track i {
-  flex-basis: 0;
-  border-radius: 6px;
-}
-
-.dpline__axis {
-  position: relative;
-  height: 14px;
-  margin-bottom: 4px;
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  color: var(--faint);
-}
-
-.dpline__axis span {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-}
-
-.dpline__axis span:first-child {
-  transform: none;
-}
-
-.dpline__axis span:last-child {
-  transform: translateX(-100%);
-}
-
-.clock--card .dots {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
-
 /* ---------- Phones: keep text at a readable size ---------- */
 
 @media (max-width: 640px) {
@@ -4823,137 +4695,2967 @@ html.tour-open {
   transform: translateX(3px);
 }
 
-/* The needle drop: the blank record and its arm, before the first track */
-.needle-drop {
+/* =================================================================
+   Launcher (⌘K), Settings and Help
+   ================================================================= */
+
+.topbar__launch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.topbar__launch:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.topbar__launch kbd {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+/* Phones have no ⌘K hint: the dot says something is hidden */
+.topbar__launch-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+@media (min-width: 761px) {
+  .topbar__launch-dot {
+    display: none;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .topbar__launch {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .topbar__launch kbd {
+    display: none;
+  }
+}
+
+kbd {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  padding: 0.1em 0.45em;
+  border-radius: 5px;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+
+.modal {
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raise);
+  color: var(--text);
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(640px, calc(100dvh - 48px));
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+
+.modal[open] {
   display: flex;
   flex-direction: column;
+  animation: modal-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.modal::backdrop {
+  background: rgba(5, 4, 8, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal[open] {
+    animation: none;
+  }
+}
+
+.modal__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.modal--panel .modal__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 22px 22px;
+}
+
+.modal--launcher {
+  margin-top: max(10vh, 24px);
+  max-height: min(640px, calc(100dvh - max(10vh, 24px) - 24px));
+}
+
+/* Keyboard shortcuts mean nothing to a finger */
+@media (pointer: coarse) {
+  .launcher__foot,
+  .launcher__shortcut {
+    display: none;
+  }
+}
+
+.modal__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
   align-items: center;
-  gap: 14px;
-  padding-top: 24px;
-  text-align: center;
-  animation: tour-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  justify-content: space-between;
+  padding: 18px 0 12px;
+  background: var(--bg-raise);
 }
 
-.needle-drop__title {
-  max-width: 14ch;
-  font-size: clamp(2.2rem, 9vw, 3.8rem);
-  font-weight: 800;
-  line-height: 0.95;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
+.modal__head h2 {
+  font-size: 1.4rem;
 }
 
-.needle-drop__title em {
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-  background: linear-gradient(95deg, var(--accent), var(--violet) 60%, var(--cyan));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  padding-right: 0.06em;
+.modal__close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
-/* As big as fits above the card, so the whole thing is on one screen */
-.needle-drop__platter {
-  position: relative;
-  width: max(220px, min(100%, 460px, calc(100svh - var(--topbar-h, 64px) - var(--tour-card-h, 88px) - 340px)));
-  aspect-ratio: 1;
-  margin-top: 6px;
-  border-radius: 24px;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
+.modal__close:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+/* The launcher */
+
+.launcher__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.launcher__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  /* 16px keeps iOS from zooming in on focus */
+  font-size: max(16px, 1.05rem);
+}
+
+.launcher__input::placeholder {
+  color: var(--faint);
+}
+
+.launcher__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+}
+
+.launcher__group {
+  margin: 10px 10px 4px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.launcher__item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.launcher__item[aria-selected='true'] {
+  background: rgba(244, 241, 234, 0.08);
+}
+
+/* A Shift selection: the run is tinted, the row the arrows are on is outlined */
+.launcher__list[aria-multiselectable='true'] .launcher__item[aria-selected='true'] {
+  border-radius: 0;
+  background: rgba(255, 39, 124, 0.14);
+}
+
+.launcher__list[aria-multiselectable='true'] .launcher__item.is-active {
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 39, 124, 0.6);
+}
+
+.modal__head h2:focus {
   outline: none;
-  cursor: grab;
 }
 
-.needle-drop__platter:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 6px;
+.launcher__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.needle-drop__platter.is-aiming {
-  cursor: grabbing;
+.launcher__hint {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 400;
+  color: var(--faint);
 }
 
-.needle-drop__platter:not(.is-idle):not(.is-aiming) {
+.launcher__item.is-active .launcher__hint {
+  color: var(--muted);
+}
+
+.launcher__shortcut {
+  flex-shrink: 0;
+  min-width: 2.6em;
+  text-align: center;
+  color: var(--muted);
+}
+
+.launcher__item.is-hidden .launcher__label {
+  color: var(--muted);
+}
+
+.launcher__tag {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.launcher__title {
+  flex: 1;
+  font-size: 1.05rem;
+  outline: none;
+}
+
+.launcher__page {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 22px 18px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.launcher__page h3 {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.launcher__page ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.launcher__page li + li {
+  margin-top: 4px;
+}
+
+.launcher__page p {
+  margin: 0 0 6px;
+}
+
+.launcher__empty {
+  padding: 18px 10px;
+  color: var(--muted);
+}
+
+.launcher__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--faint);
+}
+
+.launcher__note {
+  color: var(--text);
+}
+
+/* Settings and Help */
+
+.settings__row {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.settings__row h3 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.settings__note,
+.settings__foot {
+  margin: 8px 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.settings__foot {
+  color: var(--faint);
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch__track {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  transition: background 0.2s;
+}
+
+.switch__track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.switch input:checked + .switch__track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch input:checked + .switch__track::after {
+  transform: translateX(18px);
+  background: var(--accent-ink);
+}
+
+.switch input:focus-visible + .switch__track {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.switch input:disabled ~ * {
+  opacity: 0.5;
   cursor: default;
 }
 
-.needle-drop__spin,
-.needle-drop__spin canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.help__keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 0.9rem;
 }
 
-/* The record turns once the needle's down */
-.needle-drop__platter:is(.is-landing, .is-pressing, .is-pressed) .needle-drop__spin {
-  animation: needle-spin 24s linear infinite;
+.help__keys dd {
+  margin: 0;
+  color: var(--muted);
 }
 
-@keyframes needle-spin {
-  to { transform: rotate(360deg); }
+/* Hiding from The Charts */
+
+.charts__hidden {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  color: var(--muted);
 }
 
-/* The light on the vinyl stays put while the record turns under it */
-.needle-drop__sheen {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  background: conic-gradient(from -60deg, transparent 0 2%, rgba(255, 255, 255, 0.1) 9%, transparent 17% 50%, rgba(255, 255, 255, 0.1) 59%, transparent 67%);
-  mix-blend-mode: screen;
+.chart-list--hideable .chart-list__row {
+  grid-template-columns: 2.4rem 40px minmax(0, 1fr) auto auto;
 }
 
-.needle-drop__arm {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
+.chart-hide {
+  align-self: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
 }
 
-/* Aiming, the arm stays under the finger; pressing, it rides the grooves frame by frame */
-.needle-drop__platter.is-aiming .tonearm__arm {
-  transition-duration: 0.06s;
+.podium__spot .chart-hide {
+  align-self: flex-start;
+  margin-top: 8px;
 }
 
-.needle-drop__platter.is-pressing .tonearm__arm {
-  transition-duration: 0.12s;
-  transition-timing-function: linear;
+.chart-hide:hover,
+.chart-hide:focus-visible {
+  color: var(--text);
+  border-color: var(--text);
 }
 
-.needle-drop__beacon {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2.5;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: needle-beacon 1.8s ease-out infinite;
-}
-
-@keyframes needle-beacon {
-  from {
-    opacity: 0.9;
-    transform: scale(0.5);
-  }
-  to {
+/* With a mouse, the button waits until you're on the row */
+@media (hover: hover) {
+  .chart-list__row .chart-hide,
+  .podium__spot .chart-hide {
     opacity: 0;
-    transform: scale(1.6);
+  }
+  .chart-list__row:hover .chart-hide,
+  .podium__spot:hover .chart-hide,
+  .chart-hide:focus-visible {
+    opacity: 1;
   }
 }
 
-.needle-drop__readout {
-  min-height: 1.5em;
+/* While the charts are worked out again after a filter change */
+
+.dash.is-updating .dash__main {
+  opacity: 0.5;
+}
+
+.dash__updating {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  z-index: 250;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-raise);
+  color: var(--text);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.dash__updating:empty {
+  display: none;
+}
+
+/* =================================================================
+   Phones held upright: the record as a deck of cards
+   One track fills the screen between the top bar and the bar at the
+   bottom. Nothing scrolls: each card fits its chart to the space it has
+   (the body is a size container, so charts can use cqw / cqh).
+   ================================================================= */
+
+.chapter__hint {
+  display: none;
+}
+
+html.cards-open,
+html.cards-open body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.dash.is-cards {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash.is-cards .topbar {
+  position: relative;
+  flex: none;
+}
+
+.dash.is-cards .tracklist,
+.dash.is-cards .side,
+.dash.is-cards .up-next,
+.dash.is-cards .dash__main > .empty,
+.dash.is-cards .dash__main > .sr-only {
+  display: none;
+}
+
+/* Long presses anywhere on the deck never select text or bring up iOS's magnifier, callout or link
+   preview, and a pinch that misses the record or the stars doesn't zoom the whole deck out of shape */
+.dash.is-cards {
+  touch-action: pan-x pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Fields still take typing (iOS won't focus a field that can't be selected) */
+.dash.is-cards :is(input, textarea) {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+.dash.is-cards .dash__main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Cards waiting offstage hold still, so their animations don't run down a battery out of sight */
+.dash.is-cards .chapter.is-offstage * {
+  animation-play-state: paused;
+}
+
+.dash.is-cards .chapter {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+}
+
+/* The cards around this one wait at full size, so each shows up drawn and the way you left it */
+.dash.is-cards .chapter.is-offstage {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  padding-block: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.dash.is-cards .chapter:not(.is-offstage) {
+  animation: card-in 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dash.is-cards .dash__main[data-dealt='prev'] .chapter:not(.is-offstage) {
+  animation-name: card-in-prev;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+
+@keyframes card-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+
+/* Each card keeps the record's track heading, shrunk to one line: the outlined number, the title, and under it a line on what to do here */
+.dash.is-cards .chapter__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  margin: 0;
+  padding: 10px 0 10px;
+}
+
+.dash.is-cards .chapter__num {
+  flex: none;
+  font-size: 2.5rem;
+  line-height: 0.8;
+  -webkit-text-stroke-width: 1.2px;
+}
+
+.dash.is-cards .chapter__lede,
+.dash.is-cards .chapter__actions {
+  display: none;
+}
+
+.dash.is-cards .chapter__titles {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dash.is-cards .chapter__titles h2 {
+  font-size: 1.32rem;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash.is-cards .chapter__hint {
+  display: block;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+/* Small buttons on a card speak in sentence case, like the rest of it */
+.dash.is-cards .chip-button {
+  padding: 8px 14px;
+  font-family: var(--display);
+  font-size: 0.86rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.dash.is-cards .chapter__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  padding-bottom: 12px;
+}
+
+/* A table is the one thing on a card that scrolls, and only because you asked for it */
+.dash.is-cards .table-wrap {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+
+.dash.is-cards .dash__updating {
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+/* The top bar keeps the name, the year and search; the track you're on moves down to the thumb */
+.dash.is-cards .topbar {
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  padding-bottom: 8px;
+}
+
+.dash.is-cards .topbar .brand__name {
+  display: inline;
+}
+
+.dash.is-cards .topbar .topbar__select {
+  margin-left: auto;
+}
+
+/* The bar at the bottom: back, the track you're on (tap for the list), and on.
+   Above the card, like the top bar, so the tracklist it opens covers the chart under it. */
+.cardnav {
+  position: relative;
+  z-index: 40;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.cardnav__step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cardnav__step svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cardnav__step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.cardnav__step:active:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.cardnav .trackmenu {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.cardnav .trackmenu__button {
+  justify-content: center;
+  width: 100%;
+  height: 46px;
+  font-size: 0.98rem;
+}
+
+.cardnav__count {
+  margin-left: 6px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.trackmenu--up .trackmenu__sheet {
+  top: auto;
+  bottom: var(--cardnav-h, 64px);
+  max-height: calc(100dvh - var(--cardnav-h, 64px) - var(--topbar-h, 56px));
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 0;
+  animation-name: sheet-up;
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash.is-cards .chapter:not(.is-offstage) {
+    animation: none;
+  }
+}
+
+/* ---------- Card: A1 The Record ---------- */
+
+/* Readout on top (where a thumb on the record can't cover it), the record as big as fits, the key under it */
+.vinyl--card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  height: 100%;
+}
+
+.vinyl__readout {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vinyl__day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vinyl__date {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.vinyl__date strong {
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.vinyl__date span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.vinyl__date em {
+  margin-left: 6px;
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 650;
+}
+
+.vinyl__steps {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.vinyl__step {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vinyl__step svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vinyl__step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.vinyl__step:active:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.vinyl__now {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.vinyl__time {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.vinyl__track {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vinyl__track strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.vinyl--card .strip svg {
+  touch-action: none;
+}
+
+.dash.is-cards .vinyl--card .vinyl__stage {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: end center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dash.is-cards .vinyl--card .vinyl__platter {
+  margin: 0;
+  touch-action: none;
+}
+
+.vinyl__unzoom {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  background: var(--bg-raise);
+}
+
+/* The key: every colour on the record in a couple of lines, tap one to light up only their grooves */
+.legend--card {
+  flex: none;
+  gap: 0 12px;
+}
+
+.legend--card .legend__item {
+  gap: 6px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+.legend--card .legend__item[aria-pressed='true'] {
+  background: none;
+  color: var(--text);
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 4px;
+}
+
+.legend--card:has([aria-pressed='true']) .legend__item:not([aria-pressed='true']) {
+  color: var(--faint);
+}
+
+.legend--card .legend__dot {
+  width: 8px;
+  height: 8px;
+}
+
+.legend-fit {
+  position: relative;
+  flex: none;
+}
+
+/* Measured, never seen: the whole key laid out at the card's width */
+.legend-fit__measure {
+  position: absolute;
+  inset: 0 0 auto;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.legend__more {
+  color: var(--muted);
+  text-decoration: underline 1px var(--line-strong);
+  text-underline-offset: 4px;
+}
+
+/* The whole key, over the bottom of the record */
+.legend-fit__all {
+  position: absolute;
+  inset: auto 0 calc(100% + 6px);
+  z-index: 2;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--bg-raise);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  animation: sheet-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+
+/* ---------- end card: A1 The Record ---------- */
+
+
+
+
+/* ---------- Card: A2 Eras ---------- */
+
+.eras-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* The takeaway, or what the picked era adds up to: two lines kept free so picking one never moves the chart */
+.eras-card__status {
+  flex: none;
+  min-height: calc(2 * 1.35em);
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.eras-card__status em {
+  font-family: var(--serif);
+  font-size: 1.16em;
+  font-weight: 400;
+}
+
+.eras-card__more {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.eras-card__plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.eras-card__plot svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: visible;
+}
+
+.eras-card__tick {
+  font-size: 12px;
+}
+
+.eras-card__tickmark,
+.eras-card__edge {
+  stroke: var(--line-strong);
+}
+
+.eras-card__edge {
+  stroke: var(--text);
+  stroke-opacity: 0.55;
+  stroke-dasharray: 3 3;
+}
+
+.eras-card__leader {
+  fill: none;
+  stroke-width: 1.25;
+  stroke-opacity: 0.7;
+}
+
+/* Tapping or dragging down the river reads off a month; it owns the finger, so it never deals a card */
+.eras-card__river {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.eras-card__era {
+  position: absolute;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.eras-card__name {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--name);
+  line-height: 1.12;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.eras-card__era[aria-pressed='true'] .eras-card__name {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.eras-card__meta {
+  display: flex;
+  gap: 10px;
+  max-width: 100%;
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.eras-card__meta span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.eras-card__meta b {
+  flex: none;
+  font-weight: 500;
+}
+
+.eras-card__era:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+/* A month's top artists, laid over the labels instead of pushing them about; a tap puts it away */
+.eras-card__readout {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.eras-card__readout-title {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.eras-card__readout-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.eras-card__readout-row span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.eras-card__readout-row i {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.eras-card__readout-row b {
+  flex: none;
+  margin-left: auto;
+  color: var(--text);
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eras-card__era {
+    transition: none;
+  }
+}
+
+/* ---------- end card: A2 Eras ---------- */
+
+
+
+
+/* ---------- Card: A3 The Race ---------- */
+
+/* The race as it is, sized to the card: the ten rows share whatever height the controls leave */
+.dash.is-cards .race {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dash.is-cards .race__room {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* Rows waiting below tenth place are invisible, but would still catch taps meant for the controls */
+.dash.is-cards .race__board {
+  pointer-events: none;
+}
+
+.dash.is-cards .race__controls {
+  flex: none;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+/* A finger-sized scrubber: the line stays thin, the input around it is 44px tall */
+.dash.is-cards .race .scrubber {
+  height: 44px;
+  background: none;
+  touch-action: none;
+}
+
+.dash.is-cards .race .scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent) var(--progress), var(--line-strong) var(--progress));
+}
+
+.dash.is-cards .race .scrubber::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+  margin-top: -9px;
+}
+
+.dash.is-cards .race-export {
+  flex: none;
+  min-height: 48px;
+  margin-top: 6px;
+}
+
+.dash.is-cards .race-export--busy {
+  max-width: none;
+}
+
+.dash.is-cards .race-export__go {
+  flex: 1;
+  justify-content: center;
+  min-height: 48px;
+}
+
+/* The finished video takes the race's place until it's shared or closed */
+.race-share {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  text-align: center;
+}
+
+/* The race underneath is paused and covered; hidden, its glows can't creep out around the sheet */
+.dash.is-cards .race:has(.race-share) .race__room,
+.dash.is-cards .race:has(.race-share) .race__controls {
+  visibility: hidden;
+}
+
+.race-share__video {
+  flex: none;
+  height: min(56cqh, 340px);
+  aspect-ratio: 9 / 16;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #0b0a0f;
+}
+
+.race-share__title {
+  margin: 12px 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.race-share__note {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.race-share__go {
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+}
+
+.race-share__more {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.race-share__link {
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.race-share__link:active {
+  color: var(--text);
+}
+
+/* ---------- end card: A3 The Race ---------- */
+
+
+
+
+/* ---------- Card: B1 Around the Clock ---------- */
+
+/*
+ * Around the Clock in one card: the dial takes whatever height the readout,
+ * timeline and dots leave it. In the page (a narrow window that isn't a
+ * deck of cards) it gets a fixed height instead.
+ */
+.clockcard {
+  display: flex;
+  flex-direction: column;
+  height: 560px;
+}
+
+.dash.is-cards .clockcard {
+  height: 100%;
+}
+
+.clockcard__dial {
+  flex: 1 1 0;
+  min-height: 150px;
+  touch-action: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.clockcard__dial:focus-visible,
+.clockcard__dots:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+.clockcard__dial svg,
+.clockcard__dots svg {
+  display: block;
+}
+
+.clockcard__night {
+  fill: var(--night);
+  fill-opacity: 0.26;
+}
+
+.clockcard__day {
+  fill: var(--day);
+  fill-opacity: 0.2;
+}
+
+.clockcard__ring {
+  fill: none;
+  stroke: rgba(244, 241, 234, 0.07);
+}
+
+.clockcard__horizon {
+  stroke: rgba(244, 241, 234, 0.3);
+}
+
+.clockcard__bar {
+  fill-opacity: 0.92;
+  transition: fill-opacity 0.15s;
+}
+
+.clockcard__bar.is-dim {
+  fill-opacity: 0.45;
+}
+
+.clockcard__bar.is-on {
+  fill-opacity: 1;
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.clockcard__hand {
+  stroke: var(--text);
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.clockcard__rim {
+  fill: none;
+  stroke-width: 4;
+}
+
+.clockcard__rim--night {
+  stroke: var(--night);
+}
+
+.clockcard__rim--day {
+  stroke: var(--day);
+}
+
+.clockcard__tick {
+  stroke: var(--faint);
+  stroke-width: 1.5;
+}
+
+.clockcard__hour {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.clockcard__half {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.clockcard__half--night {
+  fill: color-mix(in srgb, var(--night) 40%, var(--text));
+}
+
+.clockcard__half--day {
+  fill: color-mix(in srgb, var(--day) 40%, var(--text));
+}
+
+.clockcard__pct {
+  fill: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Always two lines tall, so picking an hour never shifts the timeline */
+.clockcard__readout {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.6em;
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.clockcard__readout > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.clockcard__readout.is-long {
+  font-size: 0.84rem;
+}
+
+/* The timeline shares the dots' left gutter, so its hours sit over their columns */
+.cline {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-left: var(--gutter);
+}
+
+.cline__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 6px;
+  height: 36px;
+}
+
+.cline__who {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cline__who--start {
+  justify-self: start;
+  margin-left: -6px;
+}
+
+.cline__who--end {
+  justify-self: end;
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+/* The halves meet in the middle: these two hug the 6 PM line from either side */
+.cline__row--below .cline__who--end {
+  margin-right: -3px;
+}
+
+.cline__row--below .cline__who--start {
+  margin-left: -3px;
+}
+
+.cline__who[aria-pressed='true'] {
+  background: var(--surface-2);
+}
+
+.cline__who:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -2px;
+}
+
+.cline__who > .cover {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.cline__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.cline__name {
+  overflow: hidden;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-style: italic;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cline__when {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cline__times {
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.cline__bar {
+  position: relative;
+  height: 20px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--day) 32%, transparent) 50%, color-mix(in srgb, var(--night) 40%, transparent) 50%);
+}
+
+.cline__tick {
+  position: absolute;
+  top: 50%;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+}
+
+.cline__tick:first-of-type {
+  transform: translate(5px, -50%);
+}
+
+.cline__tick:last-of-type {
+  transform: translate(calc(-100% - 5px), -50%);
+}
+
+.cline__part {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 25%;
+  border-radius: 6px;
+  background: rgba(244, 241, 234, 0.2);
+}
+
+.cline__mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+}
+
+.clockcard__dots {
+  flex: none;
+  height: 84px;
+  margin-top: 8px;
+  touch-action: none;
+  cursor: crosshair;
+  outline: none;
+}
+
+.clockcard__dots-day {
+  fill: var(--day);
+  fill-opacity: 0.08;
+}
+
+.clockcard__dots-night {
+  fill: var(--night);
+  fill-opacity: 0.11;
+}
+
+.clockcard__dots-col {
+  fill: var(--text);
+  fill-opacity: 0.1;
+}
+
+.clockcard__day-name {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.clockcard__dot.is-on {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+/* A short card (a small phone, or Safari's bars showing) gives the dial what the rest can spare */
+@container (max-height: 440px) {
+  .clockcard__readout {
+    margin-top: 4px;
+    font-size: 0.9rem;
+  }
+  .cline {
+    margin-top: 6px;
+    gap: 3px;
+  }
+  .cline__row {
+    height: 32px;
+  }
+  .cline__who > .cover {
+    width: 24px;
+    height: 24px;
+  }
+  .cline__bar {
+    height: 18px;
+  }
+  .clockcard__dots {
+    height: 70px;
+    margin-top: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clockcard__bar {
+    transition: none;
+  }
+}
+
+/* ---------- end card: B1 Around the Clock ---------- */
+
+
+
+
+/* ---------- Card: B2 Every Day ---------- */
+
+/* The calendar on a phone (and any narrow column): the year, its months, then the month as an ordinary calendar */
+.daycal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.daycal__years {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.daycal__step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.daycal__step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.daycal__step svg,
+.daycal__find svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.daycal__year {
+  min-width: 3.2em;
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+/* A plain button on top, the phone's date wheel underneath it */
+.daycal__find {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  margin-left: auto;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.9rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.daycal__find input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  font-size: 16px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.daycal__find:focus-within {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.daycal__months {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.daycal__month,
+.daycal__day {
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(244, 241, 234, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.daycal__month {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  font-size: 0.8rem;
+}
+
+.daycal__heat {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.daycal__month.is-bright,
+.daycal__day.is-bright {
+  color: var(--accent-ink);
+}
+
+.daycal__month:disabled,
+.daycal__day:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.daycal__month:disabled {
+  background: transparent;
+}
+
+.daycal__month[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--accent-ink);
+}
+
+.daycal__month[aria-pressed='true'] .daycal__heat {
+  box-shadow: 0 0 0 1.5px var(--accent-ink);
+}
+
+.daycal__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0 0;
+}
+
+.daycal__title strong {
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.daycal__title span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: right;
+}
+
+.daycal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 42px;
+  gap: 4px;
+}
+
+.daycal__weekday {
+  color: var(--faint);
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.daycal__day {
+  font-size: 0.88rem;
+}
+
+.daycal__day.is-max {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+.daycal__day[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 3px var(--lime), inset 0 0 0 5px var(--bg);
+}
+
+.daycal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.daycal__legend {
+  margin: 0;
+}
+
+.daycal__biggest {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daycal__biggest .is-max-swatch {
+  width: 11px;
+  height: 11px;
+}
+
+/* On a card the month fills whatever height is left, always six rows so it never jumps */
+.dash.is-cards .calendar--card {
+  position: relative;
+  height: 100%;
+}
+
+.dash.is-cards .daycal {
+  height: 100%;
+}
+
+.dash.is-cards .daycal__grid {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: auto repeat(6, minmax(0, 1fr));
+  grid-auto-rows: unset;
+}
+
+/* The day itself: a sheet over the calendar that fits the card */
+.dash.is-cards .day-panel--sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 14px 8px;
+  overflow: hidden;
+  border-radius: 18px;
+  animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__head {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__titles {
+  flex-basis: auto;
+  order: 0;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__titles h3 {
+  font-size: 1.15rem;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__nav {
+  gap: 4px;
+  order: 0;
+}
+
+.day-panel--sheet .day-panel__step,
+.day-panel--sheet .day-panel__close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+
+.day-panel--sheet .day-panel__step svg,
+.day-panel--sheet .day-panel__close svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__stats dd {
+  font-size: 1.2rem;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__bars {
+  height: 46px;
+}
+
+/* First listens on one line, the rest behind "+n"; opened, they wrap and the list below gives up the room */
+.dash.is-cards .day-panel--sheet .day-panel__new {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__new.is-open {
+  flex-wrap: wrap;
+}
+
+.dash.is-cards .day-panel--sheet .day-panel__new:not(.is-open) .day-panel__chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-panel__more {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.day-panel__tabs {
+  align-self: flex-start;
+}
+
+.day-panel__pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.day-panel__pane .day-panel__list,
+.day-panel__pane .day-panel__log {
+  margin-top: 0;
+}
+
+
+/* ---------- end card: B2 Every Day ---------- */
+
+
+
+
+/* ---------- Card: B3 Love / Hate ---------- */
+
+/* On a card the two songs stack like the A and B sides of a single, half the card each */
+.dash.is-cards .lovehate--card {
+  height: 100%;
+}
+
+.dash.is-cards .lovehate--card .duel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0;
+  margin: 0;
+}
+
+.dash.is-cards .lovehate--card .duel__side {
+  flex: 1 1 0;
+  min-height: 0;
+  justify-content: center;
+  gap: 10px;
+}
+
+.dash.is-cards .lovehate--card .duel__side:first-child {
+  padding-bottom: 14px;
+}
+
+.dash.is-cards .lovehate--card .duel__side + .duel__side {
+  padding-top: 14px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.dash.is-cards .lovehate--card .duel__cover {
+  width: 92px;
+  height: 92px;
+}
+
+.dash.is-cards .lovehate--card .duel__fact {
+  margin: 4px 0 8px;
+}
+
+.dash.is-cards .lovehate--card .duel__more li {
+  padding: 5px 0;
+}
+
+@container (max-height: 440px) {
+  .dash.is-cards .lovehate--card .duel__side {
+    gap: 8px;
+  }
+  .dash.is-cards .lovehate--card .duel__cover {
+    width: 76px;
+    height: 76px;
+  }
+  .dash.is-cards .lovehate--card .duel__title {
+    font-size: 1.15rem;
+  }
+  .dash.is-cards .lovehate--card .duel__artist {
+    font-size: 1.05rem;
+  }
+  .dash.is-cards .lovehate--card .duel__fact {
+    font-size: 0.85rem;
+  }
+  .dash.is-cards .lovehate--card .duel__more li {
+    padding: 3px 0;
+  }
+}
+
+/* ---------- end card: B3 Love / Hate ---------- */
+
+
+
+
+/* ---------- Card: C1 Constellation ---------- */
+
+/* The sky fills the card and a finger always explores it; the caption under it names what you tapped */
+.dash.is-cards .constellation.is-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* The page's purple and teal wash, turned down so the artists' own colors lead */
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(160, 83, 253, 0.08), transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(12, 162, 188, 0.06), transparent 50%),
+    #07060c;
+}
+
+.dash.is-cards .constellation.is-card .constellation__sky {
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+}
+
+.dash.is-cards .constellation.is-card .constellation__sky svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* Background stars and halos stay, just quieter, so they don't read as artists on a small screen */
+.dash.is-cards .constellation.is-card .constellation__star {
+  opacity: 0.16;
+  animation-name: twinkle-faint;
+}
+
+@keyframes twinkle-faint {
+  from { opacity: 0.04; }
+  to { opacity: 0.3; }
+}
+
+.dash.is-cards .constellation.is-card .constellation__halo {
+  opacity: 0.14;
+}
+
+.constellation__reset {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(7, 6, 12, 0.82);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.constellation__reset:active {
+  background: var(--surface-2);
+}
+
+/* A fixed two lines, so picking a star never resizes the sky under your finger */
+.constellation__caption {
+  flex: none;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  height: calc(2 * 1.4em + 22px);
+  margin: 0;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--line);
+  background: rgba(11, 10, 15, 0.6);
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.constellation__caption em {
+  color: var(--text);
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+.constellation__caption .constellation__who {
+  font-size: 1.4em;
+}
+
+/* ---------- end card: C1 Constellation ---------- */
+
+
+
+
+/* ---------- Card: C2 Pulse ---------- */
+
+/* The ridges fill the card; under them, one line on how to read it, or the line you picked */
+.dash.is-cards .pulse.is-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+}
+
+.pulse__plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 12px 4px 0;
+}
+
+.pulse__plot svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* A faint wash of each line's color under it: still opaque, so the ridges in front hide the ones behind */
+.dash.is-cards .pulse.is-card .pulse__fill {
+  fill: color-mix(in srgb, var(--c) 9%, #000);
+}
+
+.dash.is-cards .pulse.is-card .pulse__ridge.is-on .pulse__fill {
+  fill: color-mix(in srgb, var(--c) 18%, #000);
+  fill-opacity: 0.85;
+}
+
+.dash.is-cards .pulse.is-card .pulse__ridge.is-on .pulse__line {
+  filter: none;
+}
+
+.pulse__found {
+  fill: var(--c);
+  stroke: #000;
+  stroke-width: 1.5;
+}
+
+.dash.is-cards .pulse.is-card .pulse__tag text {
+  font-size: 12px;
+}
+
+.dash.is-cards .pulse.is-card .axis-label {
+  font-size: 12px;
+}
+
+.pulse__panel {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 96px;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.pulse__lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.pulse__lead em {
+  color: var(--text);
+  font-size: 1.15em;
+}
+
+.pulse__pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pulse__readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+
+.pulse__readout em {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1.4rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pulse__peak {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.dash.is-cards .pulse.is-card .pulse__scrub {
+  position: static;
+  gap: 4px;
+  padding: 0;
+  background: none;
+  touch-action: none;
+}
+
+.dash.is-cards .pulse.is-card .pulse__step {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+
+.dash.is-cards .pulse.is-card .scrubber {
+  min-width: 0;
+  margin: 0 8px;
+  touch-action: none;
+}
+
+.pulse__at {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 5.6em;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.pulse__at b {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+/* ---------- end card: C2 Pulse ---------- */
+
+
+
+
+/* ---------- Card: C3 The Charts ---------- */
+
+/* One row of controls, the podium, then as many rows as fit; the full list opens over the card */
+.dash.is-cards .charts.is-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.charts__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.charts__bar .segmented {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+.charts__bar .segmented__option {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 0.86rem;
+}
+
+/* A narrow phone's row, and four categories (with podcasts) on any phone, get a little less air */
+@container (max-width: 350px) {
+  .charts__bar .segmented__option {
+    padding-inline: 7px;
+  }
+}
+
+.charts__bar:has(.segmented__option:nth-child(4)) .segmented__option {
+  padding-inline: 6px;
+  font-size: 0.8rem;
+}
+
+.charts__bar:has(.segmented__option:nth-child(4)) .charts__sort {
+  padding-inline: 8px 10px;
+}
+
+.charts__sort {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 46px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(244, 241, 234, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.charts__sort svg {
+  color: var(--muted);
+}
+
+.charts__sort:active {
+  background: var(--surface-2);
+}
+
+/* Each spot shares the podium's rows, so the covers sit on one line and every name starts right under its cover */
+.dash.is-cards .charts.is-card .podium {
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-rows: auto;
+  column-gap: 12px;
+  row-gap: 0;
+  margin: 0 0 4px;
+}
+
+.dash.is-cards .charts.is-card .podium__spot {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  align-items: start;
+}
+
+.dash.is-cards .charts.is-card .podium__art {
+  align-self: end;
+}
+
+.dash.is-cards .charts.is-card .podium__spot--1 {
+  order: 2;
+  grid-column: auto;
+}
+
+.dash.is-cards .charts.is-card .podium__art {
+  margin-bottom: 10px;
+}
+
+.dash.is-cards .charts.is-card .podium__art .cover {
+  border-radius: 10px;
+  box-shadow: 0 16px 30px -14px rgba(0, 0, 0, 0.8);
+}
+
+.dash.is-cards .charts.is-card .podium__spot:hover .cover {
+  transform: none;
+}
+
+.dash.is-cards .charts.is-card .podium__rank {
+  left: 0;
+  bottom: -12px;
+  font-size: 2.3rem;
+  -webkit-text-stroke: 2.5px var(--bg);
+}
+
+.dash.is-cards .charts.is-card .podium__spot--1 .podium__rank {
+  font-size: 2.8rem;
+}
+
+.dash.is-cards .charts.is-card .podium__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin-top: 4px;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.dash.is-cards .charts.is-card .podium__sub {
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dash.is-cards .charts.is-card .podium__value {
+  margin-top: 2px;
+  font-size: 0.8rem;
+}
+
+.charts__rest {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Up here rather than at the bottom, where a missed tap would land on the next-track button */
+.charts__more {
+  flex: none;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--more);
+  padding: 0 2px 0 14px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.charts__more:active {
+  color: var(--muted);
+}
+
+/* Rows at a fixed height (set from TopCharts.tsx): the card works out how many fit from it */
+.dash.is-cards .charts.is-card .chart-list {
+  margin: 0;
+}
+
+.dash.is-cards .charts.is-card .chart-list__row,
+.dash.is-cards .charts.is-card .chart-list--hideable .chart-list__row {
+  grid-template-columns: 1.6rem 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  height: var(--row);
+  padding: 0;
+}
+
+.dash.is-cards .charts.is-card .chart-list--hideable .chart-list__row {
+  grid-template-columns: 1.6rem 36px minmax(0, 1fr) auto auto;
+}
+
+.dash.is-cards .charts.is-card .chart-list__rank {
+  font-size: 1.15rem;
+}
+
+.dash.is-cards .charts.is-card .chart-list__main {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.dash.is-cards .charts.is-card .chart-list__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.dash.is-cards .charts.is-card .chart-list__sub {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.dash.is-cards .charts.is-card .chart-list__value {
+  font-size: 0.82rem;
+}
+
+.charts__sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--line-strong);
+  background: var(--bg);
+  animation: charts-sheet-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes charts-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charts__sheet {
+    animation: none;
+  }
+}
+
+.charts__sheet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.charts__sheet-head strong {
+  font-size: 1.05rem;
+}
+
+.charts__close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The one thing on this card that scrolls, and only because you opened it */
+.charts__sheet-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.charts__sheet .charts__hidden {
+  margin: 10px 0;
+}
+
+.charts__sheet .chip-button,
+.dash.is-cards .charts__sheet .chart-hide {
+  min-height: 40px;
+  padding: 0 14px;
+  font-family: var(--display);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* ---------- end card: C3 The Charts ---------- */
+
+
+
+
+/* ---------- Card: D1 Liner Notes ---------- */
+
+/*
+ * The small print: a few facts you couldn't have guessed, each a sentence
+ * with its evidence under it. They share the card in equal bands with a rule
+ * between, and the first (the most surprising) is set biggest.
+ */
+.dash.is-cards .smallprint {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.dash.is-cards .smallprint__fact {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding-block: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.dash.is-cards .smallprint__fact[hidden] {
+  display: none;
+}
+
+.dash.is-cards .smallprint__fact:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dash.is-cards .smallprint__fact:last-child {
+  padding-bottom: 0;
+}
+
+.dash.is-cards .smallprint__line {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(1.3rem, 6.6cqw, 1.65rem);
+  line-height: 1.08;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.dash.is-cards .smallprint__fact:first-child .smallprint__line {
+  font-size: clamp(1.8rem, 9.6cqw, 2.4rem);
+  line-height: 1.02;
+}
+
+.dash.is-cards .smallprint__line em {
+  font-style: italic;
+}
+
+.dash.is-cards .smallprint__proof {
   margin: 0;
   font-family: var(--mono);
   font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  line-height: 1.35;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+.dash.is-cards .smallprint--empty {
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ---------- end card: D1 Liner Notes ---------- */
+
+
+
+
+/* ---------- Card: D2 The Poster ---------- */
+
+.dash.is-cards .studio--card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  height: 100%;
+}
+
+/* The poster takes the height the controls leave, and the component fits it inside, so nothing
+   here depends on the poster's own size */
+.dash.is-cards .studio--card .studio__preview {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: hidden;
+}
+
+.dash.is-cards .studio--card .studio__canvas {
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Touch and hold saves the finished poster like any photo: the one thing on a card that may bring up
+   iOS's callout, so it opts back in to what the card turns off */
+.dash.is-cards .studio__press {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.dash.is-cards .studio--card .button {
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+}
+
+/* No lift on tap: a finger leaves hover stuck on */
+.dash.is-cards .studio--card .button:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.dash.is-cards .studio--card .button--ghost:hover {
+  background: transparent;
+}
+
+.dash.is-cards .studio--card .button--ghost:active {
+  background: rgba(244, 241, 234, 0.08);
+}
+
+/* One row of designs, each an equal share of the width, so nothing scrolls sideways under a swipe */
+.dash.is-cards .studio__designs,
+.dash.is-cards .studio__sizes {
+  display: flex;
+  flex: none;
+  width: 100%;
+  padding: 3px;
+  overflow: hidden;
+}
+
+/* Longer names take a bigger share, so "Annotated" still fits on a 360px phone */
+.dash.is-cards .studio__designs .segmented__option,
+.dash.is-cards .studio__sizes .segmented__option {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.88rem;
+}
+
+.dash.is-cards .studio--card .studio__bar {
+  display: flex;
+  flex: none;
+  gap: 10px;
+}
+
+.dash.is-cards .studio__share {
+  flex: 1;
+}
+
+.dash.is-cards .studio__options {
+  gap: 8px;
+}
+
+.dash.is-cards .studio--card .studio__notice {
+  flex: none;
+  margin: 0;
+  text-align: center;
+}
+
+/* Size, background and Ultra HD take the controls' place; the poster above shrinks to make room and
+   changes as you pick */
+.dash.is-cards .studio__sheet {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.dash.is-cards .studio__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash.is-cards .studio__label {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.dash.is-cards .studio__note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash.is-cards .studio__papers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash.is-cards .studio__paper {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dash.is-cards .studio__paper i {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(244, 241, 234, 0.3);
+}
+
+.dash.is-cards .studio__paper[aria-pressed='true'] {
+  border: 2px solid var(--text);
+}
+
+.dash.is-cards .studio__paper-name {
+  min-width: 0;
+  margin-left: 4px;
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash.is-cards .studio__more {
+  flex: 1 1 auto;
+}
+
+.dash.is-cards .studio__done {
+  flex: 1 1 auto;
+  background: var(--text);
+  color: var(--bg);
+}
+
+.dash.is-cards .studio--card .studio__done:hover {
+  background: var(--text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dash.is-cards .studio__sheet {
+    animation: studio-sheet-in 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes studio-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* ---------- end card: D2 The Poster ---------- */

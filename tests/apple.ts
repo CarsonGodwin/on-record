@@ -1,4 +1,5 @@
 import type { AppleFileKind, AppleText } from '../src/data/appleFiles'
+import { normalizePlatform } from '../src/data/parse'
 import type { RawStreamRecord } from '../src/types'
 
 /*
@@ -173,7 +174,8 @@ export function appleExportFrom(records: RawStreamRecord[]): AppleText[] {
         'Play Duration Milliseconds': r.ms_played,
         'Media Duration In Milliseconds': lengths.get(r.spotify_track_uri ?? '') ?? 0,
         'End Reason Type': r.skipped ? 'TRACK_SKIPPED_FORWARDS' : 'NATURAL_END_OF_TRACK',
-        'Build Version': BUILDS.find(([p]) => (r.platform ?? '').startsWith(p))?.[1] ?? '',
+        'Build Version': BUILDS[normalizePlatform(r.platform)] ?? '',
+        Offline: r.offline ? 'true' : 'false',
       }),
     )
     const description = `${artist} - ${title}`
@@ -193,10 +195,10 @@ export function appleExportFrom(records: RawStreamRecord[]): AppleText[] {
   ]
 }
 
-/** The demo's Spotify platforms, as Apple's Build Version strings for the same devices */
-const BUILDS: [string, string][] = [
-  ['iOS', 'Music/1.4.5 iOS/17.4 model/iPhone15,2 build/21E219'],
-  ['OS X', 'Music/1.4 macOS/14.4.1 model/Mac14,2'],
-  ['web_player', 'MusicKit JS/3 (Chrome 124; macOS 14)'],
-  ['sonos', 'Music/1.0 audioOS/17.4 model/AudioAccessory6,1'],
-]
+/** The demo's device families, as Apple's Build Version strings for the same devices */
+const BUILDS: Record<string, string> = {
+  iOS: 'Music/1.4.5 iOS/17.4 model/iPhone15,2 build/21E219',
+  macOS: 'Music/1.4 macOS/14.4.1 model/Mac14,2',
+  Web: 'MusicKit JS/3 (Chrome 124; macOS 14)',
+  'Speakers & cast': 'Music/1.0 audioOS/17.4 model/AudioAccessory6,1',
+}

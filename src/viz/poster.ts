@@ -746,7 +746,7 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   ctx.fillStyle = '#f4f1ea'
   ctx.font = `700 ${1.3 * u}px ${MONO}`
   spacing(ctx, '0.2em')
-  ctx.fillText('ON RECORD ●', kx + 1.6 * u, ky + 2.8 * u)
+  ctx.fillText('MY LISTENING RECORD ●', kx + 1.6 * u, ky + 2.8 * u)
   ctx.textAlign = 'right'
   ctx.fillStyle = 'rgba(244, 241, 234, 0.6)'
   ctx.fillText(data.period, kx + cw - 1.6 * u, ky + 2.8 * u)
@@ -1109,13 +1109,19 @@ function footer(
   ctx.fillText(stats, pad, at.statsY)
   spacing(ctx, '0px')
 
+  // The longest caption only just fits beside the mark, so it shrinks a touch rather than run into it
+  ctx.font = `700 ${1.3 * u}px ${MONO}`
+  spacing(ctx, '0.2em')
+  const mark = 'MY LISTENING RECORD ●'
+  const markW = ctx.measureText(mark).width
+  spacing(ctx, '0px')
   ctx.fillStyle = p.muted
-  ctx.font = `400 ${1.3 * u}px ${MONO}`
+  measureFit(ctx, CAPTIONS[design], W - 2 * pad - markW - 2 * u, 1.3 * u, `400 {px}px ${MONO}`)
   ctx.fillText(CAPTIONS[design], pad, at.captionY)
   ctx.textAlign = 'right'
   ctx.font = `700 ${1.3 * u}px ${MONO}`
   spacing(ctx, '0.2em')
-  ctx.fillText('ON RECORD ●', W - pad, at.captionY)
+  ctx.fillText(mark, W - pad, at.captionY)
   spacing(ctx, '0px')
 }
 

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useContext, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { HourSlot, Records, Take } from '../data/insights'
-import type { FunStats, Ranked, Summary } from '../data/stats'
+import { smallPrint } from '../data/smallPrint'
+import type { FunStats, Ranked, Summary, WearOut } from '../data/stats'
 import { formatDate, formatDuration, formatHour, formatNumber, formatPercent, formatTime } from '../lib/format'
+import { InCards } from '../lib/stage'
 
 interface Props {
   takes: Take[]
@@ -11,6 +13,8 @@ interface Props {
   devices: Ranked[]
   topArtists: Ranked[]
   hours: HourSlot[]
+  /** How songs wear out, for the phone card's small print */
+  wear: WearOut | null
   /** "2024", or "2019–2025" for all time */
   period: string
   isAllTime: boolean
@@ -21,12 +25,15 @@ interface Props {
  * in small print, and your habits as a guessing game, so you find out how
  * well you know them before the number shows up.
  */
-export function LinerNotes({ takes, fun, rec, summary, devices, topArtists, hours, period, isAllTime }: Props) {
+export function LinerNotes({ takes, fun, rec, summary, devices, topArtists, hours, wear, period, isAllTime }: Props) {
+  const inCards = useContext(InCards)
+  // A phone's card has room for a few lines, not the whole sleeve, so it keeps the ones you couldn't have guessed
+  if (inCards) return <SmallPrint fun={fun} rec={rec} wear={wear} isAllTime={isAllTime} />
   return (
     <div className="liner">
       <article className="backcover">
         <header className="backcover__top">
-          <span>On Record · {period}</span>
+          <span>My Listening Record · {period}</span>
           <span>Liner notes</span>
         </header>
         <Headline takes={takes} />
@@ -179,6 +186,69 @@ function Credits({ fun, rec, summary, devices, topArtists, hours, isAllTime }: C
         </div>
       ))}
     </dl>
+  )
+}
+
+// ---------- The small print, on a phone's card ----------
+
+/** The most facts a card shows; fewer when they don't fit (a small phone, long song titles) */
+const MOST_FACTS = 4
+
+interface SmallPrintProps {
+  fun: FunStats
+  rec: Records
+  wear: WearOut | null
+  isAllTime: boolean
+}
+
+function SmallPrint({ fun, rec, wear, isAllTime }: SmallPrintProps) {
+  const facts = useMemo(() => smallPrint(fun, rec, wear, isAllTime).slice(0, MOST_FACTS), [fun, rec, wear, isAllTime])
+  const listRef = useRef<HTMLOListElement>(null)
+
+  // Show them all, then drop the last (least surprising) until the rest fit. The DOM is measured and
+  // trimmed directly, again when the card changes size or the serif arrives (it sets wider than its fallback).
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    let live = true
+    const fit = () => {
+      if (!live) return
+      const items = [...list.children] as HTMLElement[]
+      for (const li of items) li.hidden = false
+      for (let n = items.length - 1; n > 0 && list.scrollHeight > list.clientHeight + 1; n--) items[n].hidden = true
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(list)
+    document.fonts?.addEventListener('loadingdone', fit)
+    document.fonts?.ready.then(fit)
+    return () => {
+      live = false
+      observer.disconnect()
+      document.fonts?.removeEventListener('loadingdone', fit)
+    }
+  }, [facts])
+
+  if (!facts.length) {
+    return (
+      <div className="smallprint smallprint--empty">
+        <p className="smallprint__line">Not much small print here yet.</p>
+        <p className="smallprint__proof">A longer stretch of listening has more to say</p>
+      </div>
+    )
+  }
+
+  return (
+    <ol className="smallprint" ref={listRef} aria-label="The small print">
+      {facts.map((f) => (
+        <li key={f.key} className="smallprint__fact">
+          <p className="smallprint__line">
+            {f.line.map((part, i) => (typeof part === 'string' ? part : <em key={i}>{part.name}</em>))}
+          </p>
+          <p className="smallprint__proof">{f.proof}</p>
+        </li>
+      ))}
+    </ol>
   )
 }
 

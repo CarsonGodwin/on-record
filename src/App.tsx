@@ -64,7 +64,7 @@ export default function App() {
 
       <header className="landing__top">
         <span className="brand">
-          On Record<span className="brand__dot" aria-hidden="true" />
+          My Listening Record<span className="brand__dot" aria-hidden="true" />
         </span>
         <span className="landing__tag">A Spotify &amp; Apple Music history visualizer</span>
       </header>
@@ -73,13 +73,17 @@ export default function App() {
         <div className="landing__copy">
           <p className="eyebrow">An in-depth analysis of your entire Spotify or Apple Music history</p>
           <h1 className="landing__title">
-            Your life,
+            My life,
             <br />
-            <em>on record.</em>
+            <em>my listening record.</em>
           </h1>
           <p className="landing__lede">
-            Drop in your Spotify or Apple Music export and get every day of your listening pressed into vinyl. Your eras, your 3 AM artist, the
-            songs you always skip, the scenes you drift between, and a poster worth sharing.
+            Drop in your Spotify or Apple Music export and get every day of your listening pressed into vinyl.
+            {/* A phone's first screen keeps to the one sentence, so the sleeve and the demo fit on it too */}
+            <span className="landing__more">
+              {' '}
+              Your eras, your 3 AM artist, the songs you always skip, the scenes you drift between, and a poster worth sharing.
+            </span>
           </p>
 
           {state.status === 'error' && (
@@ -102,15 +106,24 @@ export default function App() {
           <DropZone onFiles={(files) => load(() => loadFiles(files), false)} />
 
           <div className="landing__demo">
-            <span className="landing__note">No export yet? Look around with made-up listening.</span>
+            <span className="landing__note">
+              No export yet?<span className="landing__more"> Look around with made-up listening.</span>
+            </span>
             <button type="button" className="button button--ghost button--small" onClick={() => load(loadSample, true)}>
-              ▶ Try the demo
+              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+                <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
+              </svg>{' '}
+              Try the demo
             </button>
           </div>
 
           <p className="privacy">
-            <strong>Your data never leaves your device.</strong> There’s no server. Your files are read right here in the
-            browser, and nothing is uploaded or stored.
+            <strong>Your data never leaves your device.</strong>
+            <span className="landing__more">
+              {' '}
+              There’s no server. Your files are read right here in the browser, and nothing is uploaded or stored.
+            </span>
+            <span className="landing__less"> No server: nothing is uploaded or stored.</span>
           </p>
         </div>
       </main>
@@ -140,7 +153,7 @@ export default function App() {
           </li>
           <li>Confirm the request from the email Spotify sends you.</li>
           <li>Wait for the download link. Spotify says it takes up to 30 days, but it’s often faster.</li>
-          <li>Drop the zip file on the sleeve above.</li>
+          <li>Add the zip file on the sleeve above.</li>
         </ol>
         <h3>Apple Music</h3>
         <ol>
@@ -155,12 +168,12 @@ export default function App() {
             Choose <strong>Request a copy of your data</strong>, then check <strong>Apple Media Services information</strong>.
           </li>
           <li>Wait for the email saying it’s ready. Apple says it can take up to a week.</li>
-          <li>Download every part (big exports come in several zips) and drop them all on the sleeve above.</li>
+          <li>Download every part (big exports come in several zips) and add them all on the sleeve above.</li>
         </ol>
       </details>
 
       <p className="colophon">
-        On Record is open source.{' '}
+        My Listening Record is open source.{' '}
         <a href="https://github.com/CarsonGodwin/on-record" target="_blank" rel="noreferrer">
           Star it, report a bug or support it on GitHub
         </a>
@@ -168,7 +181,7 @@ export default function App() {
       </p>
 
       <p className="disclaimer">
-        On Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
+        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
         Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
       </p>
     </div>

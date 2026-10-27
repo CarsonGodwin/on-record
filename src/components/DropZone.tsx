@@ -66,8 +66,8 @@ export function DropZone({ onFiles }: Props) {
           ) : (
             <>
               {/* Phones can't drag files, so there it's a tap */}
-              {COARSE ? 'Add your' : 'Drop your'}
-              <br />
+              {COARSE ? 'Add your' : 'Drop your'}{' '}
+              <br className="sleeve__break" />
               music export
               <br />
               <em>here.</em>
@@ -75,7 +75,9 @@ export function DropZone({ onFiles }: Props) {
           )}
         </p>
         <p className="sleeve__hint">
-          The <code>.zip</code> from Spotify or Apple (every part, if Apple sent several), or the folder it unzips to.
+          The <code>.zip</code> from Spotify or Apple
+          <span className="landing__more"> (every part, if Apple sent several), or the folder it unzips to</span>
+          .
         </p>
         <span className="sleeve__cta" aria-hidden="true">
           <b>

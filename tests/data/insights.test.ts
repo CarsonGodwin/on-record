@@ -19,6 +19,7 @@ import {
   type Records,
 } from '../../src/data/insights'
 import { dayNumber, type FunStats, type Summary } from '../../src/data/stats'
+import { mulberry32 } from '../../src/lib/random'
 import { at, play, sorted } from '../helpers'
 
 const MIN = 60_000
@@ -118,6 +119,29 @@ describe('raceFrames', () => {
     expect(race.names).toEqual(['A', 'B'])
     expect(race.frames).toBe(2)
     expect([...race.values]).toEqual([10, 5, 10, 25])
+  })
+
+  it('picks the same racers as ranking every artist in every bin, ties included', () => {
+    const rand = mulberry32(7)
+    // Whole minutes from a small pool, so ties at the cutoff are common
+    const totals = Array.from({ length: 60 }, () => {
+      const bin = new Map<string, number>()
+      for (let i = 0; i < 12; i++) bin.set(`artist ${Math.floor(rand() ** 2 * 40)}`, Math.ceil(rand() * 4) * 60_000)
+      return bin
+    })
+    const running = new Map<string, number>()
+    const expected = new Set<string>()
+    for (const bin of totals) {
+      for (const [artist, ms] of bin) running.set(artist, (running.get(artist) ?? 0) + ms)
+      for (const [artist] of topEntries(running, 5)) expected.add(artist)
+    }
+    expect(raceFrames(totals, 5).names).toEqual([...expected])
+  })
+
+  it('breaks a tie for the lead in favour of whoever was heard first', () => {
+    // After the second bin all three have 10; A was heard first, though C led and B played last
+    const totals = [new Map([['A', 1], ['B', 1], ['C', 10]]), new Map([['B', 9], ['A', 9]])]
+    expect(raceFrames(totals, 1).names).toEqual(['C', 'A'])
   })
 })
 

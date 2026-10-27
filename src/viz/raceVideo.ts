@@ -21,6 +21,19 @@ export function raceFrameMs(frames: number): number {
   return Math.max(60, Math.min(450, 25_000 / Math.max(frames, 1)))
 }
 
+/**
+ * The years a race covers, and roughly how many. A week belongs to the year it ends in, so a single
+ * year's race, whose first week starts on the Monday before New Year's Day, is that year alone.
+ */
+export function raceYears(bins: Bins): { first: number; last: number; years: number } {
+  const start = new Date(bins.starts[0])
+  const firstDay = bins.size === 'week' ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6) : start
+  const first = Math.min(firstDay.getFullYear(), new Date(bins.end).getFullYear())
+  const last = new Date(bins.end).getFullYear()
+  const years = Math.max(1, Math.round((bins.end - firstDay.getTime()) / (365.25 * 86_400_000)))
+  return { first, last, years }
+}
+
 export interface RaceScene {
   bins: Bins
   race: RaceData
@@ -40,9 +53,7 @@ export function makeRaceFilm({ bins, race, colors, covers }: RaceScene): RaceFil
   const n = race.names.length
   const step = raceFrameMs(frames) / 1000
   const raceSecs = (frames - 1) * step
-  const firstYear = new Date(bins.starts[0]).getFullYear()
-  const lastYear = new Date(bins.end).getFullYear()
-  const years = Math.max(1, Math.round((bins.end - bins.starts[0]) / (365.25 * 86_400_000)))
+  const { first: firstYear, last: lastYear, years } = raceYears(bins)
   // Smoothed row positions and opacities, standing in for the page's CSS transitions
   const pos = new Map<string, number>()
   const alpha = new Map<string, number>()
@@ -139,7 +150,11 @@ export function makeRaceFilm({ bins, race, colors, covers }: RaceScene): RaceFil
       ctx.restore()
 
       const fill = Math.max(0.8 * u, (ms / max) * barMax)
-      ctx.fillStyle = color
+      // The page's bars: the colour coming up from 70% along the bar
+      const grad = ctx.createLinearGradient(x0, 0, x0 + fill, 0)
+      grad.addColorStop(0, fade(color, 0.7))
+      grad.addColorStop(1, color)
+      ctx.fillStyle = grad
       ctx.beginPath()
       ctx.roundRect(x0, cy - barH / 2, fill, barH, [0, 1 * u, 1 * u, 0])
       ctx.fill()
@@ -178,22 +193,29 @@ export function makeRaceFilm({ bins, race, colors, covers }: RaceScene): RaceFil
       ctx.textAlign = 'left'
       ctx.fillStyle = ink
       ctx.font = font(700, 4.6 * u)
-      const line = firstYear === lastYear ? `won my ${firstYear}.` : `leads after ${years} years.`
+      const line = firstYear === lastYear ? `won my ${firstYear}.` : `leads after ${years} year${years === 1 ? '' : 's'}.`
       const lineW = ctx.measureText(` ${line}`).width
       const who = clip(ctx, winner, W - 2 * pad - lineW)
       ctx.fillText(`${who} ${line}`, pad, top + RACE_TOP * rowH + 8 * u)
       ctx.globalAlpha = 1
     }
 
-    ctx.textAlign = 'left'
+    // A faint watermark, so the video still says where it came from once it's reshared
+    ctx.textAlign = 'center'
     ctx.textBaseline = 'alphabetic'
-    ctx.fillStyle = soft
-    ctx.font = font(700, 3 * u)
-    ctx.fillText('On Record', pad, H - 6 * u)
+    ctx.fillStyle = 'rgba(244, 241, 234, 0.34)'
+    ctx.font = font(600, 2.6 * u)
+    ctx.fillText('mylisteningrecord', W / 2, H - 6 * u)
     ctx.restore()
   }
 
   return { duration: LEAD + raceSecs + HOLD, draw }
+}
+
+/** A `#rrggbb` colour at an opacity */
+function fade(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1, 7), 16)
+  return Number.isNaN(n) ? hex : `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
 }
 
 /**
@@ -221,9 +243,8 @@ export async function makeRaceVideo(scene: RaceScene, onProgress: (fraction: num
   try {
     const { blob, type } = mode === 'encode' ? await encode(canvas, ctx, film, onProgress, signal) : await record(canvas, ctx, film, onProgress, signal)
     onProgress(1)
-    const yearA = new Date(scene.bins.starts[0]).getFullYear()
-    const yearB = new Date(scene.bins.end).getFullYear()
-    const name = `on-record-${yearA === yearB ? yearA : `${yearA}-${yearB}`}-race.${type === 'video/mp4' ? 'mp4' : 'webm'}`
+    const { first: yearA, last: yearB } = raceYears(scene.bins)
+    const name = `my-listening-record-${yearA === yearB ? yearA : `${yearA}-${yearB}`}-race.${type === 'video/mp4' ? 'mp4' : 'webm'}`
     return new File([blob], name, { type })
   } finally {
     canvas.width = canvas.height = 0
