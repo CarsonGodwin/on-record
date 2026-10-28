@@ -20,7 +20,7 @@ interface Callout {
   anchors: [number, number][]
 }
 
-export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: number, data: PosterData, paper: PosterPaper) {
+export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: number, data: PosterData, paper: PosterPaper, accentPick?: string) {
   const u = W / 100
   const pad = 5 * u
   const dark = isDarkPaper(paper)
@@ -29,7 +29,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   const soft = dark ? 'rgba(244, 241, 234, 0.64)' : 'rgba(23, 20, 29, 0.64)'
   const faint = dark ? 'rgba(244, 241, 234, 0.14)' : 'rgba(23, 20, 29, 0.14)'
   const otherColor = dark ? '#5d5868' : '#a8a2b3'
-  const accent = data.tracklist[0]?.color ?? '#ff277c'
+  const accent = accentPick ?? data.tracklist[0]?.color ?? '#ff277c'
   const font = (weight: number, px: number) => `${weight} ${px}px ${DISPLAY}`
   const model = data.record
   const multiYear = data.period.includes('–')

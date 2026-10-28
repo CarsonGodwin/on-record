@@ -50,25 +50,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Film grain over everything */
-body::after {
-  content: '';
-  position: fixed;
-  inset: -50%;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.06;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-  animation: grain 0.9s steps(3) infinite;
-}
-
-@keyframes grain {
-  0% { transform: translate(0, 0); }
-  33% { transform: translate(-3%, 2%); }
-  66% { transform: translate(2%, -3%); }
-  100% { transform: translate(0, 0); }
-}
-
 h1, h2, h3 {
   margin: 0;
   line-height: 1.05;
@@ -151,12 +132,7 @@ em {
   height: 12px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--bg) 0 18%, var(--accent) 20%);
-  box-shadow: 0 0 14px var(--accent);
-  animation: pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  50% { box-shadow: 0 0 2px var(--accent); }
+  box-shadow: 0 0 10px var(--accent);
 }
 
 /* ---------- Buttons ---------- */
@@ -608,12 +584,22 @@ th {
   gap: 16px;
 }
 
-.landing__tag,
-.eyebrow {
+.landing__tag {
   font-family: var(--mono);
   font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* The line above the title is said, not labelled: the serif's speaking voice */
+.eyebrow {
+  margin: 0;
+  max-width: 34ch;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+  line-height: 1.25;
   color: var(--muted);
 }
 
@@ -810,7 +796,7 @@ th {
   font-size: 0.74rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
 }
 
 .sleeve__title {
@@ -1249,7 +1235,7 @@ th {
   margin: 0 0 6px;
   font-family: var(--mono);
   font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
 }
@@ -1435,7 +1421,7 @@ th {
   font-family: var(--mono);
   font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
@@ -1449,18 +1435,14 @@ th {
   line-height: 0.82;
   letter-spacing: -0.065em;
   margin-left: -0.05em;
+  /* Held still rather than shimmering; fit to the digits so the whole sweep lands on them */
+  width: fit-content;
   background: linear-gradient(100deg, var(--text) 0 40%, var(--accent) 62%, var(--violet) 82%, var(--cyan));
-  background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: shimmer 8s ease-in-out infinite alternate;
 }
 
-@keyframes shimmer {
-  from { background-position: 0% 0; }
-  to { background-position: 100% 0; }
-}
 
 .hero__unit {
   margin: 6px 0 26px;
@@ -1523,10 +1505,15 @@ th {
   white-space: nowrap;
 }
 
+/* Between stats, a tiny record like the one next to the name */
 .ticker__set i {
-  font-style: normal;
-  color: var(--accent);
+  display: inline-block;
+  width: 7px;
+  height: 7px;
   margin: 0 22px;
+  vertical-align: 0.12em;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--bg) 0 22%, var(--accent) 26%);
 }
 
 @keyframes ticker {
@@ -1547,7 +1534,7 @@ th {
   font-size: 0.78rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.08em;
   color: var(--accent);
   white-space: nowrap;
 }
@@ -3730,7 +3717,7 @@ th {
   font-family: var(--mono);
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
@@ -3837,7 +3824,7 @@ th {
   font-family: var(--mono);
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
@@ -4157,7 +4144,7 @@ th {
   font-family: var(--mono);
   font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
@@ -4186,6 +4173,51 @@ th {
   background: transparent;
   color: var(--text);
   cursor: pointer;
+}
+
+/* Deep dive's color: small dots in one row, wrapping on a narrow column */
+.studio__accents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.studio__accent {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.studio__accent i {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.studio__accent[aria-pressed='true'] {
+  border: 2px solid var(--text);
+}
+
+.studio__reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.studio__reset:hover {
+  color: var(--text);
 }
 
 .swatch i {
@@ -4513,7 +4545,7 @@ html.tour-open {
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.08em;
   color: var(--accent);
   white-space: nowrap;
 }
@@ -4626,7 +4658,7 @@ html.tour-open {
   font-size: 0.66rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   color: var(--accent);
 }
 
@@ -4667,7 +4699,7 @@ html.tour-open {
   font-family: var(--mono);
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
@@ -4914,7 +4946,7 @@ kbd {
   margin: 10px 10px 4px;
   font-family: var(--mono);
   font-size: 0.68rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
 }
@@ -7637,6 +7669,38 @@ html.cards-open body {
 
 .dash.is-cards .studio__paper[aria-pressed='true'] {
   border: 2px solid var(--text);
+}
+
+.dash.is-cards .studio__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Every color in one row, each an equal share of the width, so nothing scrolls sideways under a swipe */
+.dash.is-cards .studio__accents {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.dash.is-cards .studio__accent {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  height: 44px;
+  border: 0;
+  border-radius: 0;
+}
+
+.dash.is-cards .studio__accent i {
+  width: min(22px, 70%);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.dash.is-cards .studio__accent[aria-pressed='true'] i {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text);
 }
 
 .dash.is-cards .studio__paper-name {
