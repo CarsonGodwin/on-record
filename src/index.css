@@ -12,7 +12,7 @@
   --line: rgba(244, 241, 234, 0.09);
   --line-strong: rgba(244, 241, 234, 0.2);
   --text: #f4f1ea;
-  --muted: #a8a39b;
+  --muted: #afaaa3;
   --faint: #807a83;
   --accent: #ff277c;
   --accent-ink: #0b0a0f;
@@ -627,6 +627,9 @@ th {
   gap: 10px 16px;
   /* Clear of the record peeking out of the sleeve */
   margin-top: 6px;
+  /* Above the sleeve cover, so its long shadow falls behind this text instead of dimming it */
+  position: relative;
+  z-index: 2;
 }
 
 @media (max-width: 860px) {
@@ -666,9 +669,9 @@ th {
   margin: 0;
 }
 
+/* Between muted and text: it sits over the glow, where plain muted reads a shade too dim */
 .landing__note {
-  color: var(--faint);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .privacy {
@@ -864,45 +867,71 @@ th {
   visibility: hidden;
 }
 
-.features {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: clamp(56px, 10vh, 110px) 0 40px;
+/*
+ * What's on the record, set like the back of a sleeve: the sides as columns of tracks under a hairline.
+ * Type and rules rather than boxes, so it reads as one list.
+ */
+.sleeve-back {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px clamp(20px, 3vw, 40px);
+  margin: clamp(56px, 10vh, 110px) 0 48px;
+}
+
+.sleeve-back__side {
+  border-top: 1px solid var(--line-strong);
+  padding-top: 14px;
+  opacity: 0;
+  animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation-delay: calc(0.4s + var(--i, 0) * 0.08s);
+}
+
+/* The stagger lives here rather than in style attributes, which the CSP blocks in the prerendered page */
+.sleeve-back__side:nth-child(2) { --i: 1; }
+.sleeve-back__side:nth-child(3) { --i: 2; }
+.sleeve-back__side:nth-child(4) { --i: 3; }
+
+.sleeve-back__side h2 {
+  margin: 0 0 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.sleeve-back__side h2 span {
+  margin-left: 4px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.sleeve-back__side ul {
+  display: grid;
+  gap: 14px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.features li {
+.sleeve-back__side li {
   display: flex;
   flex-direction: column;
-  padding: 12px 18px;
-  border-radius: 16px;
-  border: 1px solid var(--line);
-  background: rgba(244, 241, 234, 0.025);
-  opacity: 0;
-  animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  animation-delay: calc(0.4s + var(--i, 0) * 0.07s);
+  gap: 2px;
+  line-height: 1.3;
 }
 
-/* The stagger lives here rather than in style attributes, which the CSP blocks in the prerendered page */
-.features li:nth-child(2) { --i: 1; }
-.features li:nth-child(3) { --i: 2; }
-.features li:nth-child(4) { --i: 3; }
-.features li:nth-child(5) { --i: 4; }
-.features li:nth-child(6) { --i: 5; }
-.features li:nth-child(7) { --i: 6; }
-.features li:nth-child(8) { --i: 7; }
-.features li:nth-child(9) { --i: 8; }
-.features li:nth-child(n + 10) { --i: 9; }
-
-.features b {
-  font-size: 0.98rem;
+.sleeve-back__side b {
+  font-size: 1.05rem;
 }
 
-.features span {
+.sleeve-back__side li span {
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 900px) {
+  .sleeve-back {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @keyframes rise {
@@ -945,6 +974,47 @@ th {
   font-size: 0.9rem;
 }
 
+/* Room above it when "Request it" scrolls here */
+.how-to {
+  scroll-margin-top: 24px;
+}
+
+.how-to__wait {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.how-to__time {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+}
+
+/* The box people tick by mistake, said before the steps rather than inside them */
+.how-to__tip {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 0.92rem;
+  max-width: 64ch;
+}
+
+.how-to__tip strong {
+  color: var(--text);
+}
+
+/* The way in for most first visits, so it reads as a link at a glance rather than part of the small print */
+.landing__note a {
+  color: #fff;
+  font-weight: 700;
+  text-decoration-thickness: 2px;
+  white-space: nowrap;
+}
+
 /* Marks Apple Music support as new; plain text in a thin outline, so it reads as a note rather than a sticker */
 .beta {
   display: inline-block;
@@ -985,7 +1055,7 @@ th {
 
   .landing .eyebrow,
   .landing__more,
-  .features {
+  .sleeve-back {
     display: none;
   }
 
