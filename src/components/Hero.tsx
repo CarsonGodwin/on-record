@@ -70,7 +70,7 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
               {ticker.map((t) => (
                 <span key={t}>
                   {t}
-                  <i>✦</i>
+                  <i />
                 </span>
               ))}
             </span>

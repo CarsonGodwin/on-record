@@ -68,6 +68,8 @@ export interface PosterData {
   wearOut: WearOut
   /** Standout days and runs, for the designs that point them out on the record */
   moments: PosterMoment[]
+  /** Where the data came from, for the credit line: "Spotify Extended Streaming History" */
+  source: string
 }
 
 export interface PosterMoment {
@@ -165,11 +167,13 @@ export interface PosterOptions {
   design: PosterDesign
   paper: PosterPaper
   title: string
+  /** Deep dive only: overrides the color it takes from your #1 artist */
+  accent?: string
 }
 
 export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number, data: PosterData, o: PosterOptions) {
   // These two lay themselves out for one size each (see POSTER_DESIGN_SIZES)
-  if (o.design === 'deep') return renderDeepPoster(ctx, W, H, data, o.paper)
+  if (o.design === 'deep') return renderDeepPoster(ctx, W, H, data, o.paper, o.accent)
 
   const p = PAPERS[o.paper]
   const u = W / 100

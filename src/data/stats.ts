@@ -10,6 +10,13 @@ import type { Play } from '../types'
 /** Spotify only counts a stream after 30 seconds of listening. Plays counts use the same rule. */
 export const COUNTED_PLAY_MS = 30_000
 
+/**
+ * The artist given to Apple Music plays the export never names one for. Kept apart from
+ * Spotify's UNKNOWN_ARTIST (data/parse.ts) because these start hidden, and in a history
+ * with Spotify in it too that mustn't hide Spotify's own tracks.
+ */
+export const UNMATCHED_ARTIST = 'Unknown artist (Apple Music)'
+
 const DAY_MS = 86_400_000
 
 export function startDate(p: Play): Date {
@@ -83,8 +90,8 @@ export interface Summary {
   activeDays: number
   /** Share of music plays that were skipped, 0–1 */
   skipRate: number
-  /** Share of music plays with shuffle on, 0–1 */
-  shuffleRate: number
+  /** Share of music plays with shuffle on, 0–1, out of the plays that say; null when none do (older Apple Music plays) */
+  shuffleRate: number | null
   /** Share of listening time that was offline, 0–1 */
   offlineShare: number
 }
@@ -98,6 +105,7 @@ export function summarize(plays: Play[]): Summary {
   let musicPlays = 0
   let skips = 0
   let shuffles = 0
+  let shuffleKnown = 0
   const artists = new Set<string>()
   const tracks = new Set<string>()
   const days = new Set<number>()
@@ -112,6 +120,7 @@ export function summarize(plays: Play[]): Summary {
       musicMs += p.msPlayed
       musicPlays++
       if (isSkip(p)) skips++
+      if (p.shuffle !== null) shuffleKnown++
       if (p.shuffle) shuffles++
       artists.add(p.artist)
       if (p.msPlayed >= COUNTED_PLAY_MS) tracks.add(trackKey(p))
@@ -129,7 +138,8 @@ export function summarize(plays: Play[]): Summary {
     tracks: tracks.size,
     activeDays: days.size,
     skipRate: musicPlays ? skips / musicPlays : 0,
-    shuffleRate: musicPlays ? shuffles / musicPlays : 0,
+    // With no music at all there's nothing unknown about it, so that stays 0 as it always was
+    shuffleRate: shuffleKnown ? shuffles / shuffleKnown : musicPlays ? null : 0,
     offlineShare: totalMs ? offlineMs / totalMs : 0,
   }
 }

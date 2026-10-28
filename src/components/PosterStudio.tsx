@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useSize } from '../lib/hooks'
 import { COARSE } from '../lib/pointer'
+import { SERIES } from '../lib/palette'
 import { InCards, OnStage } from '../lib/stage'
 import { POSTER_DESIGN_SIZES, POSTER_SIZES, SOLID_PAPER_DESIGNS, isDarkPaper, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
@@ -62,6 +63,9 @@ const DOTS: Record<PosterPaper, string> = {
   'solid-cream': '#efe8da',
 }
 
+/** Names for the color picker's swatches, which are the chart colors in their usual order */
+const ACCENT_NAMES = ['Pink', 'Teal', 'Orange', 'Green', 'Purple', 'Ochre', 'Blue', 'Lime', 'Magenta', 'Brick']
+
 interface Props {
   data: PosterData
   design: PosterDesign
@@ -83,6 +87,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const doneRef = useRef<HTMLButtonElement>(null)
   const [size, setSize] = useState<PosterSize>('post')
   const [paper, setPaper] = useState<PosterPaper>('midnight')
+  // Deep dive's color: null follows the year's #1 artist, a pick stays put as the year changes
+  const [accentPick, setAccentPick] = useState<string | null>(null)
   const [fontsReady, setFontsReady] = useState(false)
   // Bumped when the browser hands back a preview canvas it had dropped, so the poster is drawn again
   const [restored, setRestored] = useState(0)
@@ -111,8 +117,15 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   // Only some designs offer the solid backgrounds; elsewhere a solid pick falls back to its textured twin
   const papers = SOLID_PAPER_DESIGNS.includes(design) ? [...PAPERS, ...SOLID_PAPERS] : PAPERS
   const activePaper = papers.some((p) => p.value === paper) ? paper : isDarkPaper(paper) ? 'midnight' : 'cream'
+  const hasAccent = design === 'deep'
+  const yearAccent = data.tracklist[0]?.color ?? SERIES[0]
+  const accents = SERIES.includes(yearAccent) ? SERIES : [yearAccent, ...SERIES]
+  const activeAccent = accentPick ?? yearAccent
+  const accent = hasAccent ? activeAccent : undefined
+  // Picking the year's own color goes back to following the year
+  const pickAccent = (color: string) => setAccentPick(color === yearAccent ? null : color)
   const fileName = `my-listening-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
-  const optionsKey = `${design}|${activeSize}|${activePaper}`
+  const optionsKey = `${design}|${activeSize}|${activePaper}|${accent ?? ''}`
 
   useEffect(() => {
     let live = true
@@ -153,21 +166,21 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
-    const inputs = [data, design, activePaper, cssW, cssH, fontsReady, restored]
+    const inputs = [data, design, activePaper, accent, cssW, cssH, fontsReady, restored]
     if (inputs.every((v, i) => drawn.current[i] === v)) return
     drawn.current = inputs
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     canvas.width = Math.round(cssW * dpr)
     canvas.height = Math.round(cssH * dpr)
-    renderPoster(ctx, canvas.width, canvas.height, data, { design, paper: activePaper, title: TITLE })
-  }, [showing, data, design, activePaper, cssW, cssH, fontsReady, restored])
+    renderPoster(ctx, canvas.width, canvas.height, data, { design, paper: activePaper, accent, title: TITLE })
+  }, [showing, data, design, activePaper, accent, cssW, cssH, fontsReady, restored])
 
   const fullSize = useCallback(
     async (scales: number[] = FULL_SCALES): Promise<Blob | null> => {
       await document.fonts.ready
       let image: RenderedImage | null = null
       try {
-        image = await renderBlob(spec.width, spec.height, scales, (ctx, w, h) => renderPoster(ctx, w, h, data, { design, paper: activePaper, title: TITLE }))
+        image = await renderBlob(spec.width, spec.height, scales, (ctx, w, h) => renderPoster(ctx, w, h, data, { design, paper: activePaper, accent, title: TITLE }))
       } catch (err) {
         console.error(err)
       }
@@ -180,7 +193,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
       else if (regular) setShortfall(image.width < spec.width ? { key: optionsKey, data, made: { width: image.width, height: image.height } } : null)
       return image?.blob ?? null
     },
-    [spec, data, design, activePaper, optionsKey],
+    [spec, data, design, activePaper, accent, optionsKey],
   )
 
   useEffect(() => {
@@ -291,6 +304,32 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     closeSheet()
   }
 
+  // Says where the color comes from, or offers the way back to it (shorter on a phone's card)
+  const accentNote = (short: boolean) =>
+    accentPick === null ? (
+      short ? 'Your #1 artist’s' : 'From your #1 artist, so it changes with the year'
+    ) : (
+      <button type="button" className="studio__reset" onClick={() => setAccentPick(null)}>
+        {short ? 'Use #1 artist’s' : 'Use my #1 artist’s color'}
+      </button>
+    )
+  const accentRow = (
+    <div className="studio__accents" role="group" aria-label="Color">
+      {accents.map((color) => (
+        <button
+          key={color}
+          type="button"
+          className="studio__accent"
+          aria-label={`${ACCENT_NAMES[SERIES.indexOf(color)] ?? 'Gray'}${color === yearAccent ? ', your #1 artist’s color' : ''}`}
+          aria-pressed={activeAccent === color}
+          onClick={() => pickAccent(color)}
+        >
+          <i style={{ background: color }} />
+        </button>
+      ))}
+    </div>
+  )
+
   const preview = (
     <div className="studio__preview" ref={wrapRef}>
       <div className="studio__poster" style={{ width: cssW, height: cssH }}>
@@ -360,6 +399,16 @@ export function PosterStudio({ data, design, onDesign }: Props) {
                 </span>
               </div>
             </div>
+            {hasAccent && (
+              <div className="studio__row">
+                {/* The note shares the label's line, so the poster above keeps its room */}
+                <div className="studio__head">
+                  <span className="studio__label">Color</span>
+                  <span className="studio__note">{accentNote(true)}</span>
+                </div>
+                {accentRow}
+              </div>
+            )}
             <div className="studio__bar">
               {canShare && (
                 <button type="button" className="button button--ghost studio__more" onClick={download} disabled={busy !== null}>
@@ -451,6 +500,14 @@ export function PosterStudio({ data, design, onDesign }: Props) {
             ))}
           </div>
         </div>
+
+        {hasAccent && (
+          <div className="field">
+            <span className="field__label">Color</span>
+            {accentRow}
+            <span className="field__note">{accentNote(false)}</span>
+          </div>
+        )}
 
         {mobile ? (
           <div className="studio__actions">

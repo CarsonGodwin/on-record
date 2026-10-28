@@ -111,6 +111,15 @@ describe('summarize', () => {
     expect(s.shuffleRate).toBeCloseTo(1 / 3)
     expect(s.offlineShare).toBeCloseTo(120_000 / s.totalMs)
   })
+
+  it('works out the shuffle rate only from plays that record shuffle', () => {
+    // Apple Music plays don't say whether shuffle was on
+    const apple = [play(at(2024, 1, 1, 8), { shuffle: null }), play(at(2024, 1, 1, 9), { shuffle: null })]
+    expect(summarize(apple).shuffleRate).toBeNull()
+    expect(summarize([...apple, play(at(2024, 1, 2, 8), { shuffle: true }), play(at(2024, 1, 2, 9))]).shuffleRate).toBe(0.5)
+    // Podcasts alone leave nothing unknown
+    expect(summarize([play(at(2024, 1, 1), { kind: 'episode', shuffle: null })]).shuffleRate).toBe(0)
+  })
 })
 
 describe('wearOut', () => {

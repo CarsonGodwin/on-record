@@ -15,8 +15,22 @@ import {
   songStats,
   takes,
 } from '../data/insights'
-import { canHide, filterByYear, filterPlays, funStats, getYears, newArtistsIn, platforms, sameFilter, summarize, topItems, wearOut, weekHourGrid } from '../data/stats'
-import { formatHour, formatNumber } from '../lib/format'
+import {
+  canHide,
+  filterByYear,
+  filterPlays,
+  funStats,
+  getYears,
+  newArtistsIn,
+  platforms,
+  sameFilter,
+  summarize,
+  topItems,
+  UNMATCHED_ARTIST,
+  wearOut,
+  weekHourGrid,
+} from '../data/stats'
+import { formatHour, formatNumber, historyName } from '../lib/format'
 import { useMediaQuery } from '../lib/hooks'
 import { isLaunchKey, LAUNCH_KEY } from '../lib/keys'
 import { COARSE } from '../lib/pointer'
@@ -24,7 +38,7 @@ import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import { InCards, OnStage, resolveStop } from '../lib/stage'
 import { closeTopmost, useCloseOnBack } from '../lib/back'
 import { useSwipe } from '../lib/swipe'
-import type { LoadResult } from '../types'
+import type { DataSource, LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
 import { posterMoments, type PosterData, type PosterDesign } from '../viz/poster'
 import { buildRecord, GROOVE, PODCAST } from '../viz/record'
@@ -82,8 +96,15 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   // Music only and hidden artists come off before anything else, so every chart, color and poster leaves them out.
   // Neither is stored: they reset with the page, like everything else here.
   const [musicOnly, setMusicOnly] = useState(true)
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
+  // Apple Music plays with no artist in the export would rank as one big unknown artist on the
+  // charts and the poster, so they start hidden, as long as some other artist is left (see canHide).
+  // They have their own name, so Spotify's tracks without an artist stay put.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() =>
+    result.unmatchedArtists > 0 && result.plays.some((p) => p.kind === 'track' && p.artist !== UNMATCHED_ARTIST) ? new Set([UNMATCHED_ARTIST]) : new Set(),
+  )
   const otherPlays = useMemo(() => result.plays.filter((p) => p.kind !== 'track').length, [result.plays])
+  // Older Apple Music rows don't say whether shuffle was on
+  const noShuffle = useMemo(() => result.plays.filter((p) => p.shuffle === null).length, [result.plays])
   const hasAnyMusic = otherPlays < result.plays.length
   const [launcher, setLauncher] = useState<LauncherMode | null>(null)
   // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
@@ -220,8 +241,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, songs: summary.tracks, peak: formatHour(peak.hour) },
       wearOut: wear,
       moments: posterMoments(record, fun, rec),
+      source: historyName(result.sources),
     }),
-    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, fun, rec],
+    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, fun, rec, result.sources],
   )
 
   /*
@@ -717,10 +739,21 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 <details className="load-details">
                   <summary>Load details</summary>
                   <ul>
+                    {result.sources.includes('apple') && (
+                      <li>
+                        Apple Music support is in beta. If something looks wrong,{' '}
+                        <a href="https://github.com/CarsonGodwin/on-record/issues" target="_blank" rel="noreferrer">
+                          report it on GitHub
+                        </a>{' '}
+                        with these details.
+                      </li>
+                    )}
                     <li>
                       {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
                     </li>
-                    <li>{formatNumber(result.skippedRows)} rows without track info ignored (usually local files)</li>
+                    <li>
+                      {formatNumber(result.skippedRows)} rows without track info ignored ({skippedRowsHint(result.sources)})
+                    </li>
                     {applied.filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
                     {applied.filter.hidden.size > 0 && (
                       <li>
@@ -728,6 +761,17 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                       </li>
                     )}
                     {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
+                    {result.unmatchedArtists > 0 && (
+                      <li>
+                        {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export.{' '}
+                        {applied.filter.hidden.has(UNMATCHED_ARTIST)
+                          ? `They’re hidden as “${UNMATCHED_ARTIST}”, and Hide Artists… shows them again.`
+                          : `They show as “${UNMATCHED_ARTIST}”.`}
+                      </li>
+                    )}
+                    {noShuffle > 0 && (
+                      <li>{formatNumber(noShuffle)} Apple Music plays don’t say whether shuffle was on, so shuffle stats leave them out</li>
+                    )}
                     {result.warnings.map((w) => (
                       <li key={w}>{w}</li>
                     ))}
@@ -741,8 +785,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                   .
                 </p>
                 <p className="disclaimer">
-                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a
-                  trademark of Spotify AB.
+                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
+                  Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
                 </p>
               </footer>
             )}
@@ -813,4 +857,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
 function NotEnough() {
   return <p className="empty">Not enough music in this period to draw this one.</p>
+}
+
+/** What usually leaves a row without track info, for the load details */
+function skippedRowsHint(sources: DataSource[]): string {
+  if (sources.includes('apple')) return sources.includes('spotify') ? 'usually local files on Spotify, radio on Apple Music' : 'usually radio'
+  return 'usually local files'
 }
