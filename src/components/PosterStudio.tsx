@@ -116,7 +116,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     Promise.all([
       document.fonts.load('800 40px "Bricolage Grotesque Variable"'),
       document.fonts.load('600 40px "JetBrains Mono Variable"'),
-      document.fonts.load('italic 40px "Instrument Serif"'),
+      document.fonts.load('40px "Instrument Serif"'),
     ]).finally(() => live && setFontsReady(true))
     return () => {
       live = false

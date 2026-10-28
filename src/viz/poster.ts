@@ -246,7 +246,7 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
     ctx.font = `800 ${titleSize}px ${DISPLAY}`
     ctx.fillText(o.title, pad - 0.3 * u, titleY)
     spacing(ctx, '0px')
-    ctx.font = `italic ${4.6 * u}px ${SERIF}`
+    ctx.font = `${4.6 * u}px ${SERIF}`
     ctx.fillStyle = p.dark ? accent : darken(accent)
     ctx.fillText(data.subtitle, pad, subtitleY)
   }
@@ -362,7 +362,7 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
   ctx.fillRect(sx + cp, sy + cp + head * 1.3, inner, Math.max(1, 0.1 * u))
   ctx.textAlign = 'left'
   ctx.fillStyle = light ? darken(accent) : accent
-  fitText(ctx, data.subtitle, sx + cp, sy + cp + head * 1.3 + S * 0.1, inner, S * 0.075, `italic {px}px ${SERIF}`)
+  fitText(ctx, data.subtitle, sx + cp, sy + cp + head * 1.3 + S * 0.1, inner, S * 0.075, `{px}px ${SERIF}`)
 
   const titleBase = sy + S - cp
 
@@ -525,7 +525,7 @@ function annotatedArt(ctx: CanvasRenderingContext2D, data: PosterData, box: Box,
 
   ctx.textAlign = 'left'
   ctx.fillStyle = p.muted
-  ctx.font = `italic ${2.6 * u}px ${SERIF}`
+  ctx.font = `${2.6 * u}px ${SERIF}`
   ctx.fillText('Fig. 1', x + s * 0.02, y + s - 0.4 * u)
 }
 
@@ -716,7 +716,7 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   ctx.fillText(title, tx - (right ? -0.3 : 0.3) * u, at)
   spacing(ctx, '0px')
   at += stack[2]
-  fitText(ctx, data.subtitle, tx, at, tw, 4 * u, `italic {px}px ${SERIF}`)
+  fitText(ctx, data.subtitle, tx, at, tw, 4 * u, `{px}px ${SERIF}`)
   at += stack[3]
   const totals = `${formatNumber(data.stats.hours)} hours, ${formatNumber(data.stats.artists)} artists`
   measureFit(ctx, totals, tw, 2.4 * u, `600 {px}px ${DISPLAY}`)
