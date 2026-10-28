@@ -395,7 +395,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
             {/* The badge needs the room, so "of listening" makes way for it */}
             <span className="deck__stat">
               {formatDuration(model.dayMinutes[ring] * 60_000)}
-              {ring !== biggest && ' of listening'} · {formatNumber(day.plays)} plays
+              {ring !== biggest && ' of listening'}, {formatNumber(day.plays)} plays
             </span>
             {ring === biggest && <span className="deck__badge">Biggest day</span>}
           </>
@@ -542,9 +542,9 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
         createPortal(
           <div className="scrub-tip" aria-hidden="true">
             <span className="scrub-tip__when">
-              {formatLongDate(date)} · {formatTime(at)}
+              {formatLongDate(date)}, {formatTime(at)}
             </span>
-            <span className="scrub-tip__what">{playing ? `${playing.title} · ${playing.artist}` : 'Nothing playing'}</span>
+            <span className="scrub-tip__what">{playing ? `${playing.title} by ${playing.artist}` : 'Nothing playing'}</span>
           </div>,
           document.body,
         )}

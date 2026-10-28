@@ -29,7 +29,7 @@ export function longestEra(eras: Era[]): Era | null {
  * Places labels along one axis without overlaps. Label `i` would like to start
  * at `want[i]` (given in axis order), is `size` long and keeps `gap` from the
  * next; all stay within [0, length]. Labels that would collide move as a
- * group, centred on where its members want to be, so each moves as little as
+ * group, centered on where its members want to be, so each moves as little as
  * the room allows and the order never changes. If they can't all fit, they
  * pack from 0 and the last ones run past `length`.
  */

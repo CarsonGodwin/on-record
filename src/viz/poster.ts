@@ -29,13 +29,10 @@ import {
 
 export type PosterDesign = 'record' | 'deep' | 'sleeve' | 'annotated' | 'macro' | 'constellation' | 'pulse'
 export type PosterSize = 'post' | 'story' | 'print'
-/** Midnight and cream carry glows and grain; the solid two are flat color, like the deep dive's */
-export type PosterPaper = 'midnight' | 'cream' | 'black' | 'solid-cream'
+/** The studio's two backgrounds, both flat color: 'midnight' is the black one */
+export type PosterPaper = 'midnight' | 'cream'
 
-/** The designs that offer the solid backgrounds too (the deep dive is always solid) */
-export const SOLID_PAPER_DESIGNS: PosterDesign[] = ['sleeve', 'annotated']
-
-export const isDarkPaper = (paper: PosterPaper) => paper === 'midnight' || paper === 'black'
+export const isDarkPaper = (paper: PosterPaper) => paper === 'midnight'
 
 /** Print stays under iOS Safari's ~16.7 megapixel canvas limit */
 export const POSTER_SIZES: Record<PosterSize, { label: string; ratio: string; width: number; height: number; note: string }> = {
@@ -56,7 +53,7 @@ export interface PosterData {
   subtitle: string
   record: RecordModel
   recordColors: string[]
-  /** What the record's label says: "2024" or "ALL TIME" */
+  /** What the record's label says: "2024" or "All time" */
   recordTitle: string
   /** Top artists, with their chart colors */
   tracklist: { name: string; color: string; ms: number }[]
@@ -74,7 +71,7 @@ export interface PosterData {
 
 export interface PosterMoment {
   kind: 'day' | 'streak' | 'session' | 'first' | 'week'
-  /** "LONGEST DAY" */
+  /** "Longest day" */
   label: string
   /** "9.2 hrs" */
   value: string
@@ -96,18 +93,18 @@ export function posterMoments(model: RecordModel, fun: FunStats, rec: Records): 
   const minuteOf = (d: Date) => d.getHours() * 60 + d.getMinutes()
   const out: PosterMoment[] = []
   if (fun.biggestDay) {
-    out.push({ kind: 'day', label: 'LONGEST DAY', value: formatDuration(fun.biggestDay.ms), detail: formatDate(fun.biggestDay.date), ring: ringOf(fun.biggestDay.date) })
+    out.push({ kind: 'day', label: 'Longest day', value: formatDuration(fun.biggestDay.ms), detail: formatDate(fun.biggestDay.date), ring: ringOf(fun.biggestDay.date) })
   }
   if (fun.longestStreak && fun.longestStreak.days > 1) {
     const { start, end, days } = fun.longestStreak
-    out.push({ kind: 'streak', label: 'LONGEST STREAK', value: `${formatNumber(days)} days`, detail: `${formatDate(start)} – ${formatDate(end)}`, ring: ringOf(start), ringEnd: ringOf(end) })
+    out.push({ kind: 'streak', label: 'Longest streak', value: `${formatNumber(days)} days`, detail: `${formatDate(start)} – ${formatDate(end)}`, ring: ringOf(start), ringEnd: ringOf(end) })
   }
   if (rec.marathon) {
     const start = new Date(rec.marathon.start)
     const from = minuteOf(start)
     out.push({
       kind: 'session',
-      label: 'LONGEST SESSION',
+      label: 'Longest session',
       value: formatDuration(rec.marathon.ms),
       detail: formatDate(start),
       ring: ringOf(start),
@@ -117,15 +114,15 @@ export function posterMoments(model: RecordModel, fun: FunStats, rec: Records): 
   }
   if (rec.firstPlay) {
     const d = new Date(rec.firstPlay.date)
-    out.push({ kind: 'first', label: 'FIRST SPIN', value: rec.firstPlay.title, detail: rec.firstPlay.artist, ring: ringOf(d), from: minuteOf(d) })
+    out.push({ kind: 'first', label: 'First spin', value: rec.firstPlay.title, detail: rec.firstPlay.artist, ring: ringOf(d), from: minuteOf(d) })
   }
   if (fun.topWeek && fun.topWeek.count > 1) {
     const { title, artist, start, end, count, plays } = fun.topWeek
     out.push({
       kind: 'week',
-      label: 'MOST PLAYED IN A WEEK',
+      label: 'Most played in a week',
       value: title,
-      detail: `${artist} · ${formatNumber(count)} plays the week of ${formatDate(start)}`,
+      detail: `${artist}, ${formatNumber(count)} plays the week of ${formatDate(start)}`,
       ring: ringOf(start),
       ringEnd: ringOf(end),
       plays: plays.map((d) => ({ ring: ringOf(d), minute: minuteOf(d) })),
@@ -139,28 +136,23 @@ interface Paper {
   ink: string
   muted: string
   rule: string
-  glow: number
-  grain: string
   dark: boolean
-  /** Flat color: no glows, no grain */
-  solid: boolean
 }
 
 const PAPERS: Record<PosterPaper, Paper> = {
-  midnight: { bg: '#0b0a0f', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.58)', rule: 'rgba(244, 241, 234, 0.2)', glow: 0.32, grain: '255,255,255', dark: true, solid: false },
-  cream: { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.6)', rule: 'rgba(23, 20, 29, 0.22)', glow: 0.14, grain: '23,20,29', dark: false, solid: false },
-  black: { bg: '#0e0d12', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.58)', rule: 'rgba(244, 241, 234, 0.2)', glow: 0, grain: '255,255,255', dark: true, solid: true },
-  'solid-cream': { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.6)', rule: 'rgba(23, 20, 29, 0.22)', glow: 0, grain: '23,20,29', dark: false, solid: true },
+  // The same black as the deep dive's, so every design's dark poster matches
+  midnight: { bg: '#0e0d12', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.62)', rule: 'rgba(244, 241, 234, 0.2)', dark: true },
+  cream: { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.64)', rule: 'rgba(23, 20, 29, 0.22)', dark: false },
 }
 
 const CAPTIONS: Record<PosterDesign, string> = {
-  record: 'Each groove represents a day, from the label out. Midnight at the top, clockwise.',
+  record: 'One groove per day, label to rim. Midnight at the top, clockwise.',
   deep: '',
-  sleeve: 'Each groove represents a day, from the label out. Midnight at the top, clockwise.',
-  annotated: 'Fig. 1. Each groove represents a day, label to rim. Midnight at the top, clockwise.',
-  macro: 'Each groove represents a day. Midnight at the top, clockwise.',
+  sleeve: 'One groove per day, label to rim. Midnight at the top, clockwise.',
+  annotated: 'Fig. 1. One groove per day, label to rim. Midnight at the top, clockwise.',
+  macro: 'One groove per day. Midnight at the top, clockwise.',
   constellation: 'Stars are artists, sized by hours. Lines join artists played back to back.',
-  pulse: 'One line per artist, in the order you found them, each scaled to its own peak.',
+  pulse: 'One line per artist, in order of discovery, scaled to its own peak.',
 }
 
 export interface PosterOptions {
@@ -184,28 +176,13 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
   const rows = ratio > 1.6 ? 4 : ratio > 1.4 ? 3 : 2
   const rowH = 4.3 * u
 
-  // Paper and a couple of soft color glows from your top artists. The annotated figure, the record and
-  // the solid backgrounds sit on flat paper.
-  const flat = p.solid || o.design === 'annotated' || o.design === 'record'
   ctx.save()
   ctx.fillStyle = p.bg
   ctx.fillRect(0, 0, W, H)
-  const glows: [number, number, string][] = flat ? [] : [
-    [W * 0.05, H * 0.08, accent],
-    [W * 0.95, H * 0.55, data.tracklist[1]?.color ?? '#0ca2bc'],
-  ]
-  for (const [x, y, color] of glows) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, W * 0.95)
-    g.addColorStop(0, withAlpha(color, p.glow))
-    g.addColorStop(1, withAlpha(color, 0))
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, W, H)
-  }
 
   // The macro crop is full bleed, with its words on the record's label
   if (o.design === 'macro') {
     macroPoster(ctx, data, W, H, u, pad, p, accent)
-    grain(ctx, W, H, p)
     ctx.restore()
     return
   }
@@ -213,23 +190,21 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
   // Header
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = p.ink
-  ctx.font = `600 ${1.7 * u}px ${MONO}`
-  spacing(ctx, '0.22em')
+  ctx.font = `650 ${2.6 * u}px ${DISPLAY}`
   ctx.textAlign = 'left'
-  ctx.fillText('A LISTENING RECORD', pad, pad + 1.7 * u)
+  ctx.fillText('A listening record', pad, pad + 2.4 * u)
   ctx.textAlign = 'right'
-  ctx.fillText(data.period, W - pad, pad + 1.7 * u)
-  spacing(ctx, '0px')
+  ctx.fillText(data.period, W - pad, pad + 2.4 * u)
   ctx.fillStyle = p.rule
-  ctx.fillRect(pad, pad + 3.1 * u, W - 2 * pad, Math.max(1, 0.12 * u))
+  ctx.fillRect(pad, pad + 3.6 * u, W - 2 * pad, Math.max(1, 0.12 * u))
 
   // Lay out the bottom block from the bottom up: caption, stats, tracklist, then title
   const captionY = H - pad
-  const statsY = captionY - 3 * u
-  const listBottom = statsY - 3.6 * u
+  const statsY = captionY - 4.2 * u
+  const listBottom = statsY - 4 * u
   const listTop = listBottom - rows * rowH
   const listHeadY = listTop - 1.1 * u
-  const subtitleY = listHeadY - 4.6 * u
+  const subtitleY = listHeadY - 5.2 * u
   const titleMax = 11 * u
   ctx.textAlign = 'left'
   spacing(ctx, '-0.02em')
@@ -238,7 +213,7 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
   const titleY = subtitleY - 5.4 * u
   // The sleeve carries the title on its cover, so its artwork runs down to the tracklist
   const framed = o.design !== 'sleeve'
-  const artTop = pad + 6 * u
+  const artTop = pad + 6.6 * u
   const artBottom = framed ? titleY - titleSize * 0.8 - 4 * u : listHeadY - 5 * u
   const artH = artBottom - artTop
   const artW = W - 2 * pad
@@ -277,7 +252,6 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
   }
 
   footer(ctx, data, { listHeadY, listTop, statsY, captionY }, rows, rowH, W, pad, u, p, o.design)
-  if (o.design !== 'record' && !p.solid) grain(ctx, W, H, p)
   ctx.restore()
 }
 
@@ -309,7 +283,7 @@ function placeRecord(ctx: CanvasRenderingContext2D, data: PosterData, x: number,
     colors: data.recordColors,
     focus: null,
     title: data.recordTitle,
-    subtitle: `${formatNumber(data.stats.hours)} HRS  ·  ${formatNumber(data.stats.artists)} ARTISTS`,
+    subtitle: `${formatNumber(data.stats.hours)} hours, ${formatNumber(data.stats.artists)} artists`,
     labelColor: accent,
     sheen: true,
     ink: p.muted,
@@ -375,18 +349,20 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
   // Cover type
   const cp = S * 0.075
   const inner = S - 2 * cp
+  // Side A on the left and the year on the right, like the spine of a sleeve
+  const head = Math.max(S * 0.042, 2.6 * u)
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = coverInk
-  ctx.font = `600 ${S * 0.026}px ${MONO}`
-  spacing(ctx, '0.2em')
+  ctx.font = `700 ${head}px ${DISPLAY}`
   ctx.textAlign = 'left'
-  ctx.fillText(`SIDE A  ·  33⅓ RPM  ·  ${data.recordTitle}`, sx + cp, sy + cp + S * 0.026)
-  spacing(ctx, '0px')
+  ctx.fillText('Side A', sx + cp, sy + cp + head * 0.8)
+  ctx.textAlign = 'right'
+  ctx.fillText(data.recordTitle, sx + S - cp, sy + cp + head * 0.8)
   ctx.fillStyle = withAlpha(coverInk, 0.25)
-  ctx.fillRect(sx + cp, sy + cp + S * 0.05, inner, Math.max(1, 0.1 * u))
+  ctx.fillRect(sx + cp, sy + cp + head * 1.3, inner, Math.max(1, 0.1 * u))
   ctx.textAlign = 'left'
   ctx.fillStyle = light ? darken(accent) : accent
-  fitText(ctx, data.subtitle, sx + cp, sy + cp + S * 0.16, inner, S * 0.075, `italic {px}px ${SERIF}`)
+  fitText(ctx, data.subtitle, sx + cp, sy + cp + head * 1.3 + S * 0.1, inner, S * 0.075, `italic {px}px ${SERIF}`)
 
   const titleBase = sy + S - cp
 
@@ -404,7 +380,8 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
 /** The record as a numbered figure, with callouts for your standout days in the margins */
 function annotatedArt(ctx: CanvasRenderingContext2D, data: PosterData, box: Box, u: number, p: Paper, accent: string) {
   const model = data.record
-  const s = Math.min(box.h * 1.04, box.w * 0.62)
+  // The margins beside it have to hold "3. Longest session" at callout size, so the record leaves them 18u each
+  const s = Math.min(box.h * 1.04, box.w * 0.58)
   const x = box.x + (box.w - s) / 2
   const y = box.y + (box.h - s) / 2
   placeRecord(ctx, data, x, y, s, u, p, accent)
@@ -469,8 +446,9 @@ function annotatedArt(ctx: CanvasRenderingContext2D, data: PosterData, box: Box,
 
   // Split the callouts between the margins by where they sit, then stack each side top to bottom
   const colW = (box.w - s) / 2 - 0.4 * u
-  const blockH = 8.2 * u
-  const gap = 10 * u
+  // A callout is a label, a value and up to two detail lines; the last descender sits 11.6u below its top
+  const blockH = 12 * u
+  const gap = 13.6 * u
   const byX = [...marks].sort((a, b) => a.x - b.x)
   const half = Math.ceil(byX.length / 2)
   const sides = [
@@ -489,7 +467,7 @@ function annotatedArt(ctx: CanvasRenderingContext2D, data: PosterData, box: Box,
 
   // Leaders: paper-colored ink in the margins, light on the black of the disc
   const leader = (mark: (typeof marks)[number], left: boolean, top: number) => {
-    const mid = top + 2.9 * u
+    const mid = top + 3.2 * u
     const edge = left ? x - 0.1 * u : x + s + 0.1 * u
     const elbow = left ? x + s * 0.04 : x + s * 0.96
     ctx.beginPath()
@@ -532,19 +510,17 @@ function annotatedArt(ctx: CanvasRenderingContext2D, data: PosterData, box: Box,
     const tx = left ? x - 0.6 * u : x + s + 0.6 * u
     ctx.textAlign = left ? 'right' : 'left'
     ctx.fillStyle = p.muted
-    ctx.font = `600 ${1.15 * u}px ${MONO}`
-    spacing(ctx, '0.08em')
-    ctx.fillText(ellipsize(ctx, `${mark.n}  ${mark.m.label}`, colW), tx, top + 1.3 * u)
-    spacing(ctx, '0px')
+    ctx.font = `600 ${2 * u}px ${DISPLAY}`
+    ctx.fillText(ellipsize(ctx, `${mark.n}. ${mark.m.label}`, colW), tx, top + 2 * u)
     ctx.fillStyle = p.ink
-    ctx.font = `650 ${2.3 * u}px ${DISPLAY}`
-    ctx.fillText(ellipsize(ctx, mark.m.value, colW), tx, top + 4.2 * u)
+    ctx.font = `650 ${2.5 * u}px ${DISPLAY}`
+    ctx.fillText(ellipsize(ctx, mark.m.value, colW), tx, top + 5.4 * u)
     ctx.fillStyle = p.muted
-    ctx.font = `500 ${1.15 * u}px ${MONO}`
+    ctx.font = `500 ${2 * u}px ${DISPLAY}`
     // A date range that won't fit breaks after the dash
     const detail = mark.m.detail
     const lines = ctx.measureText(detail).width > colW && detail.includes(' – ') ? detail.replace(' – ', ' –\n').split('\n') : [detail]
-    lines.forEach((line, i) => ctx.fillText(ellipsize(ctx, line, colW), tx, top + (6.2 + i * 1.6) * u))
+    lines.forEach((line, i) => ctx.fillText(ellipsize(ctx, line, colW), tx, top + (8.7 + i * 2.5) * u))
   }
 
   ctx.textAlign = 'left'
@@ -613,25 +589,45 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   type Rect = { x0: number; x1: number; y0: number; y1: number }
   const hits = (a: Rect, b: Rect, gap: number) => a.x0 < b.x1 + gap && a.x1 > b.x0 - gap && a.y0 < b.y1 + gap && a.y1 > b.y0 - gap
   const inQuarter = (min: number) => Math.floor(min / 360) === best
+  const right = cx > 0
+  const bottom = cy > 0
+  // A key to the colors in the far corner, mostly over bare paper past the rim, and with no footer
+  // here, the key to the record itself
+  const fx = right ? pad : W - pad
+  const fy = bottom ? pad : H - pad
+  const items = data.tracklist.slice(0, 4)
+  const rowH = 3.4 * u
+  const cw = 36 * u
+  const inset = 1.8 * u
+  const noteFont = `500 ${2.2 * u}px ${DISPLAY}`
+  ctx.font = noteFont
+  const note = wrapLines(ctx, CAPTIONS.macro, cw - 2 * inset)
+  // From the rule to the last line's descender: 1.9u down to the first baseline, then 2.9u a line
+  const noteH = 1.9 * u + (note.length - 1) * 2.9 * u
+  const ch = 4.8 * u + items.length * rowH + 1.6 * u + noteH + 1.7 * u
+  const kx = right ? fx : fx - cw
+  const ky = bottom ? fy : fy - ch
+  const key = { x0: kx, x1: kx + cw, y0: ky, y1: ky + ch }
   const dotR = 0.6 * u
-  const th = 3 * u
-  ctx.font = `600 ${1.35 * u}px ${MONO}`
-  spacing(ctx, '0.14em')
+  const th = 3.4 * u
+  const pinFont = `600 ${1.8 * u}px ${DISPLAY}`
+  ctx.font = pinFont
   const pins = [day, session].flatMap((m) => {
     if (!m) return []
     const preferred = m.from !== undefined && m.to !== undefined ? (m.from + m.to) / 2 : busiestMinute(model, m.ring)
     const pt = groovePoint(model, origin.x, origin.y, size, m.ring, inQuarter(preferred) ? preferred : best * 360 + 180)
     const fromCenter = Math.hypot(pt.x - cx, pt.y - cy)
     if (pt.x < pad || pt.x > W - pad || pt.y < pad + 4 * u || pt.y > H - pad - 4 * u || fromCenter < lr + 4 * u) return []
-    const text = `${m.label}  ·  ${m.detail.toUpperCase()}  ·  ${m.value.toUpperCase()}`
+    const text = `${m.label}: ${m.value} on ${m.detail}`
     const tw = Math.min(ctx.measureText(text).width, W - 2 * pad - 2.4 * u)
     const dot = { x0: pt.x - dotR, x1: pt.x + dotR, y0: pt.y - dotR, y1: pt.y + dotR }
+    if (hits(dot, key, u)) return []
     return [{ m, pt, text, tw, dot }]
   })
 
-  // Every dot is fixed, so each tag and its leader keep clear of the dots and of the tags placed before it,
-  // stepping farther out or flipping sides until they fit
-  const taken: Rect[] = pins.map((t) => t.dot)
+  // Every dot is fixed, so each tag and its leader keep clear of the key, the dots and the tags placed
+  // before it, stepping farther out or flipping sides until they fit
+  const taken: Rect[] = [key, ...pins.map((t) => t.dot)]
   const tags = pins.flatMap((t) => {
     const { pt, tw } = t
     const tx = Math.min(Math.max(pt.x - tw / 2 - 1.2 * u, pad), W - pad - tw - 2.4 * u)
@@ -672,8 +668,6 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   const toRecord = (r: Rect) => ({ x0: (r.x0 - cx) / k + W / 2, y0: (r.y0 - cy) / k + W / 2, x1: (r.x1 - cx) / k + W / 2, y1: (r.y1 - cy) / k + W / 2 })
   drawGuideLabels(ctx, model.days, { ...recordOptions, guideAvoid, guideBlocked: taken.filter((r) => !pins.some((t) => t.dot === r && !tags.some((d) => d.dot === r))).map(toRecord) })
   ctx.restore()
-  ctx.font = `600 ${1.35 * u}px ${MONO}`
-  spacing(ctx, '0.14em')
   for (const { pt, box, above } of tags) {
     ctx.strokeStyle = '#ffffff'
     ctx.lineWidth = Math.max(1, 0.14 * u)
@@ -691,6 +685,7 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   }
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
+  ctx.font = pinFont
   for (const { text, tw, box } of tags) {
     ctx.fillStyle = 'rgba(11, 10, 15, 0.88)'
     roundRect(ctx, box.x0, box.y0, box.x1 - box.x0, th, th / 2)
@@ -698,78 +693,71 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
     ctx.fillStyle = '#f4f1ea'
     ctx.fillText(ellipsize(ctx, text, tw), box.x0 + 1.2 * u, box.y0 + th / 2 + 0.1 * u)
   }
-  spacing(ctx, '0px')
 
   // Type on the label, tucked into the corner
-  const right = cx > 0
-  const bottom = cy > 0
   const tx = right ? W - pad : pad
   const tw = lr * 0.56
+  const title = data.recordTitle
   ctx.fillStyle = '#0b0a0f'
   ctx.textAlign = right ? 'right' : 'left'
   ctx.textBaseline = 'alphabetic'
   spacing(ctx, '-0.02em')
-  const ts = measureFit(ctx, data.recordTitle, tw, 12 * u, `800 {px}px ${DISPLAY}`)
+  const ts = measureFit(ctx, title, tw, 12 * u, `800 {px}px ${DISPLAY}`)
   spacing(ctx, '0px')
-  const stack = [1.5 * u, ts * 0.78 + 2 * u, 5 * u, 3.2 * u]
+  const stack = [2.2 * u, ts * 0.78 + 2 * u, 5 * u, 3.6 * u]
   const total = stack.reduce((a, b) => a + b, 0)
   let at = bottom ? H - pad - total : pad
   at += stack[0]
-  ctx.font = `600 ${1.5 * u}px ${MONO}`
-  spacing(ctx, '0.22em')
-  ctx.fillText('A LISTENING RECORD', tx, at)
+  ctx.font = `650 ${2.4 * u}px ${DISPLAY}`
+  ctx.fillText('A listening record', tx, at)
   spacing(ctx, '-0.02em')
   at += stack[1]
   ctx.font = `800 ${ts}px ${DISPLAY}`
-  ctx.fillText(data.recordTitle, tx - (right ? -0.3 : 0.3) * u, at)
+  ctx.fillText(title, tx - (right ? -0.3 : 0.3) * u, at)
   spacing(ctx, '0px')
   at += stack[2]
   fitText(ctx, data.subtitle, tx, at, tw, 4 * u, `italic {px}px ${SERIF}`)
   at += stack[3]
-  spacing(ctx, '0.14em')
-  measureFit(ctx, `${formatNumber(data.stats.hours)} HRS  ·  ${formatNumber(data.stats.artists)} ARTISTS`, tw, 1.35 * u, `600 {px}px ${MONO}`)
-  ctx.fillText(`${formatNumber(data.stats.hours)} HRS  ·  ${formatNumber(data.stats.artists)} ARTISTS`, tx, at)
-  spacing(ctx, '0px')
+  const totals = `${formatNumber(data.stats.hours)} hours, ${formatNumber(data.stats.artists)} artists`
+  measureFit(ctx, totals, tw, 2.4 * u, `600 {px}px ${DISPLAY}`)
+  ctx.fillText(totals, tx, at)
 
-  // A key to the colors in the far corner, mostly over bare paper past the rim
-  const fx = right ? pad : W - pad
-  const fy = bottom ? pad : H - pad
-  const items = data.tracklist.slice(0, 4)
-  const rowH = 2.9 * u
-  const cw = 30 * u
-  const ch = 4.4 * u + items.length * rowH + 1.2 * u
-  const kx = right ? fx : fx - cw
-  const ky = bottom ? fy : fy - ch
+  // The key, placed before the tags so they keep clear of it
   ctx.fillStyle = 'rgba(11, 10, 15, 0.86)'
   roundRect(ctx, kx, ky, cw, ch, 1.2 * u)
   ctx.fill()
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
   ctx.fillStyle = '#f4f1ea'
-  ctx.font = `700 ${1.3 * u}px ${MONO}`
-  spacing(ctx, '0.2em')
-  ctx.fillText('MY LISTENING RECORD ●', kx + 1.6 * u, ky + 2.8 * u)
+  ctx.font = `700 ${2 * u}px ${DISPLAY}`
+  ctx.fillText('My listening record', kx + inset, ky + 3.2 * u)
   ctx.textAlign = 'right'
-  ctx.fillStyle = 'rgba(244, 241, 234, 0.6)'
-  ctx.fillText(data.period, kx + cw - 1.6 * u, ky + 2.8 * u)
-  spacing(ctx, '0px')
+  ctx.fillStyle = 'rgba(244, 241, 234, 0.62)'
+  ctx.font = `600 ${2 * u}px ${DISPLAY}`
+  ctx.fillText(data.period, kx + cw - inset, ky + 3.2 * u)
   items.forEach((item, i) => {
-    const base = ky + 4.4 * u + (i + 0.75) * rowH
+    const base = ky + 4.8 * u + (i + 0.75) * rowH
     ctx.fillStyle = item.color
     ctx.beginPath()
-    ctx.arc(kx + 2.2 * u, base - 0.55 * u, 0.6 * u, 0, TAU)
+    ctx.arc(kx + inset + 0.6 * u, base - 0.7 * u, 0.7 * u, 0, TAU)
     ctx.fill()
     ctx.textAlign = 'right'
-    ctx.fillStyle = 'rgba(244, 241, 234, 0.6)'
-    ctx.font = `500 ${1.3 * u}px ${MONO}`
-    const hours = formatNumber(item.ms / 3_600_000)
-    ctx.fillText(hours, kx + cw - 1.6 * u, base)
+    ctx.fillStyle = 'rgba(244, 241, 234, 0.62)'
+    ctx.font = `500 ${1.7 * u}px ${MONO}`
+    const hours = `${formatNumber(item.ms / 3_600_000)} hrs`
+    ctx.fillText(hours, kx + cw - inset, base)
     const hw = ctx.measureText(hours).width
     ctx.textAlign = 'left'
     ctx.fillStyle = '#f4f1ea'
-    ctx.font = `650 ${1.8 * u}px ${DISPLAY}`
-    ctx.fillText(ellipsize(ctx, item.name, cw - 5.4 * u - hw), kx + 3.6 * u, base)
+    ctx.font = `650 ${2.2 * u}px ${DISPLAY}`
+    ctx.fillText(ellipsize(ctx, item.name, cw - 2 * inset - 2.4 * u - hw - u), kx + inset + 2.4 * u, base)
   })
+  ctx.font = noteFont
+  const noteTop = ky + 4.8 * u + items.length * rowH + 1.6 * u
+  ctx.fillStyle = 'rgba(244, 241, 234, 0.2)'
+  ctx.fillRect(kx + inset, noteTop - 1.2 * u, cw - 2 * inset, Math.max(1, 0.1 * u))
+  ctx.fillStyle = 'rgba(244, 241, 234, 0.62)'
+  note.forEach((line, i) => ctx.fillText(line, kx + inset, noteTop + 1.9 * u + i * 2.9 * u))
 }
 
 /** Where a groove meets a time of day, for a record drawn into an s × s square at (x, y) */
@@ -849,15 +837,13 @@ function splitTitle(title: string): string[] {
 
 // ---------- Artwork ----------
 
+const SKY = '#100d26'
+
 function starChart(ctx: CanvasRenderingContext2D, data: PosterData, cx: number, cy: number, R: number, u: number, p: Paper) {
   const rand = mulberry32(11)
 
-  // The sky: always night, even on cream paper, like a printed star map
-  const sky = ctx.createRadialGradient(cx, cy - R * 0.2, R * 0.1, cx, cy, R)
-  sky.addColorStop(0, '#1d1847')
-  sky.addColorStop(0.65, '#0f0c26')
-  sky.addColorStop(1, '#07060c')
-  ctx.fillStyle = sky
+  // The sky: always night, even on cream paper, like a printed star map, and as flat as one
+  ctx.fillStyle = SKY
   ctx.beginPath()
   ctx.arc(cx, cy, R, 0, TAU)
   ctx.fill()
@@ -942,13 +928,6 @@ function starChart(ctx: CanvasRenderingContext2D, data: PosterData, cx: number, 
     const q = pos(n.id)
     const r = starR(n.ms)
     const color = data.colors.get(n.id) ?? '#d9d4ff'
-    const glow = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, r * 3.4)
-    glow.addColorStop(0, withAlpha(color, 0.55))
-    glow.addColorStop(1, withAlpha(color, 0))
-    ctx.fillStyle = glow
-    ctx.beginPath()
-    ctx.arc(q.x, q.y, r * 3.4, 0, TAU)
-    ctx.fill()
     ctx.fillStyle = color
     ctx.beginPath()
     ctx.arc(q.x, q.y, r, 0, TAU)
@@ -960,8 +939,7 @@ function starChart(ctx: CanvasRenderingContext2D, data: PosterData, cx: number, 
   }
 
   // Name the brightest stars, skipping any label that would collide
-  ctx.font = `600 ${1.3 * u}px ${MONO}`
-  spacing(ctx, '0.12em')
+  ctx.font = `600 ${1.8 * u}px ${DISPLAY}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   const placed: { x0: number; x1: number; y0: number; y1: number }[] = []
@@ -969,19 +947,23 @@ function starChart(ctx: CanvasRenderingContext2D, data: PosterData, cx: number, 
   for (const n of nodes.slice(0, 16)) {
     const q = pos(n.id)
     const r = starR(n.ms)
-    const text = n.id.toUpperCase()
+    const text = n.id
     const w = ctx.measureText(text).width
-    const box = { x0: q.x - w / 2 - 0.4 * u, x1: q.x + w / 2 + 0.4 * u, y0: q.y + r + 0.8 * u, y1: q.y + r + 2.6 * u }
+    const box = { x0: q.x - w / 2 - 0.4 * u, x1: q.x + w / 2 + 0.4 * u, y0: q.y + r + 0.8 * u, y1: q.y + r + 3.1 * u }
     const inside = Math.hypot(q.x - cx, box.y1 - cy) < R - u && box.x0 > cx - R && box.x1 < cx + R
     const clash =
       placed.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0) ||
-      stars.some((s) => s.x > box.x0 && s.x < box.x1 && s.y + s.r > box.y0 && s.y - s.r < box.y1)
+      stars.some((s) => s.x + s.r > box.x0 && s.x - s.r < box.x1 && s.y + s.r > box.y0 && s.y - s.r < box.y1)
     if (!inside || clash) continue
     placed.push(box)
-    ctx.fillStyle = 'rgba(244, 241, 234, 0.88)'
+    // Cut out of the link lines in the sky's color, so the name reads where they cross it
+    ctx.strokeStyle = SKY
+    ctx.lineWidth = 0.5 * u
+    ctx.lineJoin = 'round'
+    ctx.strokeText(text, q.x, box.y0 + 0.2 * u)
+    ctx.fillStyle = 'rgba(244, 241, 234, 0.92)'
     ctx.fillText(text, q.x, box.y0 + 0.2 * u)
   }
-  spacing(ctx, '0px')
   ctx.textBaseline = 'alphabetic'
 }
 
@@ -1060,12 +1042,10 @@ function footer(
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
   ctx.fillStyle = p.muted
-  ctx.font = `600 ${1.45 * u}px ${MONO}`
-  spacing(ctx, '0.22em')
-  ctx.fillText('TRACKLIST · TOP ARTISTS', pad, at.listHeadY - 0.9 * u)
+  ctx.font = `650 ${1.9 * u}px ${DISPLAY}`
+  ctx.fillText('Top artists', pad, at.listHeadY - 0.9 * u)
   ctx.textAlign = 'right'
-  ctx.fillText('HOURS', W - pad, at.listHeadY - 0.9 * u)
-  spacing(ctx, '0px')
+  ctx.fillText('Hours', W - pad, at.listHeadY - 0.9 * u)
   ctx.fillStyle = p.rule
   ctx.fillRect(pad, at.listHeadY, W - 2 * pad, Math.max(1, 0.12 * u))
 
@@ -1079,7 +1059,7 @@ function footer(
 
     ctx.textAlign = 'left'
     ctx.fillStyle = p.muted
-    ctx.font = `500 ${1.55 * u}px ${MONO}`
+    ctx.font = `500 ${1.7 * u}px ${MONO}`
     ctx.fillText(`${col === 0 ? 'A' : 'B'}${row + 1}`, x, baseline)
 
     ctx.fillStyle = item.color
@@ -1089,7 +1069,7 @@ function footer(
 
     ctx.textAlign = 'right'
     ctx.fillStyle = p.muted
-    ctx.font = `500 ${1.65 * u}px ${MONO}`
+    ctx.font = `500 ${1.9 * u}px ${MONO}`
     const hours = formatNumber(item.ms / 3_600_000)
     ctx.fillText(hours, x + colW, baseline)
     const hoursW = ctx.measureText(hours).width
@@ -1105,67 +1085,35 @@ function footer(
 
   ctx.textAlign = 'left'
   ctx.fillStyle = p.ink
-  spacing(ctx, '0.12em')
-  const stats = `${formatNumber(data.stats.hours)} HOURS  ·  ${formatNumber(data.stats.streams)} STREAMS  ·  ${formatNumber(data.stats.artists)} ARTISTS  ·  PEAK TIME ${data.stats.peak.toUpperCase()}`
-  measureFit(ctx, stats, W - 2 * pad, 1.7 * u, `600 {px}px ${MONO}`)
+  const { hours, artists, peak } = data.stats
+  const stats = `${formatNumber(hours)} hours, ${formatNumber(artists)} artists, busiest around ${peak}.`
+  measureFit(ctx, stats, W - 2 * pad, 2.8 * u, `600 {px}px ${DISPLAY}`)
   ctx.fillText(stats, pad, at.statsY)
-  spacing(ctx, '0px')
 
-  // The longest caption only just fits beside the mark, so it shrinks a touch rather than run into it
-  ctx.font = `700 ${1.3 * u}px ${MONO}`
-  spacing(ctx, '0.2em')
-  const mark = 'MY LISTENING RECORD ●'
-  const markW = ctx.measureText(mark).width
-  spacing(ctx, '0px')
+  // The key to the picture gets the whole width; the header already says what the poster is
   ctx.fillStyle = p.muted
-  measureFit(ctx, CAPTIONS[design], W - 2 * pad - markW - 2 * u, 1.3 * u, `400 {px}px ${MONO}`)
+  measureFit(ctx, CAPTIONS[design], W - 2 * pad, 2.6 * u, `500 {px}px ${DISPLAY}`)
   ctx.fillText(CAPTIONS[design], pad, at.captionY)
-  ctx.textAlign = 'right'
-  ctx.font = `700 ${1.3 * u}px ${MONO}`
-  spacing(ctx, '0.2em')
-  ctx.fillText(mark, W - pad, at.captionY)
-  spacing(ctx, '0px')
 }
 
-// ---------- Texture and helpers ----------
+// ---------- Helpers ----------
 
-let noiseTile: HTMLCanvasElement | null = null
-
-/** Fine film grain, so the image feels printed rather than rendered */
-function grain(ctx: CanvasRenderingContext2D, W: number, H: number, p: Paper) {
-  if (!noiseTile) {
-    noiseTile = document.createElement('canvas')
-    noiseTile.width = 220
-    noiseTile.height = 220
-    const nctx = noiseTile.getContext('2d')!
-    const img = nctx.createImageData(220, 220)
-    const rand = mulberry32(5)
-    for (let i = 0; i < img.data.length; i += 4) {
-      const v = rand()
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = 255
-      img.data[i + 3] = v > 0.5 ? Math.round((v - 0.5) * 70) : 0
+/** Breaks text into lines no wider than `width` in the current font */
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(' ')) {
+    const next = line ? `${line} ${word}` : word
+    if (line && ctx.measureText(next).width > width) {
+      lines.push(line)
+      line = word
+    } else {
+      line = next
     }
-    nctx.putImageData(img, 0, 0)
   }
-  // Tint the white tile to the paper's grain color
-  const tinted = document.createElement('canvas')
-  tinted.width = noiseTile.width
-  tinted.height = noiseTile.height
-  const tctx = tinted.getContext('2d')!
-  tctx.drawImage(noiseTile, 0, 0)
-  tctx.globalCompositeOperation = 'source-in'
-  tctx.fillStyle = `rgb(${p.grain})`
-  tctx.fillRect(0, 0, tinted.width, tinted.height)
-
-  const pattern = ctx.createPattern(tinted, 'repeat')
-  if (!pattern) return
-  pattern.setTransform(new DOMMatrix().scale(Math.max(1, W / 1400)))
-  ctx.globalAlpha = 0.5
-  ctx.fillStyle = pattern
-  ctx.fillRect(0, 0, W, H)
-  ctx.globalAlpha = 1
+  if (line) lines.push(line)
+  return lines
 }
-
 /** Sets a font at the largest size up to `max` whose text fits `width`; returns that size */
 function measureFit(ctx: CanvasRenderingContext2D, text: string, width: number, max: number, font: string): number {
   ctx.font = font.replace('{px}', String(max))

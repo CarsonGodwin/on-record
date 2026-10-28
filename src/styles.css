@@ -1,0 +1,9 @@
+/*
+ * The one list of fonts and the stylesheet. main.tsx imports this file; the guides and the
+ * 404 page have no script, so they link it instead.
+ */
+@import '@fontsource-variable/bricolage-grotesque/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+@import './index.css';

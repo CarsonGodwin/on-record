@@ -241,10 +241,10 @@ function Scatter({ songs, skipRate, marks }: ScatterProps) {
           </text>
         ))}
         <text x={M.left + innerW} y={height - 4} textAnchor="end" className="axis-title">
-          plays →
+          Plays →
         </text>
         <text x={12} y={M.top - 6} className="axis-title">
-          ↑ skipped
+          ↑ Skipped
         </text>
 
         <line x1={x(midPlays)} x2={x(midPlays)} y1={M.top} y2={M.top + innerH} className="divider" />

@@ -32,7 +32,7 @@ export function River(props: Props) {
   return useContext(InCards) ? <ErasCard {...props} /> : <RiverPage {...props} />
 }
 
-/** The stacked, wiggle-centred streams, one layer per artist */
+/** The stacked, wiggle-centered streams, one layer per artist */
 function useStreams(bins: Bins, totals: Map<string, number>[], artists: string[]) {
   return useMemo(() => {
     const series = artistSeries(totals, artists, bins.size === 'month' ? 1 : 2)
@@ -225,7 +225,7 @@ function RiverPage({ bins, totals, eras, artists, colors }: Props) {
                 <em>{era.artist}</em> era
               </span>
               <span className="era__meta">
-                {eraRange(bins, era)} · {formatPercent(era.share)} of your music
+                {eraRange(bins, era)}, {formatPercent(era.share)} of your music
               </span>
             </li>
           ))}

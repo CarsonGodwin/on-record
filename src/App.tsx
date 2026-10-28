@@ -77,12 +77,6 @@ export default function App() {
 
   return (
     <div className="landing">
-      <div className="landing__glow" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </div>
-
       <header className="landing__top">
         <span className="brand">
           My Listening Record<span className="brand__dot" aria-hidden="true" />
@@ -92,8 +86,8 @@ export default function App() {
 
       <main className="landing__main">
         <div className="landing__copy">
-          <p className="eyebrow">An in-depth analysis of your entire Spotify or Apple Music history</p>
           <h1 className="landing__title">
+            <span className="eyebrow">An in-depth analysis of your entire Spotify or Apple Music history</span>{' '}
             My life,
             <br />
             <em>my listening record.</em>
@@ -206,6 +200,9 @@ export default function App() {
           <li>Wait for the email with the download link.</li>
           <li>Add the zip file on the sleeve above.</li>
         </ol>
+        <p className="how-to__note">
+          <a href="guides/spotify-extended-streaming-history/">The full guide to Spotify’s Extended Streaming History</a>
+        </p>
         <h3>
           Apple Music <span className="beta">Beta</span>
         </h3>
@@ -231,6 +228,9 @@ export default function App() {
           <li>Wait for the email saying it’s ready.</li>
           <li>Download every part (big exports come in several zips) and add them all on the sleeve above.</li>
         </ol>
+        <p className="how-to__note">
+          <a href="guides/apple-music-listening-history/">The full guide to your Apple Music listening history</a>
+        </p>
         <p className="how-to__note">
           Apple Music support is new, and Apple’s export changes between versions. If something looks wrong,{' '}
           <a href="https://github.com/CarsonGodwin/on-record/issues" target="_blank" rel="noreferrer">

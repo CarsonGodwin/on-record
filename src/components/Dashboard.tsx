@@ -21,7 +21,6 @@ import {
   filterPlays,
   funStats,
   getYears,
-  newArtistsIn,
   platforms,
   sameFilter,
   summarize,
@@ -205,7 +204,6 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const lines = useMemo(() => takes(plays, summary, rec, fun, hours, year === null), [plays, summary, rec, fun, hours, year])
   const devices = useMemo(() => platforms(plays), [plays])
   const wear = useMemo(() => wearOut(all, year), [all, year])
-  const newArtists = useMemo(() => (year === null ? null : newArtistsIn(all, year)), [all, year])
 
   const span = years.length > 1 ? `${years[0]}–${years[years.length - 1]}` : String(years[0])
   const hasMusic = summary.musicMs > 0
@@ -224,8 +222,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    * miss an input the way a key per chart, listing what its state points into, can.
    */
   const viewKey = `${year ?? 'all'}|${applied.version}`
-  const recordTitle = year === null ? 'ALL TIME' : String(year)
-  const recordSubtitle = `${formatNumber(summary.totalMs / 3_600_000)} HRS  ·  ${formatNumber(summary.artists)} ARTISTS`
+  const recordTitle = year === null ? 'All time' : String(year)
+  const recordSubtitle = `${formatNumber(summary.totalMs / 3_600_000)} hours, ${formatNumber(summary.artists)} artists`
 
   const posterData = useMemo<PosterData>(
     () => ({
@@ -589,8 +587,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 span={span}
                 isSample={isSample}
                 topArtist={topArtists[0]}
-                hours={hours}
-                newArtists={newArtists}
+                biggestDay={fun.biggestDay}
                 onPlay={() => openTour(true)}
                 onPoster={() => makePoster(posterDesign)}
               />

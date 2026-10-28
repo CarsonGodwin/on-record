@@ -211,10 +211,10 @@ export function Pulse({ bins, totals, artists, firstHeard, colors, onPoster }: P
       {!narrow && (
         <>
           <text x={left - 14} y={14} textAnchor="end" className="axis-title">
-            artist
+            Artist
           </text>
           <text x={width - right + 14} y={14} className="axis-title">
-            first heard
+            First heard
           </text>
         </>
       )}

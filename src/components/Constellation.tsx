@@ -132,7 +132,7 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
       // Zoomed in on a card, a star panned out of sight takes its name with it
       if (card && (p.x < -r || p.x > width + r || p.y < -r || p.y > height + r)) return
       const w = n.id.length * charW + 6
-      // Keep centred names inside the sky instead of half off its edge
+      // Keep centered names inside the sky instead of half off its edge
       const cx = Math.max(w / 2, Math.min(width - w / 2, p.x))
       const spots: (Label & { x0: number })[] = [
         { x: cx, y: p.y + r + 14, anchor: 'middle', x0: cx - w / 2 },

@@ -1,7 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { dayDetail } from '../data/insights'
 import { fromDayNumber, isSkip } from '../data/stats'
-import { formatDuration, formatHour, formatLongDate, formatNumber, formatShortDate, formatTime } from '../lib/format'
+import { formatDuration, formatHour, formatLongDate, formatNumber, formatPlays, formatShortDate, formatTime } from '../lib/format'
 import { colorFor } from '../lib/palette'
 import { InCards } from '../lib/stage'
 import { useSwipe } from '../lib/swipe'
@@ -291,7 +291,7 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
       </div>
 
       <section>
-        <h4 className="day-panel__label">Every play · {formatNumber(log.length)}</h4>
+        <h4 className="day-panel__label">{formatPlays(log.length)}</h4>
         {logList(showAll)}
         {log.length > LOG_PREVIEW && (
           <button type="button" className="chip-button" onClick={() => setExpandedDay(showAll ? null : day)}>
