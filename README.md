@@ -76,6 +76,8 @@ npm run build   # type-check, then build to dist/
 
 The site is hosted on Cloudflare at [mylisteningrecord.com](https://mylisteningrecord.com), which builds and deploys from `production`. Connect the repo under **Workers & Pages** with build command `npm run build` and output directory `dist`. Every push and pull request also runs lint, audit, build and tests in [CI](.github/workflows/ci.yml).
 
+Besides the app, the site has two guides, `guides/spotify-extended-streaming-history/` and `guides/apple-music-listening-history/`, and a `404.html` that Cloudflare serves for any address that doesn't exist. Each is its own HTML page whose markup `vite.config.ts` renders at build time from `src/components/Guide.tsx`; they ship with no script. List new pages in `PAGES` there and in `public/sitemap.xml`.
+
 The build emits `dist/_headers`, which Cloudflare applies as response headers: the Content Security Policy plus HSTS, framing and caching rules. The build uses relative asset paths, so `dist/` also works on any other static host, where the CSP meta tag in the page still applies.
 
 ## Project structure
@@ -109,7 +111,11 @@ src/
   lib/swipe.ts          What counts as a swipe between cards
   lib/back.ts           The back gesture closing whatever is open over a card
   components/           One file per visualization, plus Dashboard, PosterStudio, the landing sleeve,
-                        The Long Play (Tour) and the phone deck's bottom bar (CardNav)
+                        The Long Play (Tour), the phone deck's bottom bar (CardNav), and the guides
+                        and 404 page (Guide)
+  styles.css            The fonts and index.css; main.tsx imports it, and the guides and 404 page (no script) link it
+guides/                 The guides' HTML pages (head and metadata; the body is rendered at build time)
+404.html                The page for addresses that don't exist
 ```
 
 ## License

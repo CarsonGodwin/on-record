@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { topItems, type Category, type RankBy, type Ranked } from '../data/stats'
-import { formatDuration, formatNumber } from '../lib/format'
+import { formatDuration, formatPlays } from '../lib/format'
 import { useSize } from '../lib/hooks'
 import { InCards } from '../lib/stage'
 import type { Play } from '../types'
@@ -14,8 +14,6 @@ const CATEGORIES: { value: Category; label: string }[] = [
   { value: 'album', label: 'Albums' },
   { value: 'show', label: 'Podcasts' },
 ]
-
-const playsLabel = (n: number) => `${formatNumber(n)} play${n === 1 ? '' : 's'}`
 
 /**
  * A list row's height on a phone's card (taller when each name has an artist under it), and the
@@ -65,8 +63,8 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
   }, [plays, active, rankBy, expanded, card, hidden])
 
   const value = rankBy === 'time' ? (r: Ranked) => r.ms : (r: Ranked) => r.plays
-  const primary = rankBy === 'time' ? (r: Ranked) => formatDuration(r.ms) : (r: Ranked) => playsLabel(r.plays)
-  const secondary = rankBy === 'time' ? (r: Ranked) => playsLabel(r.plays) : (r: Ranked) => formatDuration(r.ms)
+  const primary = rankBy === 'time' ? (r: Ranked) => formatDuration(r.ms) : (r: Ranked) => formatPlays(r.plays)
+  const secondary = rankBy === 'time' ? (r: Ranked) => formatPlays(r.plays) : (r: Ranked) => formatDuration(r.ms)
   const max = Math.max(...items.map(value), 1)
   const canHide = active === 'artist'
   const hideButton = (name: string) =>
@@ -207,7 +205,7 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
                 <strong className="podium__name">{item.label}</strong>
                 {item.sublabel && <span className="podium__sub">{item.sublabel}</span>}
                 <span className="podium__value">
-                  {primary(item)} <span className="muted">· {secondary(item)}</span>
+                  {primary(item)}, <span className="muted">{secondary(item)}</span>
                 </span>
                 {hideButton(item.label)}
               </li>

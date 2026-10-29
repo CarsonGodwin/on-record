@@ -32,7 +32,7 @@ export function River(props: Props) {
   return useContext(InCards) ? <ErasCard {...props} /> : <RiverPage {...props} />
 }
 
-/** The stacked, wiggle-centred streams, one layer per artist */
+/** The stacked, wiggle-centered streams, one layer per artist */
 function useStreams(bins: Bins, totals: Map<string, number>[], artists: string[]) {
   return useMemo(() => {
     const series = artistSeries(totals, artists, bins.size === 'month' ? 1 : 2)
@@ -225,7 +225,7 @@ function RiverPage({ bins, totals, eras, artists, colors }: Props) {
                 <em>{era.artist}</em> era
               </span>
               <span className="era__meta">
-                {eraRange(bins, era)} · {formatPercent(era.share)} of your music
+                {eraRange(bins, era)}, {formatPercent(era.share)} of your music
               </span>
             </li>
           ))}
@@ -513,9 +513,9 @@ function cardRange(bins: Bins, era: Era): string {
     : `${dayRange.format(start)}\u2009–\u2009${dayRange.format(to)}`
 }
 
-/** Roughly how wide Instrument Serif italic sets a name, in ems: enough to shrink a long name before it's cut */
+/** Roughly how wide Instrument Serif sets a name, in ems: enough to shrink a long name before it's cut */
 function serifEms(text: string): number {
-  return text.length * 0.41
+  return text.length * 0.44
 }
 
 /** The chart in one sentence: how many eras, the longest, and the latest */

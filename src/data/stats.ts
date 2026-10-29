@@ -360,16 +360,3 @@ export function funStats(plays: Play[]): FunStats {
 
   return { longestStreak, biggestDay, onRepeat, topWeek }
 }
-
-/** Artists whose first-ever counted play happened in `year` */
-export function newArtistsIn(allPlays: Play[], year: number): number {
-  const firstYear = new Map<string, number>()
-  for (const p of allPlays) {
-    // allPlays is sorted by time, so the first sighting is the earliest
-    if (p.kind !== 'track' || p.msPlayed < COUNTED_PLAY_MS || firstYear.has(p.artist)) continue
-    firstYear.set(p.artist, startDate(p).getFullYear())
-  }
-  let count = 0
-  for (const y of firstYear.values()) if (y === year) count++
-  return count
-}

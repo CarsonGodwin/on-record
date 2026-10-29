@@ -240,7 +240,7 @@ export function UpNext({ tracks, sides, step, onStep, onFinish }: UpNextProps) {
             {newSide && (
               <>
                 {' '}
-                · Side {side} <em>{sides[side]}</em>
+                on Side {side} <em>{sides[side]}</em>
               </>
             )}
           </span>

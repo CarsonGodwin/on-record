@@ -179,7 +179,7 @@ export function Calendar({ days, years, plays, firstHeard, colors }: Props) {
           <span className="float-tip__title">{formatLongDate(fromDayNumber(hover.day))}</span>
           <span className="float-tip__big">{hovered ? formatDuration(hovered.ms) : '—'}</span>
           <span className="float-tip__line">
-            {hovered ? `${formatNumber(hovered.plays)} plays · mostly ${hovered.top}` : 'No listening'}
+            {hovered ? `${formatNumber(hovered.plays)} plays, mostly ${hovered.top}` : 'No listening'}
           </span>
         </FloatTip>
       )}

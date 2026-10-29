@@ -128,7 +128,7 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
         <video className="race-export__video" src={phase.url} autoPlay muted loop playsInline aria-label="Your race as a story video" />
         <div className="race-export__side">
           <p className="race-export__title">Your race, ready for your story</p>
-          <p className="field__note">1080 × 1920 · made on your device, nothing uploaded</p>
+          <p className="field__note">1080 × 1920, made on your device. Nothing is uploaded.</p>
           <div className="race-export__actions">
             {shareable && (
               <button type="button" className="button" onClick={() => share(file, phase.url)}>

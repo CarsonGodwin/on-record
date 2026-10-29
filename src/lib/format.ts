@@ -10,6 +10,21 @@ export function formatNumber(n: number): string {
   return number.format(Math.round(n))
 }
 
+/** "1 play", "312 plays" */
+export function formatPlays(n: number): string {
+  return `${formatNumber(n)} play${n === 1 ? '' : 's'}`
+}
+
+/** A span of listening in days, for when "0 days" or "1 days" would read wrong: "less than a day", "1 day", "12 days" */
+export function formatDays(ms: number): string {
+  const days = ms / 86_400_000
+  // Rounded the same way formatNumber does, so "less than a day" covers exactly what would have printed as 0
+  const rounded = Math.round(days)
+  if (rounded < 1) return 'less than a day'
+  if (rounded === 1) return '1 day'
+  return `${formatNumber(days)} days`
+}
+
 export function formatHours(ms: number): string {
   return `${formatNumber(ms / 3_600_000)} hrs`
 }
@@ -69,18 +84,6 @@ export function formatShortDate(d: number | Date): string {
 /** "Mar 2024" */
 export function formatMonthYearShort(d: number | Date): string {
   return monthYearShort.format(d)
-}
-
-/** Fun yardsticks for a big pile of listening time */
-export function equivalents(ms: number): { days: number; flights: number; marathons: number } {
-  const hours = ms / 3_600_000
-  return {
-    days: hours / 24,
-    // New York to Tokyo, about 14 hours
-    flights: hours / 14,
-    // All eight Harry Potter films back to back, 19 hours 41 minutes (1,181 minutes)
-    marathons: (hours * 60) / 1181,
-  }
 }
 
 const monthYear = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'long' })

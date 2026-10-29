@@ -9,7 +9,7 @@ import { WEAR_MAX, type FunStats, type WearOut } from './stats'
  * their own, so they aren't candidates here.
  */
 
-/** A sentence, with song and artist names kept apart so they can be set in italics */
+/** A sentence, with song and artist names kept apart so they can be set in the serif */
 export type FactPart = string | { name: string }
 
 export interface Fact {

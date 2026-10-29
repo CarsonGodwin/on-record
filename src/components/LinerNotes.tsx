@@ -33,7 +33,9 @@ export function LinerNotes({ takes, fun, rec, summary, devices, topArtists, hour
     <div className="liner">
       <article className="backcover">
         <header className="backcover__top">
-          <span>My Listening Record · {period}</span>
+          <span>
+            My Listening Record <em>{period}</em>
+          </span>
           <span>Liner notes</span>
         </header>
         <Headline takes={takes} />
@@ -110,7 +112,7 @@ function Credits({ fun, rec, summary, devices, topArtists, hours, isAllTime }: C
       value: devices
         .slice(0, 3)
         .map((d) => `${d.label} ${formatPercent(d.ms / total)}`)
-        .join(' · '),
+        .join(', '),
     })
   }
 
@@ -128,17 +130,17 @@ function Credits({ fun, rec, summary, devices, topArtists, hours, isAllTime }: C
     }
     credits.push({
       label: 'Peak hours',
-      value: `${formatHour(best)}–${formatHour((best + 3) % 24)} · ${formatPercent(bestMs / total)} of your listening`,
+      value: `${formatHour(best)}–${formatHour((best + 3) % 24)}, ${formatPercent(bestMs / total)} of your listening`,
     })
   }
 
-  credits.push({ label: 'Total listening', value: `${formatDuration(summary.totalMs)} · ${formatNumber(summary.streams)} plays` })
+  credits.push({ label: 'Total listening', value: `${formatDuration(summary.totalMs)} over ${formatNumber(summary.streams)} plays` })
   if (summary.tracks > 0) credits.push({ label: 'Different songs', value: formatNumber(summary.tracks) })
 
   if (rec.firstPlay) {
     credits.push({
       label: isAllTime ? 'First play' : 'First play of the year',
-      value: `“${rec.firstPlay.title}”, ${rec.firstPlay.artist} · ${formatDate(rec.firstPlay.date)}`,
+      value: `“${rec.firstPlay.title}”, ${rec.firstPlay.artist}, on ${formatDate(rec.firstPlay.date)}`,
     })
   }
   if (rec.marathon) {
@@ -150,29 +152,29 @@ function Credits({ fun, rec, summary, devices, topArtists, hours, isAllTime }: C
   if (fun.longestStreak) {
     credits.push({
       label: 'Longest streak',
-      value: `${formatNumber(fun.longestStreak.days)} days in a row · ${formatDate(fun.longestStreak.start)} to ${formatDate(fun.longestStreak.end)}`,
+      value: `${formatNumber(fun.longestStreak.days)} days in a row, ${formatDate(fun.longestStreak.start)} to ${formatDate(fun.longestStreak.end)}`,
     })
   }
   if (fun.biggestDay) {
-    credits.push({ label: 'Biggest day', value: `${formatDuration(fun.biggestDay.ms)} · ${formatDate(fun.biggestDay.date)}` })
+    credits.push({ label: 'Biggest day', value: `${formatDuration(fun.biggestDay.ms)} on ${formatDate(fun.biggestDay.date)}` })
   }
   if (fun.onRepeat) {
     credits.push({
       label: 'Most repeats in a day',
-      value: `“${fun.onRepeat.title}” ×${fun.onRepeat.count} · ${formatDate(fun.onRepeat.date)}`,
+      value: `“${fun.onRepeat.title}” ${fun.onRepeat.count} times on ${formatDate(fun.onRepeat.date)}`,
     })
   }
   if (rec.evergreen) {
     credits.push({
       label: 'Most consistent song',
-      value: `“${rec.evergreen.title}”, ${rec.evergreen.artist} · ${rec.evergreen.months} of ${rec.evergreen.activeMonths} months`,
+      value: `“${rec.evergreen.title}”, ${rec.evergreen.artist}, played in ${rec.evergreen.months} of ${rec.evergreen.activeMonths} months`,
     })
   }
   credits.push({ label: 'Average session', value: formatDuration(rec.avgSessionMs) })
   if (isAllTime && rec.forgotten) {
     credits.push({
       label: 'Dropped off',
-      value: `${rec.forgotten.artist} · ${formatDuration(rec.forgotten.ms)} total, last played ${formatDate(rec.forgotten.lastPlayed)}`,
+      value: `${rec.forgotten.artist}, ${formatDuration(rec.forgotten.ms)} in all, last played ${formatDate(rec.forgotten.lastPlayed)}`,
     })
   }
 

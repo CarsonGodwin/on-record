@@ -56,7 +56,7 @@ function sector(r0: number, r1: number, a0: number, a1: number, cx = C, cy = C):
   return `M${x0},${y0} L${x1},${y1} A${r1},${r1} 0 ${large} 1 ${x2},${y2} L${x3},${y3} A${r0},${r0} 0 ${large} 0 ${x0},${y0} Z`
 }
 
-/** A straight line out from the centre, from radius r0 to r1 */
+/** A straight line out from the center, from radius r0 to r1 */
 function hand(cx: number, cy: number, r0: number, r1: number, a: number) {
   const [x1, y1] = polar(cx, cy, r0, a)
   const [x2, y2] = polar(cx, cy, r1, a)
@@ -199,7 +199,7 @@ function ClockPage({ hours, parts, grid }: Omit<Props, 'plays'>) {
               {p.artist ? <Cover name={p.artist} size={56} /> : <span className="cover cover--empty" />}
               <div>
                 <span className="daypart__label">
-                  {p.label} <span className="muted">· {p.hours}</span>
+                  {p.label} <span className="muted">{p.hours}</span>
                 </span>
                 <strong className="daypart__artist">{p.artist ?? 'Nobody yet'}</strong>
                 {p.artist && <span className="daypart__time">{formatDuration(p.ms)}</span>}

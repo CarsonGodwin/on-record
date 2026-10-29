@@ -3,7 +3,7 @@ import { useSize } from '../lib/hooks'
 import { COARSE } from '../lib/pointer'
 import { SERIES } from '../lib/palette'
 import { InCards, OnStage } from '../lib/stage'
-import { POSTER_DESIGN_SIZES, POSTER_SIZES, SOLID_PAPER_DESIGNS, isDarkPaper, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
+import { POSTER_DESIGN_SIZES, POSTER_SIZES, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
 import { Segmented } from './ui'
 import { useCloseOnBack } from '../lib/back'
@@ -45,23 +45,9 @@ const ULTRA_SCALES = [4, 3, 2]
 const FULL_SCALES = [1, 0.75, 0.5]
 
 const PAPERS: { value: PosterPaper; label: string; swatch: string }[] = [
-  { value: 'midnight', label: 'Black gradient', swatch: '#0b0a0f' },
-  { value: 'cream', label: 'Cream gradient', swatch: '#efe8da' },
+  { value: 'midnight', label: 'Black', swatch: '#0e0d12' },
+  { value: 'cream', label: 'Cream', swatch: '#efe8da' },
 ]
-
-/** Flat versions, for the designs in SOLID_PAPER_DESIGNS */
-const SOLID_PAPERS: { value: PosterPaper; label: string; swatch: string }[] = [
-  { value: 'black', label: 'Black', swatch: '#0e0d12' },
-  { value: 'solid-cream', label: 'Cream', swatch: '#efe8da' },
-]
-
-/** The card's round swatches: the textured papers show a hint of their glow, so they read apart from the flat ones */
-const DOTS: Record<PosterPaper, string> = {
-  midnight: 'radial-gradient(circle at 30% 28%, #3b2b47, #0b0a0f 72%)',
-  cream: 'radial-gradient(circle at 30% 28%, #fffaf1, #d9cdb8 82%)',
-  black: '#0e0d12',
-  'solid-cream': '#efe8da',
-}
 
 /** Names for the color picker's swatches, which are the chart colors in their usual order */
 const ACCENT_NAMES = ['Pink', 'Teal', 'Orange', 'Green', 'Purple', 'Ochre', 'Blue', 'Lime', 'Magenta', 'Brick']
@@ -114,9 +100,6 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     : Math.min(box.width, activeSize === 'story' ? 330 : 440)
   const cssH = (cssW * spec.height) / spec.width
   const hasUltra = design === 'deep'
-  // Only some designs offer the solid backgrounds; elsewhere a solid pick falls back to its textured twin
-  const papers = SOLID_PAPER_DESIGNS.includes(design) ? [...PAPERS, ...SOLID_PAPERS] : PAPERS
-  const activePaper = papers.some((p) => p.value === paper) ? paper : isDarkPaper(paper) ? 'midnight' : 'cream'
   const hasAccent = design === 'deep'
   const yearAccent = data.tracklist[0]?.color ?? SERIES[0]
   const accents = SERIES.includes(yearAccent) ? SERIES : [yearAccent, ...SERIES]
@@ -125,7 +108,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   // Picking the year's own color goes back to following the year
   const pickAccent = (color: string) => setAccentPick(color === yearAccent ? null : color)
   const fileName = `my-listening-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
-  const optionsKey = `${design}|${activeSize}|${activePaper}|${accent ?? ''}`
+  const optionsKey = `${design}|${activeSize}|${paper}|${accent ?? ''}`
 
   useEffect(() => {
     let live = true
@@ -133,7 +116,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     Promise.all([
       document.fonts.load('800 40px "Bricolage Grotesque Variable"'),
       document.fonts.load('600 40px "JetBrains Mono Variable"'),
-      document.fonts.load('italic 40px "Instrument Serif"'),
+      document.fonts.load('40px "Instrument Serif"'),
     ]).finally(() => live && setFontsReady(true))
     return () => {
       live = false
@@ -166,21 +149,21 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
-    const inputs = [data, design, activePaper, accent, cssW, cssH, fontsReady, restored]
+    const inputs = [data, design, paper, accent, cssW, cssH, fontsReady, restored]
     if (inputs.every((v, i) => drawn.current[i] === v)) return
     drawn.current = inputs
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     canvas.width = Math.round(cssW * dpr)
     canvas.height = Math.round(cssH * dpr)
-    renderPoster(ctx, canvas.width, canvas.height, data, { design, paper: activePaper, accent, title: TITLE })
-  }, [showing, data, design, activePaper, accent, cssW, cssH, fontsReady, restored])
+    renderPoster(ctx, canvas.width, canvas.height, data, { design, paper, accent, title: TITLE })
+  }, [showing, data, design, paper, accent, cssW, cssH, fontsReady, restored])
 
   const fullSize = useCallback(
     async (scales: number[] = FULL_SCALES): Promise<Blob | null> => {
       await document.fonts.ready
       let image: RenderedImage | null = null
       try {
-        image = await renderBlob(spec.width, spec.height, scales, (ctx, w, h) => renderPoster(ctx, w, h, data, { design, paper: activePaper, accent, title: TITLE }))
+        image = await renderBlob(spec.width, spec.height, scales, (ctx, w, h) => renderPoster(ctx, w, h, data, { design, paper, accent, title: TITLE }))
       } catch (err) {
         console.error(err)
       }
@@ -193,7 +176,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
       else if (regular) setShortfall(image.width < spec.width ? { key: optionsKey, data, made: { width: image.width, height: image.height } } : null)
       return image?.blob ?? null
     },
-    [spec, data, design, activePaper, accent, optionsKey],
+    [spec, data, design, paper, accent, optionsKey],
   )
 
   useEffect(() => {
@@ -382,20 +365,20 @@ export function PosterStudio({ data, design, onDesign }: Props) {
             <div className="studio__row">
               <span className="studio__label">Background</span>
               <div className="studio__papers" role="group" aria-label="Background">
-                {papers.map((p) => (
+                {PAPERS.map((p) => (
                   <button
                     key={p.value}
                     type="button"
                     className="studio__paper"
                     aria-label={p.label}
-                    aria-pressed={activePaper === p.value}
+                    aria-pressed={paper === p.value}
                     onClick={() => setPaper(p.value)}
                   >
-                    <i style={{ background: DOTS[p.value] }} />
+                    <i style={{ background: p.swatch }} />
                   </button>
                 ))}
                 <span className="studio__paper-name" aria-hidden="true">
-                  {papers.find((p) => p.value === activePaper)?.label}
+                  {PAPERS.find((p) => p.value === paper)?.label}
                 </span>
               </div>
             </div>
@@ -485,15 +468,15 @@ export function PosterStudio({ data, design, onDesign }: Props) {
             }))}
           />
           <span className="field__note">
-            {spec.width} × {spec.height} px · {spec.note}
+            {spec.width} × {spec.height} px, {spec.note}
           </span>
         </div>
 
         <div className="field">
           <span className="field__label">Background</span>
           <div className="swatches" role="group" aria-label="Background">
-            {papers.map((p) => (
-              <button key={p.value} type="button" className="swatch" aria-pressed={activePaper === p.value} onClick={() => setPaper(p.value)}>
+            {PAPERS.map((p) => (
+              <button key={p.value} type="button" className="swatch" aria-pressed={paper === p.value} onClick={() => setPaper(p.value)}>
                 <i style={{ background: p.swatch }} />
                 {p.label}
               </button>
@@ -549,7 +532,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
               </button>
             )}
             <span className="field__note">
-              Up to {spec.width * ULTRA_SCALES[0]} × {spec.height * ULTRA_SCALES[0]} px · zoom in until every groove is a single day
+              Up to {spec.width * ULTRA_SCALES[0]} × {spec.height * ULTRA_SCALES[0]} px. Zoom in until every groove is a single day.
             </span>
           </div>
         )}

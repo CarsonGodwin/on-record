@@ -335,7 +335,7 @@ function LauncherBody({
           <span>Tap a row to pick it, or tap outside to close.</span>
         ) : (
           <span>
-            <kbd>↑</kbd> <kbd>↓</kbd> to move · <kbd>↵</kbd> to pick · <kbd>Esc</kbd> to close
+            <kbd>↑</kbd> <kbd>↓</kbd> to move, <kbd>↵</kbd> to pick, <kbd>Esc</kbd> to close
           </span>
         )}
       </footer>

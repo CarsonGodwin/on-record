@@ -21,21 +21,21 @@ describe('posterMoments', () => {
   it('places the longest day on its groove', () => {
     const date = at(2024, 1, 12, 0)
     const [day] = posterMoments(model, { ...noFun, biggestDay: { date, ms: 9.2 * 3_600_000 } }, noRecords)
-    expect(day).toEqual({ kind: 'day', label: 'LONGEST DAY', value: formatDuration(9.2 * 3_600_000), detail: formatDate(date), ring: 2 })
+    expect(day).toEqual({ kind: 'day', label: 'Longest day', value: formatDuration(9.2 * 3_600_000), detail: formatDate(date), ring: 2 })
   })
 
   it('runs a streak across its grooves, but only when it is more than a day', () => {
     const streak = (days: number) => ({ ...noFun, longestStreak: { days, start: at(2024, 1, 14, 0), end: at(2024, 1, 14 + days - 1, 0) } })
     expect(posterMoments(model, streak(1), noRecords)).toEqual([])
     const [s] = posterMoments(model, streak(4), noRecords)
-    expect(s).toMatchObject({ kind: 'streak', label: 'LONGEST STREAK', value: '4 days', ring: 4, ringEnd: 7 })
+    expect(s).toMatchObject({ kind: 'streak', label: 'Longest streak', value: '4 days', ring: 4, ringEnd: 7 })
     expect(s.detail).toBe(`${formatDate(at(2024, 1, 14))} – ${formatDate(at(2024, 1, 17))}`)
   })
 
   it('places the longest session by its time of day', () => {
     const marathon = (start: Date, minutes: number) => ({ ...noRecords, marathon: { start: start.getTime(), end: start.getTime() + minutes * 60_000, ms: minutes * 60_000, plays: 5 } })
     const [a] = posterMoments(model, noFun, marathon(at(2024, 1, 15, 20), 90))
-    expect(a).toMatchObject({ kind: 'session', label: 'LONGEST SESSION', value: formatDuration(90 * 60_000), ring: 5, from: 1200, to: 1290 })
+    expect(a).toMatchObject({ kind: 'session', label: 'Longest session', value: formatDuration(90 * 60_000), ring: 5, from: 1200, to: 1290 })
     // A session that runs past midnight stops at the end of its groove
     const [b] = posterMoments(model, noFun, marathon(at(2024, 1, 15, 23), 120))
     expect([b.from, b.to]).toEqual([1380, MINUTES])
@@ -44,7 +44,7 @@ describe('posterMoments', () => {
   it('marks the first spin by the minute it started', () => {
     const date = at(2024, 1, 10, 9, 30).getTime()
     const [first] = posterMoments(model, noFun, { ...noRecords, firstPlay: { title: 'Opener', artist: 'Band', date } })
-    expect(first).toEqual({ kind: 'first', label: 'FIRST SPIN', value: 'Opener', detail: 'Band', ring: 0, from: 570 })
+    expect(first).toEqual({ kind: 'first', label: 'First spin', value: 'Opener', detail: 'Band', ring: 0, from: 570 })
   })
 
   it('lists them in a fixed order', () => {
@@ -73,6 +73,6 @@ describe('posterMoments', () => {
     expect(posterMoments(model, topWeek(1), noRecords)).toEqual([])
     const [w] = posterMoments(model, topWeek(2), noRecords)
     expect(w).toMatchObject({ kind: 'week', value: 'Loop', ring: 2, ringEnd: 4, plays: [{ ring: 2, minute: 480 }, { ring: 4, minute: 1350 }] })
-    expect(w.detail).toBe(`Band · 2 plays the week of ${formatDate(at(2024, 1, 12))}`)
+    expect(w.detail).toBe(`Band, 2 plays the week of ${formatDate(at(2024, 1, 12))}`)
   })
 })
