@@ -175,12 +175,12 @@ interface GuideItem {
  */
 export function ReadingGuide({ takeaway, items }: { takeaway?: ReactNode; items: GuideItem[] }) {
   return (
-    <div className="guide">
-      {takeaway && <p className="guide__takeaway">{takeaway}</p>}
-      <ul className="guide__key" aria-label="How to read it">
+    <div className="reading-guide">
+      {takeaway && <p className="reading-guide__takeaway">{takeaway}</p>}
+      <ul className="reading-guide__key" aria-label="How to read it">
         {items.map((item, i) => (
           <li key={i}>
-            <svg className="guide__glyph" viewBox="0 0 28 16" width={28} height={16} aria-hidden="true">
+            <svg className="reading-guide__glyph" viewBox="0 0 28 16" width={28} height={16} aria-hidden="true">
               {item.glyph}
             </svg>
             <span>{item.text}</span>

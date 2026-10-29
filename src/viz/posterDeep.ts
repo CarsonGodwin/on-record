@@ -6,7 +6,7 @@ import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from 
 
 /*
  * The Deep dive poster (4:5): dense and made to be read up close, like a post on r/dataisbeautiful.
- * The record is the centrepiece, fully annotated, with small charts that unpack it underneath.
+ * The record is the centerpiece, fully annotated, with small charts that unpack it underneath.
  */
 
 /** Lines of callout detail that fit in a callout's block */
@@ -76,7 +76,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.font = font(500, 1.7 * u)
   y = wrap(
     ctx,
-    `Each ring is one day, from the centre (${formatDate(firstDate)}) to the edge (${formatDate(lastDate)}). Each coloured mark is a play, placed at the time of day it happened, midnight at the top.`,
+    `Each ring is one day, from the center (${formatDate(firstDate)}) to the edge (${formatDate(lastDate)}). Each colored mark is a play, placed at the time of day it happened, midnight at the top.`,
     pad,
     y + 3 * u,
     W - 2 * pad,
@@ -133,7 +133,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillStyle = '#0b0a0f'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  fit(ctx, data.recordTitle === 'ALL TIME' ? 'All time' : data.recordTitle, cx, cy + 0.2 * u, g.label * 1.3, 2.6 * u, (px) => font(800, px))
+  fit(ctx, data.recordTitle, cx, cy + 0.2 * u, g.label * 1.3, 2.6 * u, (px) => font(800, px))
 
   // 24-hour clock around the rim
   const hourNames = ['midnight', '3 am', '6 am', '9 am', 'noon', '3 pm', '6 pm', '9 pm']
@@ -285,7 +285,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
   const legend = [
-    // Only the artists with their own colour on the record; everyone else is grey
+    // Only the artists with their own color on the record; everyone else is grey
     ...data.tracklist.slice(0, SLOT_OTHER).map((t, i) => ({ name: t.name, hours: t.ms / 3_600_000, color: data.recordColors[i] })),
     { name: 'Everyone else', hours: -1, color: otherColor },
   ]
@@ -663,45 +663,52 @@ function placeCallouts(
     const t = Math.max(0, Math.min(1, ((o.cx - a[0]) * dx + (o.cy - a[1]) * dy) / (dx * dx + dy * dy || 1)))
     return Math.hypot(a[0] + t * dx - o.cx, a[1] + t * dy - o.cy) < o.rLabel + u
   }
-  const best = items.map((c) =>
+  // Moments with the fewest possible points go first, so one pinned to a single play keeps it and a
+  // moment that can stand anywhere on a day moves aside rather than landing on the same spot
+  const order = items.map((_, i) => i).sort((a, b) => items[a].anchors.length - items[b].anchors.length)
+  const options = order.map((i) =>
     slots.map((slot) => {
+      const c = items[i]
       const end = endOf(c, slot)
-      let pick = c.anchors[0]
-      let cost = Infinity
-      for (const a of c.anchors) {
-        const d = Math.hypot(a[0] - end[0], a[1] - end[1]) + (crossesLabel(a, end) ? 1000 * u : 0)
-        if (d < cost) {
-          cost = d
-          pick = a
-        }
-      }
-      return { cost: cost + (fits(c, slot.width) ? 0 : 100 * u), anchor: pick, end }
+      const extra = fits(c, slot.width) ? 0 : 100 * u
+      return c.anchors
+        .map((a) => ({ anchor: a, end, cost: Math.hypot(a[0] - end[0], a[1] - end[1]) + (crossesLabel(a, end) ? 1000 * u : 0) + extra }))
+        .sort((a, b) => a.cost - b.cost)
     }),
   )
+  // Two numbered dots closer than this hide each other, so a dot that would land there costs as much as crossing the label
+  const minGap = 2.6 * u
+  type Pick = { slot: number; anchor: [number, number]; end: [number, number]; cost: number }
+  const choose = (k: number, s: number, taken: Pick[]): Pick => {
+    const list = options[k][s]
+    const free = list.find((o) => taken.every((t) => Math.hypot(o.anchor[0] - t.anchor[0], o.anchor[1] - t.anchor[1]) >= minGap))
+    return free ? { slot: s, ...free } : { slot: s, ...list[0], cost: list[0].cost + 1000 * u }
+  }
   // Try every assignment of callouts to distinct slots (at most 8P5) and keep the cheapest
   let bestTotal = Infinity
-  let bestPicks: number[] = []
+  let bestPicks: Pick[] = []
   const used = new Array(slots.length).fill(false)
-  const picks: number[] = []
-  const search = (i: number, total: number) => {
+  const picks: Pick[] = []
+  const search = (k: number, total: number) => {
     if (total >= bestTotal) return
-    if (i === items.length) {
+    if (k === order.length) {
       bestTotal = total
       bestPicks = [...picks]
       return
     }
     for (let s = 0; s < slots.length; s++) {
       if (used[s]) continue
+      const p = choose(k, s, picks)
       used[s] = true
-      picks.push(s)
-      search(i + 1, total + best[i][s].cost)
+      picks.push(p)
+      search(k + 1, total + p.cost)
       picks.pop()
       used[s] = false
     }
   }
   search(0, 0)
-  const placed = items
-    .map((c, i) => ({ c, slot: slots[bestPicks[i]], ...best[i][bestPicks[i]] }))
+  const placed = bestPicks
+    .map((p, k) => ({ c: items[order[k]], slot: slots[p.slot], anchor: p.anchor, end: p.end }))
     .sort((a, b) => Number(b.slot.left) - Number(a.slot.left) || a.slot.top - b.slot.top)
 
   // Leaders: faint and dashed, so they read as pointers rather than data
@@ -723,7 +730,7 @@ function placeCallouts(
   placed.forEach(leader)
   ctx.restore()
 
-  // Numbered dots in the label colour, matched by a badge on each callout
+  // Numbered dots in the label color, matched by a badge on each callout
   const badge = (x: number, y: number, n: number, r: number) => {
     ctx.fillStyle = o.accent
     ctx.strokeStyle = '#0b0a0f'

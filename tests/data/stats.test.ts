@@ -8,7 +8,6 @@ import {
   funStats,
   getYears,
   isSkip,
-  newArtistsIn,
   platforms,
   sameFilter,
   startDate,
@@ -280,20 +279,6 @@ describe('funStats', () => {
       count: 5,
       plays: [at(2024, 1, 4), at(2024, 1, 7), at(2024, 1, 8), at(2024, 1, 9), at(2024, 1, 9, 13)],
     })
-  })
-})
-
-describe('newArtistsIn', () => {
-  it('counts artists whose first counted play was that year', () => {
-    const plays = sorted([
-      play(at(2023, 6, 1), { artist: 'Old' }),
-      play(at(2024, 2, 1), { artist: 'Old' }),
-      play(at(2024, 3, 1), { artist: 'New' }),
-      play(at(2023, 1, 1), { artist: 'Teaser', msPlayed: 10_000 }), // doesn't count
-      play(at(2024, 4, 1), { artist: 'Teaser' }),
-    ])
-    expect(newArtistsIn(plays, 2024)).toBe(2)
-    expect(newArtistsIn(plays, 2023)).toBe(1)
   })
 })
 
