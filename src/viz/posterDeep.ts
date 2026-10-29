@@ -9,6 +9,9 @@ import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from 
  * The record is the centerpiece, fully annotated, with small charts that unpack it underneath.
  */
 
+/** Apple's own typeface where there is one (San Francisco), else the platform's */
+const SYSTEM = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif'
+
 /** Lines of callout detail that fit in a callout's block */
 const DETAIL_LINES = 3
 
@@ -24,13 +27,26 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   const u = W / 100
   const pad = 5 * u
   const dark = isDarkPaper(paper)
-  const bg = dark ? '#0e0d12' : '#efe8da'
-  const ink = dark ? '#f4f1ea' : '#17141d'
-  const soft = dark ? 'rgba(244, 241, 234, 0.64)' : 'rgba(23, 20, 29, 0.64)'
-  const faint = dark ? 'rgba(244, 241, 234, 0.14)' : 'rgba(23, 20, 29, 0.14)'
-  const otherColor = dark ? '#5d5868' : '#a8a2b3'
+  // The Glass background: a pale gray backdrop with the black record resting on it, a label of clear glass
+  // that splits the light at its edge, and the system typeface
+  const glass = paper === 'glass'
+  const bg = glass ? '#ececf0' : dark ? '#0e0d12' : '#efe8da'
+  const ink = glass ? '#0b0b0d' : dark ? '#f4f1ea' : '#17141d'
+  const soft = glass ? 'rgba(60, 60, 67, 0.7)' : dark ? 'rgba(244, 241, 234, 0.64)' : 'rgba(23, 20, 29, 0.64)'
+  const faint = glass ? 'rgba(60, 60, 67, 0.16)' : dark ? 'rgba(244, 241, 234, 0.14)' : 'rgba(23, 20, 29, 0.14)'
+  const otherColor = glass ? '#a1a1a8' : dark ? '#5d5868' : '#a8a2b3'
+  // What the charts sit on: a white card on the Glass background, the paper otherwise
+  const card = glass ? '#f9f9fb' : bg
   const accent = accentPick ?? data.tracklist[0]?.color ?? '#ff277c'
-  const font = (weight: number, px: number) => `${weight} ${px}px ${DISPLAY}`
+  const family = glass ? SYSTEM : DISPLAY
+  const font = (weight: number, px: number) => `${weight} ${px}px ${family}`
+  // The system face is set tight at big sizes on the Glass background; canvas doesn't do that on its own
+  const tight = (px: number) => {
+    if (glass && 'letterSpacing' in ctx) ctx.letterSpacing = `${-0.025 * px}px`
+  }
+  const untight = () => {
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px'
+  }
   const model = data.record
   const multiYear = data.period.includes('–')
   const months = monthly(model, 'month', multiYear)
@@ -41,6 +57,14 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.save()
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, W, H)
+  if (glass) {
+    // Lit from the front, a touch brighter behind the record
+    const light = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, H * 0.75)
+    light.addColorStop(0, '#f7f7fa')
+    light.addColorStop(1, '#e1e1e7')
+    ctx.fillStyle = light
+    ctx.fillRect(0, 0, W, H)
+  }
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
 
@@ -50,7 +74,9 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   const title = multiYear ? `${years} years of my music, one groove per day` : `My ${y0} in music, one groove per day`
   ctx.fillStyle = ink
   ctx.font = font(800, 4.2 * u)
+  tight(4.2 * u)
   let y = wrap(ctx, title, pad, 9 * u, W - 2 * pad, 4.9 * u)
+  untight()
 
   // The headline numbers, big, in a row under the title
   const figures = [
@@ -65,7 +91,9 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     const x = pad + i * figW
     ctx.fillStyle = ink
     ctx.font = font(800, 4 * u)
+    tight(4 * u)
     ctx.fillText(formatNumber(f.value), x, figTop + 3.6 * u)
+    untight()
     ctx.fillStyle = soft
     ctx.font = font(600, 1.5 * u)
     ctx.fillText(f.label, x, figTop + 5.9 * u)
@@ -82,8 +110,10 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     W - 2 * pad,
     2.35 * u,
   )
-  ctx.fillStyle = faint
-  ctx.fillRect(pad, y + 2 * u, W - 2 * pad, Math.max(1, 0.1 * u))
+  if (!glass) {
+    ctx.fillStyle = faint
+    ctx.fillRect(pad, y + 2 * u, W - 2 * pad, Math.max(1, 0.1 * u))
+  }
 
   // ---------- The record ----------
   const mainTop = y + 2.6 * u
@@ -92,13 +122,26 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   const cx = W / 2
   const cy = (mainTop + mainBottom) / 2
   const s = Rd / recordGeometry(1, model.days).disc
+  if (glass) {
+    // The record rests on the backdrop, so it casts a shadow
+    ctx.save()
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)'
+    ctx.shadowBlur = 4 * u
+    ctx.shadowOffsetY = 1.2 * u
+    ctx.fillStyle = '#000000'
+    ctx.beginPath()
+    ctx.arc(cx, cy, Rd, 0, TAU)
+    ctx.fill()
+    ctx.restore()
+  }
   ctx.save()
   ctx.translate(cx - s / 2, cy - s / 2)
   drawRecord(ctx, model, {
     size: s,
     colors: data.recordColors,
     focus: null,
-    title: '',
+    // The Glass background lays its own glass label over this one
+    title: glass ? '' : data.recordTitle,
     subtitle: '',
     labelColor: accent,
     sheen: true,
@@ -125,17 +168,22 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     ctx.stroke()
   }
 
-  // Label
-  ctx.fillStyle = accent
-  ctx.beginPath()
-  ctx.arc(cx, cy, g.label, 0, TAU)
-  ctx.fill()
-  ctx.fillStyle = '#0b0a0f'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  fit(ctx, data.recordTitle, cx, cy + 0.2 * u, g.label * 1.3, 2.6 * u, (px) => font(800, px))
+  // On the Glass background the label is a disc of clear glass with black type
+  if (glass) {
+    ctx.fillStyle = '#fafafc'
+    ctx.beginPath()
+    ctx.arc(cx, cy, g.label, 0, TAU)
+    ctx.fill()
+    glassEdge(ctx, (grow) => ctx.arc(cx, cy, g.label + grow, 0, TAU), cx - g.label, cy - g.label, cx + g.label, cy + g.label, u)
+    ctx.fillStyle = ink
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    fit(ctx, data.recordTitle, cx, cy + 0.2 * u, g.label * 1.3, 2.6 * u, (px) => font(800, px))
+  }
 
   // 24-hour clock around the rim
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
   const hourNames = ['midnight', '3 am', '6 am', '9 am', 'noon', '3 pm', '6 pm', '9 pm']
   ctx.strokeStyle = soft
   ctx.fillStyle = soft
@@ -239,7 +287,10 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       anchors: arcsOn(quiet.ring, (k) => model.slot[k] === quiet.slot),
     })
   }
-  const { markers, leaders, boxes } = placeCallouts(ctx, callouts.filter((c) => c.anchors.length > 0), { cx, cy, rClear: Rd + 5.6 * u, rLabel: g.label, top: mainTop + 0.5 * u, bottom: mainBottom, pad, W, u, ink, soft, dark, accent, disc: g.disc, font })
+  const { markers, leaders, boxes } = placeCallouts(ctx, callouts.filter((c) => c.anchors.length > 0), { cx, cy, rClear: Rd + 5.6 * u, rLabel: g.label, top: mainTop + 0.5 * u, bottom: mainBottom, pad, W, u, ink, soft, dark, glass, disc: g.disc, font,
+    // Numbered dots in the label's color, or black on the Glass background
+    badge: glass ? { fill: ink, text: '#ffffff', ring: '#ffffff' } : { fill: accent, text: '#0b0a0f', ring: '#0b0a0f' },
+  })
 
   // White is only ever the drift line, so it gets a name where it ends, on whichever side is clearest
   if (pts.length > 1) {
@@ -314,13 +365,28 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   }
 
   // ---------- Three small charts ----------
-  const panelTop = ly + 3.8 * u
-  const gap = 3.5 * u
-  const pw = (W - 2 * pad - 2 * gap) / 3
+  // On the Glass background each chart sits on its own white card
+  const inset = glass ? 1.8 * u : 0
+  const panelTop = ly + (glass ? 4.4 : 3.8) * u
+  const gap = glass ? 1.4 * u : 3.5 * u
+  const cardW = (W - 2 * pad - 2 * gap) / 3
+  const pw = cardW - 2 * inset
   const chartTop = panelTop + 4.4 * u
   const chartH = 9 * u
+  const cardBottom = chartTop + chartH + 1.3 * u
   const panel = (i: number, heading: string, sub: string) => {
-    const x = pad + i * (pw + gap)
+    const x = pad + i * (cardW + gap) + inset
+    if (glass) {
+      ctx.save()
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.1)'
+      ctx.shadowBlur = 2.4 * u
+      ctx.shadowOffsetY = 0.6 * u
+      ctx.fillStyle = card
+      ctx.beginPath()
+      ctx.roundRect(x - inset, panelTop - 2.9 * u, cardW, cardBottom - (panelTop - 2.9 * u), 1.6 * u)
+      ctx.fill()
+      ctx.restore()
+    }
     ctx.textAlign = 'left'
     ctx.fillStyle = ink
     ctx.font = font(700, 1.9 * u)
@@ -334,12 +400,13 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   // 1. Weekday × hour. Shades are by rank, not raw time: each step covers an equal share of the week's
   // hours, so a listener who's on all day still shows which hours are their heaviest
   {
-    const x = panel(0, 'When I listen', 'By hour of the week')
+    const sub = 'By hour of the week'
+    const x = panel(0, 'When I listen', sub)
     const grid = weekHour(model)
     const steps = 7
     const sorted = grid.flat().filter((v) => v > 0).sort((a, b) => a - b)
     const shade = (v: number) => {
-      if (v <= 0) return mix(bg, accent, 0.04)
+      if (v <= 0) return mix(card, accent, 0.04)
       let lo = 0
       let hi = sorted.length
       while (lo < hi) {
@@ -350,11 +417,20 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       return ramp(Math.min(steps - 1, Math.floor((lo / sorted.length) * steps)) / (steps - 1))
     }
     // Paper to accent, then on past it (lighter on midnight, deeper on cream) for the busiest hours
-    const ramp = (f: number) => (f <= 0.75 ? mix(bg, accent, 0.14 + (f / 0.75) * 0.86) : mix(accent, dark ? '#ffffff' : '#000000', ((f - 0.75) / 0.25) * 0.45))
+    const ramp = (f: number) => (f <= 0.75 ? mix(card, accent, 0.14 + (f / 0.75) * 0.86) : mix(accent, dark ? '#ffffff' : '#000000', ((f - 0.75) / 0.25) * 0.45))
+    // The Glass background rounds off every cell
+    const cell = (cx0: number, cy0: number, w: number, h: number) => {
+      if (!glass) return ctx.fillRect(cx0, cy0, w, h)
+      ctx.beginPath()
+      ctx.roundRect(cx0, cy0, w, h, Math.min(w, h) * 0.22)
+      ctx.fill()
+    }
 
-    // Key, right-aligned on the subtitle line
-    const sq = 1.05 * u
+    // Key, right-aligned on the subtitle line, its squares shrinking to fit beside it in a narrower card
+    ctx.font = font(500, 1.35 * u)
+    const room = x + pw - (x + ctx.measureText(sub).width + u)
     ctx.font = font(500, 1.2 * u)
+    const sq = Math.min(1.05 * u, (room - ctx.measureText('less more').width - 1.1 * u) / steps)
     ctx.textBaseline = 'alphabetic'
     ctx.textAlign = 'right'
     ctx.fillStyle = soft
@@ -363,7 +439,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     const keyRight = x + pw - ctx.measureText('more').width - 0.6 * u
     for (let i = 0; i < steps; i++) {
       ctx.fillStyle = ramp(i / (steps - 1))
-      ctx.fillRect(keyRight - (steps - i) * sq, keyY - sq * 0.95, sq - 0.12 * u, sq - 0.12 * u)
+      cell(keyRight - (steps - i) * sq, keyY - sq * 0.95, sq - 0.12 * u, sq - 0.12 * u)
     }
     ctx.fillStyle = soft
     ctx.fillText('less', keyRight - steps * sq - 0.5 * u, keyY)
@@ -379,7 +455,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       ctx.fillText(d.slice(0, 2), x, chartTop + row * ch + ch / 2)
       for (let h = 0; h < 24; h++) {
         ctx.fillStyle = shade(grid[row][h])
-        ctx.fillRect(x + labelW + h * cw + 0.08 * u, chartTop + row * ch + 0.08 * u, cw - 0.16 * u, ch - 0.16 * u)
+        cell(x + labelW + h * cw + 0.08 * u, chartTop + row * ch + 0.08 * u, cw - 0.16 * u, ch - 0.16 * u)
       }
     })
     ctx.textBaseline = 'alphabetic'
@@ -398,12 +474,21 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     months.forEach((m, i) => {
       let top = chartTop + bh
       const parts = [...m.slots.map((v, s) => [v, data.recordColors[s]] as const), [Math.max(0, m.total - m.slots.reduce((a, b) => a + b, 0)), otherColor] as const]
+      // On the Glass background bars have rounded tops, so each stack is cut to one
+      ctx.save()
+      if (glass) {
+        const h = (m.total / max) * bh
+        ctx.beginPath()
+        ctx.roundRect(x + i * bw + bw * 0.08, top - h, bw * 0.84, h, [Math.min(bw * 0.3, h / 2), Math.min(bw * 0.3, h / 2), 0, 0])
+        ctx.clip()
+      }
       for (const [v, color] of parts) {
         const h = (v / max) * bh
         ctx.fillStyle = color
         ctx.fillRect(x + i * bw + bw * 0.08, top - h, bw * 0.84, h)
         top -= h
       }
+      ctx.restore()
     })
     ctx.fillStyle = soft
     ctx.font = font(500, 1.2 * u)
@@ -477,7 +562,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
         if (ctx.measureText('sweet spot').width <= x1 - x0 + 1.6 * u && py(bestRate) < floor - 2 * u) {
           // Starts under the note when they share a corner
           const bandTop = x0 < noteLeft + noteW && x1 > noteLeft ? chartTop + 3.4 * u : chartTop
-          ctx.fillStyle = mix(bg, accent, 0.14)
+          ctx.fillStyle = mix(card, accent, 0.14)
           ctx.fillRect(x0, bandTop, x1 - x0, floor - bandTop)
           ctx.fillStyle = soft
           ctx.textAlign = 'center'
@@ -519,7 +604,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       ctx.arc(px(mark), py(rates[mark]), 0.6 * u, 0, TAU)
       ctx.fillStyle = accent
       ctx.fill()
-      ctx.strokeStyle = bg
+      ctx.strokeStyle = card
       ctx.lineWidth = 0.25 * u
       ctx.stroke()
 
@@ -546,9 +631,11 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   }
 
   // ---------- Your #1, year by year (month by month for a single year) ----------
-  const stripTop = chartTop + chartH + 2.4 * u
-  ctx.fillStyle = faint
-  ctx.fillRect(pad, stripTop - 1.6 * u, W - 2 * pad, Math.max(1, 0.1 * u))
+  const stripTop = glass ? cardBottom + 2 * u : chartTop + chartH + 2.4 * u
+  if (!glass) {
+    ctx.fillStyle = faint
+    ctx.fillRect(pad, stripTop - 1.6 * u, W - 2 * pad, Math.max(1, 0.1 * u))
+  }
   const periods = multiYear ? monthly(model, 'year', true) : months
   ctx.textAlign = 'left'
   ctx.fillStyle = ink
@@ -556,25 +643,29 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillText(multiYear ? 'My #1 artist, year by year' : 'My #1 artist, month by month', pad, stripTop + 0.8 * u)
   const colW = (W - 2 * pad) / periods.length
   const maxTotal = Math.max(...periods.map((p) => p.total), 1)
+  // The cards push the strip down on the Glass background, so it's drawn a little more compactly there
+  const [labelY, barBottom, barMax, nameY] = glass ? [3.6, 6.4, 2.4, 8] : [3.8, 7.2, 2.8, 9]
   periods.forEach((p, i) => {
     const x = pad + i * colW
     const top = p.slots.indexOf(Math.max(...p.slots))
     const has = p.slots[top] > 0
     ctx.fillStyle = ink
     ctx.font = font(700, 1.45 * u)
-    ctx.fillText(multiYear && periods.length > 8 ? `’${String(p.year).slice(2)}` : p.label, x, stripTop + 3.8 * u)
-    const bh = (p.total / maxTotal) * 2.8 * u
+    ctx.fillText(multiYear && periods.length > 8 ? `’${String(p.year).slice(2)}` : p.label, x, stripTop + labelY * u)
+    const bh = (p.total / maxTotal) * barMax * u
     ctx.fillStyle = has ? data.recordColors[top] : otherColor
-    ctx.fillRect(x, stripTop + 7.2 * u - bh, colW - 0.8 * u, bh)
+    ctx.beginPath()
+    ctx.roundRect(x, stripTop + barBottom * u - bh, colW - 0.8 * u, bh, glass ? Math.min(0.5 * u, bh / 2) : 0)
+    ctx.fill()
     ctx.fillStyle = soft
     ctx.font = font(500, 1.25 * u)
     // Names break onto a second line rather than being cut off
     const name = has ? data.tracklist[top]?.name ?? '' : '–'
     const words = name.split(' ')
     // ...when there's room above the source line
-    const roomFor2 = stripTop + 10.55 * u <= H - 3.4 * u
+    const roomFor2 = stripTop + (nameY + 1.55) * u <= H - 3.4 * u
     const lines = !roomFor2 || ctx.measureText(name).width <= colW - 0.8 * u || words.length < 2 ? [name] : [words[0], words.slice(1).join(' ')]
-    lines.forEach((line, j) => ctx.fillText(clip(ctx, line, colW - 0.8 * u), x, stripTop + (9 + j * 1.55) * u))
+    lines.forEach((line, j) => ctx.fillText(clip(ctx, line, colW - 0.8 * u), x, stripTop + (nameY + j * 1.55) * u))
   })
   ctx.fillStyle = soft
   ctx.font = font(500, 1.25 * u)
@@ -604,7 +695,8 @@ function placeCallouts(
     ink: string
     soft: string
     dark: boolean
-    accent: string
+    glass: boolean
+    badge: { fill: string; text: string; ring: string }
     disc: number
     font: (w: number, px: number) => string
   },
@@ -711,7 +803,7 @@ function placeCallouts(
     .map((p, k) => ({ c: items[order[k]], slot: slots[p.slot], anchor: p.anchor, end: p.end }))
     .sort((a, b) => Number(b.slot.left) - Number(a.slot.left) || a.slot.top - b.slot.top)
 
-  // Leaders: faint and dashed, so they read as pointers rather than data
+  // Leaders: faint and dashed, so they read as pointers rather than data (solid hairlines on Glass)
   const leader = (p: (typeof placed)[number]) => {
     ctx.beginPath()
     ctx.moveTo(...p.anchor)
@@ -720,7 +812,7 @@ function placeCallouts(
   }
   ctx.save()
   ctx.lineWidth = Math.max(1, 0.1 * u)
-  ctx.setLineDash([0.45 * u, 0.4 * u])
+  if (!o.glass) ctx.setLineDash([0.45 * u, 0.4 * u])
   ctx.strokeStyle = o.dark ? 'rgba(244, 241, 234, 0.4)' : 'rgba(23, 20, 29, 0.4)'
   placed.forEach(leader)
   ctx.beginPath()
@@ -732,14 +824,14 @@ function placeCallouts(
 
   // Numbered dots in the label color, matched by a badge on each callout
   const badge = (x: number, y: number, n: number, r: number) => {
-    ctx.fillStyle = o.accent
-    ctx.strokeStyle = '#0b0a0f'
+    ctx.fillStyle = o.badge.fill
+    ctx.strokeStyle = o.badge.ring
     ctx.lineWidth = 0.15 * u
     ctx.beginPath()
     ctx.arc(x, y, r, 0, TAU)
     ctx.fill()
     ctx.stroke()
-    ctx.fillStyle = '#0b0a0f'
+    ctx.fillStyle = o.badge.text
     ctx.font = o.font(800, r * 1.15)
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -769,6 +861,52 @@ function placeCallouts(
       return { x0, y0: p.slot.top, x1: x0 + p.slot.width, y1: p.slot.top + blockH }
     }),
   }
+}
+
+/**
+ * The rim of a piece of clear glass: an edge catching the light all round,
+ * and just inside it at the top-right and bottom-left corners the light split into red, then the dark behind,
+ * then blue. `trace` adds the shape's outline to the path, grown outward by `grow`
+ */
+function glassEdge(ctx: CanvasRenderingContext2D, trace: (grow: number) => void, x0: number, y0: number, x1: number, y1: number, u: number) {
+  const stroke = (grow: number, style: string | CanvasGradient, width: number) => {
+    ctx.strokeStyle = style
+    ctx.lineWidth = width
+    ctx.beginPath()
+    trace(grow)
+    ctx.stroke()
+  }
+  ctx.save()
+  stroke(0, 'rgba(0, 0, 0, 0.12)', Math.max(1, 0.08 * u))
+  // A band across the other diagonal: running the gradient along the box's normal to it puts the
+  // top-right and bottom-left corners both at its middle, whatever the box's shape
+  const [w, h] = [x1 - x0, y1 - y0]
+  const [mx, my] = [(x0 + x1) / 2, (y0 + y1) / 2]
+  const k = (w * h) / (w * w + h * h)
+  const band = (color: string) => {
+    const gr = ctx.createLinearGradient(mx - h * k, my - w * k, mx + h * k, my + w * k)
+    gr.addColorStop(0, 'rgba(0, 0, 0, 0)')
+    gr.addColorStop(0.27, 'rgba(0, 0, 0, 0)')
+    gr.addColorStop(0.5, color)
+    gr.addColorStop(0.73, 'rgba(0, 0, 0, 0)')
+    gr.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    return gr
+  }
+  // Clipped to the glass, so none of it spills onto what's around
+  ctx.beginPath()
+  trace(0)
+  ctx.clip()
+  ctx.filter = `blur(${0.18 * u}px)`
+  stroke(-0.4 * u, band('rgba(255, 40, 90, 1)'), 0.7 * u)
+  stroke(-0.92 * u, band('rgba(14, 10, 30, 0.85)'), 0.4 * u)
+  stroke(-1.38 * u, band('rgba(36, 100, 255, 1)'), 0.62 * u)
+  stroke(-1.86 * u, band('rgba(70, 225, 255, 0.85)'), 0.45 * u)
+  ctx.filter = 'none'
+  ctx.restore()
+  // The clear edge goes back on top of the color
+  ctx.save()
+  stroke(-0.12 * u, 'rgba(255, 255, 255, 0.9)', 0.2 * u)
+  ctx.restore()
 }
 
 /** The lines wrap() would draw, without drawing them */
