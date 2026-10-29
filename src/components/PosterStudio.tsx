@@ -44,9 +44,16 @@ const ULTRA_SCALES = [4, 3, 2]
 /** The full-size poster, then smaller fallbacks for phones whose canvas gives out on a big record */
 const FULL_SCALES = [1, 0.75, 0.5]
 
-const PAPERS: { value: PosterPaper; label: string; swatch: string }[] = [
+const PAPERS: { value: PosterPaper; label: string; swatch: string; deepOnly?: boolean }[] = [
   { value: 'midnight', label: 'Black', swatch: '#0e0d12' },
   { value: 'cream', label: 'Cream', swatch: '#efe8da' },
+  // Only the Deep dive is drawn in glass; the other designs would just be pale gray
+  {
+    value: 'glass',
+    label: 'Glass',
+    swatch: 'linear-gradient(135deg, #ececf0 42%, #4fe3ff 50%, #2a6dff 56%, #ff2d55 64%, #ececf0 72%)',
+    deepOnly: true,
+  },
 ]
 
 /** Names for the color picker's swatches, which are the chart colors in their usual order */
@@ -101,6 +108,9 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const cssH = (cssW * spec.height) / spec.width
   const hasUltra = design === 'deep'
   const hasAccent = design === 'deep'
+  const papers = PAPERS.filter((p) => !p.deepOnly || design === 'deep')
+  // The Glass background is kept while you look at other designs, which draw black meanwhile
+  const activePaper = papers.some((p) => p.value === paper) ? paper : 'midnight'
   const yearAccent = data.tracklist[0]?.color ?? SERIES[0]
   const accents = SERIES.includes(yearAccent) ? SERIES : [yearAccent, ...SERIES]
   const activeAccent = accentPick ?? yearAccent
@@ -108,7 +118,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   // Picking the year's own color goes back to following the year
   const pickAccent = (color: string) => setAccentPick(color === yearAccent ? null : color)
   const fileName = `my-listening-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
-  const optionsKey = `${design}|${activeSize}|${paper}|${accent ?? ''}`
+  const optionsKey = `${design}|${activeSize}|${activePaper}|${accent ?? ''}`
 
   useEffect(() => {
     let live = true
@@ -149,21 +159,21 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
-    const inputs = [data, design, paper, accent, cssW, cssH, fontsReady, restored]
+    const inputs = [data, design, activePaper, accent, cssW, cssH, fontsReady, restored]
     if (inputs.every((v, i) => drawn.current[i] === v)) return
     drawn.current = inputs
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     canvas.width = Math.round(cssW * dpr)
     canvas.height = Math.round(cssH * dpr)
-    renderPoster(ctx, canvas.width, canvas.height, data, { design, paper, accent, title: TITLE })
-  }, [showing, data, design, paper, accent, cssW, cssH, fontsReady, restored])
+    renderPoster(ctx, canvas.width, canvas.height, data, { design, paper: activePaper, accent, title: TITLE })
+  }, [showing, data, design, activePaper, accent, cssW, cssH, fontsReady, restored])
 
   const fullSize = useCallback(
     async (scales: number[] = FULL_SCALES): Promise<Blob | null> => {
       await document.fonts.ready
       let image: RenderedImage | null = null
       try {
-        image = await renderBlob(spec.width, spec.height, scales, (ctx, w, h) => renderPoster(ctx, w, h, data, { design, paper, accent, title: TITLE }))
+        image = await renderBlob(spec.width, spec.height, scales, (ctx, w, h) => renderPoster(ctx, w, h, data, { design, paper: activePaper, accent, title: TITLE }))
       } catch (err) {
         console.error(err)
       }
@@ -176,7 +186,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
       else if (regular) setShortfall(image.width < spec.width ? { key: optionsKey, data, made: { width: image.width, height: image.height } } : null)
       return image?.blob ?? null
     },
-    [spec, data, design, paper, accent, optionsKey],
+    [spec, data, design, activePaper, accent, optionsKey],
   )
 
   useEffect(() => {
@@ -365,20 +375,20 @@ export function PosterStudio({ data, design, onDesign }: Props) {
             <div className="studio__row">
               <span className="studio__label">Background</span>
               <div className="studio__papers" role="group" aria-label="Background">
-                {PAPERS.map((p) => (
+                {papers.map((p) => (
                   <button
                     key={p.value}
                     type="button"
                     className="studio__paper"
                     aria-label={p.label}
-                    aria-pressed={paper === p.value}
+                    aria-pressed={activePaper === p.value}
                     onClick={() => setPaper(p.value)}
                   >
                     <i style={{ background: p.swatch }} />
                   </button>
                 ))}
                 <span className="studio__paper-name" aria-hidden="true">
-                  {PAPERS.find((p) => p.value === paper)?.label}
+                  {papers.find((p) => p.value === activePaper)?.label}
                 </span>
               </div>
             </div>
@@ -475,8 +485,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
         <div className="field">
           <span className="field__label">Background</span>
           <div className="swatches" role="group" aria-label="Background">
-            {PAPERS.map((p) => (
-              <button key={p.value} type="button" className="swatch" aria-pressed={paper === p.value} onClick={() => setPaper(p.value)}>
+            {papers.map((p) => (
+              <button key={p.value} type="button" className="swatch" aria-pressed={activePaper === p.value} onClick={() => setPaper(p.value)}>
                 <i style={{ background: p.swatch }} />
                 {p.label}
               </button>

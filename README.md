@@ -23,7 +23,7 @@ Everything runs in your browser. There's no server, and your data is never uploa
 | **Pulse** | An *Unknown Pleasures*-style ridgeline of your top artists, in the order you found them. |
 | **The Charts** | Top artists, songs, albums and podcasts with generative covers. |
 | **Liner Notes** | A listener-type card, records (streaks, marathons, obsessions, the artist you went quiet on) and habits. On a phone, the four facts you'd never have guessed. |
-| **The Poster** | A shareable PNG in four designs: Deep dive (the record fully annotated, with small charts underneath), The Record, Sleeve (an album cover with a tracklist) and Annotated (a labelled figure). Three sizes (4:5 post, 9:16 story, 2:3 print), on black or cream. Deep dive is 4:5 only, and can come out several times bigger for reading up close. On phones it goes straight to the share sheet. |
+| **The Poster** | A shareable PNG in four designs: Deep dive (the record fully annotated, with small charts underneath), The Record, Sleeve (an album cover with a tracklist) and Annotated (a labelled figure). Three sizes (4:5 post, 9:16 story, 2:3 print), on black or cream. Deep dive is 4:5 only, can come out several times bigger for reading up close, and has a third background, Glass: pale gray with a clear glass label. On phones it goes straight to the share sheet. |
 
 Every view follows the year picker at the top.
 
