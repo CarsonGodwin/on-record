@@ -343,28 +343,26 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
 
   if (!o.noGuideLabels) drawGuideLabels(ctx, model.days, o)
 
-  // Label
+  // The lead-out: the smooth band between the last groove and the label. Its edge with the grooves catches
+  // a little light, and the label's edge, sitting proud of the vinyl, casts a thin shadow onto it
   const lr = g.label
-  const label = ctx.createRadialGradient(c - lr * 0.4, c - lr * 0.5, lr * 0.1, c, c, lr)
-  label.addColorStop(0, mix(o.labelColor, '#ffffff', 0.35))
-  label.addColorStop(1, o.labelColor)
-  ctx.fillStyle = label
   ctx.beginPath()
-  ctx.arc(c, c, lr, 0, TAU)
+  ctx.arc(c, c, g.inner, 0, TAU)
+  ctx.arc(c, c, lr, 0, TAU, true)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.03)'
   ctx.fill()
+  ctx.lineWidth = hair
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
+  ctx.beginPath()
+  ctx.arc(c, c, g.inner, 0, TAU)
+  ctx.stroke()
+  ctx.lineWidth = lr * 0.035
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'
+  ctx.beginPath()
+  ctx.arc(c, c, lr + lr * 0.0175, 0, TAU)
+  ctx.stroke()
 
-  ctx.fillStyle = '#0b0a0f'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.font = `700 ${lr * 0.12}px ${DISPLAY}`
-  ctx.fillText('Side A', c, c - lr * 0.66)
-  fitText(ctx, o.title, c, c - lr * 0.3, lr * 1.45, lr * 0.44, `800 {px}px ${DISPLAY}`)
-  ctx.font = `600 ${lr * 0.12}px ${DISPLAY}`
-  ctx.fillText(o.subtitle, c, c + lr * 0.36)
-  fitText(ctx, 'my listening record', c, c + lr * 0.6, lr * 1.45, lr * 0.17, `{px}px ${SERIF}`)
-  ctx.beginPath()
-  ctx.arc(c, c, lr * 0.065, 0, TAU)
-  ctx.fill()
+  drawLabel(ctx, c, c, lr, { color: o.labelColor, title: o.title, subtitle: o.subtitle })
 
   // Hour marks around the outside
   ctx.fillStyle = o.ink
@@ -381,6 +379,72 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
     const r = g.disc + o.size * 0.034
     ctx.fillText(formatHour(h).replace(' ', '').toLowerCase(), c + r * Math.cos(a), c + r * Math.sin(a))
   }
+}
+
+export interface LabelOptions {
+  color: string
+  title: string
+  subtitle: string
+}
+
+/**
+ * The paper label at the center of the record, laid out like a pressed one: a printed rim, the side set
+ * around the bottom, the title and subtitle in the middle, and a streak of gloss across it all
+ */
+export function drawLabel(ctx: CanvasRenderingContext2D, x: number, y: number, lr: number, o: LabelOptions) {
+  const ink = '#0b0a0f'
+  ctx.save()
+  ctx.fillStyle = o.color
+  ctx.beginPath()
+  ctx.arc(x, y, lr, 0, TAU)
+  ctx.fill()
+  ctx.clip()
+
+  ctx.strokeStyle = 'rgba(11, 10, 15, 0.4)'
+  ctx.lineWidth = lr * 0.012
+  ctx.beginPath()
+  ctx.arc(x, y, lr * 0.93, 0, TAU)
+  ctx.stroke()
+
+  ctx.fillStyle = ink
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.font = `700 ${lr * 0.1}px ${DISPLAY}`
+  arcText(ctx, 'Side A', x, y, lr * 0.83, Math.PI / 2, true)
+
+  ctx.textBaseline = 'middle'
+  // The title sits on the middle, nudged up to share it with a subtitle
+  const titleY = o.subtitle ? y - lr * 0.06 : y + lr * 0.02
+  if (o.title) fitText(ctx, o.title, x, titleY, lr * 1.3, lr * 0.38, `800 {px}px ${DISPLAY}`)
+  if (o.subtitle) fitText(ctx, o.subtitle, x, y + lr * 0.3, lr * 1.2, lr * 0.12, `600 {px}px ${DISPLAY}`)
+
+  // Gloss: one narrow streak, lying the way the light falls on the vinyl
+  const shine = ctx.createLinearGradient(x - lr, y - lr, x + lr, y + lr)
+  for (const [at, alpha] of [[0, 0], [0.26, 0], [0.34, 0.2], [0.42, 0], [1, 0]]) shine.addColorStop(at, `rgba(255, 255, 255, ${alpha})`)
+  ctx.fillStyle = shine
+  ctx.fillRect(x - lr, y - lr, lr * 2, lr * 2)
+  ctx.restore()
+}
+
+/**
+ * Sets text along a circle, centered on `angle`. Over the top it runs clockwise with the letters standing
+ * outward from the baseline; `below` runs it anticlockwise with the letters leaning in, so it still reads
+ * left to right along the bottom
+ */
+function arcText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, r: number, angle: number, below: boolean) {
+  const chars = [...text]
+  const widths = chars.map((ch) => ctx.measureText(ch).width)
+  const dir = below ? -1 : 1
+  let a = angle - (dir * widths.reduce((sum, w) => sum + w, 0)) / r / 2
+  chars.forEach((ch, i) => {
+    const mid = a + (dir * widths[i]) / r / 2
+    ctx.save()
+    ctx.translate(x + r * Math.cos(mid), y + r * Math.sin(mid))
+    ctx.rotate(mid + (below ? -Math.PI / 2 : Math.PI / 2))
+    ctx.fillText(ch, 0, 0)
+    ctx.restore()
+    a += (dir * widths[i]) / r
+  })
 }
 
 /** Little tags on the guide rings, thinned out when they'd crowd each other */

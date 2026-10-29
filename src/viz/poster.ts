@@ -29,8 +29,11 @@ import {
 
 export type PosterDesign = 'record' | 'deep' | 'sleeve' | 'annotated' | 'macro' | 'constellation' | 'pulse'
 export type PosterSize = 'post' | 'story' | 'print'
-/** The studio's two backgrounds, both flat color: 'midnight' is the black one */
-export type PosterPaper = 'midnight' | 'cream'
+/**
+ * The studio's backgrounds: 'midnight' is the black one. 'glass' is the Deep dive on pale gray with a label
+ * of clear glass and system type, and the other designs draw it as plain pale gray
+ */
+export type PosterPaper = 'midnight' | 'cream' | 'glass'
 
 export const isDarkPaper = (paper: PosterPaper) => paper === 'midnight'
 
@@ -143,6 +146,7 @@ const PAPERS: Record<PosterPaper, Paper> = {
   // The same black as the deep dive's, so every design's dark poster matches
   midnight: { bg: '#0e0d12', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.62)', rule: 'rgba(244, 241, 234, 0.2)', dark: true },
   cream: { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.64)', rule: 'rgba(23, 20, 29, 0.22)', dark: false },
+  glass: { bg: '#ececf0', ink: '#0b0b0d', muted: 'rgba(60, 60, 67, 0.7)', rule: 'rgba(60, 60, 67, 0.2)', dark: false },
 }
 
 const CAPTIONS: Record<PosterDesign, string> = {
