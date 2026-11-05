@@ -7,6 +7,8 @@ Drop in your Spotify **Extended Streaming History** or your Apple Music **privac
 
 Everything runs in your browser. There's no server, and your data is never uploaded. Even the cover art is generated from names rather than fetched. The built site ships with a Content Security Policy that blocks all network requests (`connect-src 'none'`), so the browser itself enforces that.
 
+![on-record — every day of your Spotify or Apple Music listening, pressed into vinyl](./on-record-demo.gif)
+
 ## What you get
 
 | | |
