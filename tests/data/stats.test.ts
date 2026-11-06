@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   canHide,
+  canShowYears,
   dayNumber,
   filterByYear,
+  filterByYears,
   filterPlays,
   fromDayNumber,
   funStats,
   getYears,
   isSkip,
   platforms,
+  playsPerYear,
   sameFilter,
   startDate,
   summarize,
@@ -331,5 +334,45 @@ describe('sameFilter', () => {
     expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: false, hidden: new Set(['A']) })).toBe(false)
     expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['B']) })).toBe(false)
     expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['A', 'B']) })).toBe(false)
+  })
+})
+
+describe('year range', () => {
+  const old = play(at(2015, 6, 1), { artist: 'Old' })
+  const sameYear = play(at(2015, 12, 31, 23, 58), { artist: 'Old', msPlayed: 60_000 })
+  const recent = play(at(2022, 3, 1), { artist: 'New' })
+  const show = play(at(2022, 4, 1), { kind: 'episode' })
+  const plays = sorted([old, sameYear, recent, show])
+
+  it('keeps the years inside the range, ends included', () => {
+    expect(filterByYears(plays, [2015, 2015])).toEqual([old, sameYear])
+    expect(filterByYears(plays, [2016, 2022])).toEqual([recent, show])
+    expect(filterByYears(plays, null)).toBe(plays)
+  })
+
+  it('goes through filterPlays with the other filters', () => {
+    expect(filterPlays(plays, { musicOnly: true, hidden: new Set(), years: [2016, 2030] })).toEqual([recent])
+    expect(filterPlays(plays, { musicOnly: false, hidden: new Set(['New']), years: [2016, 2030] })).toEqual([show])
+    expect(filterPlays(plays, { musicOnly: false, hidden: new Set(), years: null })).toBe(plays)
+  })
+
+  it('counts plays by the year they started', () => {
+    expect([...playsPerYear(plays)]).toEqual([[2015, 2], [2022, 2]])
+  })
+
+  it('refuses a range that would leave nothing to show', () => {
+    expect(canShowYears(plays, new Set(), [2016, 2021])).toBe(false)
+    expect(canShowYears(plays, new Set(), [2022, 2022])).toBe(true)
+    // Only a hidden artist's music left, with Music only on
+    expect(canShowYears(plays, new Set(['New']), [2022, 2022])).toBe(false)
+    expect(canShowYears(plays, new Set(['New']), [2015, 2022])).toBe(true)
+  })
+
+  it('tells filters with different ranges apart', () => {
+    const base = { musicOnly: true, hidden: new Set<string>() }
+    expect(sameFilter({ ...base, years: [2015, 2022] }, { ...base, years: [2015, 2022] })).toBe(true)
+    expect(sameFilter({ ...base, years: null }, base)).toBe(true)
+    expect(sameFilter({ ...base, years: [2015, 2022] }, { ...base, years: [2016, 2022] })).toBe(false)
+    expect(sameFilter({ ...base, years: [2015, 2022] }, base)).toBe(false)
   })
 })
