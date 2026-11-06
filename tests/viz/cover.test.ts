@@ -165,8 +165,9 @@ describe('designCover legibility', () => {
   it('never sets the small line below a readable size', () => {
     const long = 'Piano Concerto No. 2 in C Minor, Op. 18: I. Moderato, performed at very great length'
     for (const name of many((i) => `${long} ${i}|Sergei Rachmaninoff and the Philadelphia Orchestra under Eugene Ormandy ${i}`)) {
-      for (const mark of texts(name)) expect(mark.size).toBeGreaterThanOrEqual(1)
-      const small = texts(name).filter((m) => m.size < 8)
+      const marks = texts(name)
+      for (const mark of marks) expect(mark.size).toBeGreaterThanOrEqual(1)
+      const small = marks.filter((m) => m.size < 8)
       for (const mark of small) expect(mark.size).toBeGreaterThanOrEqual(5)
     }
   })
