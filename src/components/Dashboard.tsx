@@ -49,7 +49,7 @@ import { Hero } from './Hero'
 import { Launcher, type LauncherMode } from './Launcher'
 import { LinerNotes } from './LinerNotes'
 import { LoveHate, LoveHateTable } from './LoveHate'
-import { SettingsPanel } from './Panels'
+import { MissingHistoryPanel, SettingsPanel } from './Panels'
 import { PosterStudio } from './PosterStudio'
 import { Pulse } from './Pulse'
 import { Race } from './Race'
@@ -108,6 +108,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const [launcher, setLauncher] = useState<LauncherMode | null>(null)
   // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [missingOpen, setMissingOpen] = useState(result.failures.length > 0)
   // A history with no music at all keeps its podcasts, or there would be nothing to show
   const chosen = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden }), [musicOnly, hasAnyMusic, hidden])
   /*
@@ -389,6 +390,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
   useCloseOnBack(launcher !== null, () => setLauncher(null))
   useCloseOnBack(settingsOpen, () => setSettingsOpen(false))
+  useCloseOnBack(missingOpen, () => setMissingOpen(false))
 
   // Arrow keys deal cards too, except where a slider or the day details want them
   useEffect(() => {
@@ -833,6 +835,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         otherPlays={otherPlays}
         hasAnyMusic={hasAnyMusic}
       />
+      <MissingHistoryPanel open={missingOpen} onClose={() => setMissingOpen(false)} onReset={clearData} failures={result.failures} />
       {/* Paints before the charts are worked out again, so the moment that takes doesn't look like a hang */}
       <p className="dash__updating" role="status">
         {updating ? 'Updating the charts…' : ''}

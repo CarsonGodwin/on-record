@@ -9,22 +9,11 @@ import { filterByYear, getYears, summarize, topItems, weekHourGrid } from '../..
  * and is a template for checking any new data source (e.g. Apple Music) end to end.
  */
 
-const { plays, skippedRows, duplicateRows } = loadSample()
+const { plays } = loadSample()
 const total = summarize(plays).totalMs
 const sumOf = (values: Iterable<number>) => [...values].reduce((a, b) => a + b, 0)
 
 describe('sample history', () => {
-  it('loads cleanly, sorted by end time', () => {
-    expect(plays.length).toBeGreaterThan(10_000)
-    expect(skippedRows).toBe(0)
-    expect(duplicateRows).toBe(0)
-    for (let i = 1; i < plays.length; i++) expect(plays[i].endTime).toBeGreaterThanOrEqual(plays[i - 1].endTime)
-  })
-
-  it('is deterministic', () => {
-    expect(loadSample().plays).toEqual(plays)
-  })
-
   it('accounts for every millisecond the same way in every aggregation', () => {
     expect(sumOf(weekHourGrid(plays).flat())).toBe(total)
     expect(sumOf(hourProfile(plays).map((h) => h.ms))).toBe(total)

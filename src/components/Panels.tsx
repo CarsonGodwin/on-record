@@ -104,6 +104,40 @@ function ModalHead({ title, onClose }: { title: string; onClose: () => void }) {
   )
 }
 
+interface MissingHistoryProps {
+  open: boolean
+  onClose: () => void
+  onReset: () => void
+  /** What went wrong with each file */
+  failures: string[]
+}
+
+/**
+ * Says up front when some files couldn't be read. The charts look just as finished
+ * without them, and on a phone's deck there's no Load details to find out from.
+ */
+export function MissingHistoryPanel({ open, onClose, onReset, failures }: MissingHistoryProps) {
+  return (
+    <Modal open={open} onClose={onClose} label="Part of your history is missing" className="modal--panel">
+      <ModalHead title="Part of your history is missing" onClose={onClose} />
+      <ul className="missing__files">
+        {[...new Set(failures)].map((failure) => (
+          <li key={failure}>{failure}</li>
+        ))}
+      </ul>
+      <p className="settings__note">The charts only show the files that did load. To include the rest, start over and add all your files together.</p>
+      <div className="missing__actions">
+        <button type="button" className="button button--small" onClick={onClose}>
+          Show what loaded
+        </button>
+        <button type="button" className="button button--ghost button--small" onClick={onReset}>
+          Start over
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 interface SettingsProps {
   open: boolean
   onClose: () => void

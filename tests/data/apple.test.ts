@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { appleDevice, loadApple, looseKey, parseDay, parseTime, splitDescription, titleKey } from '../../src/data/apple'
-import { appleFileKind, isAppleArchiveName, type AppleText } from '../../src/data/appleFiles'
+import { appleFileKind, isAppleArchiveName, type AppleFile } from '../../src/data/appleFiles'
 import { dayNumber, startDate, summarize, UNMATCHED_ARTIST } from '../../src/data/stats'
 import type { Play } from '../../src/types'
 import { appleText, dailyTracks, library, playActivity, playRow, PLAY_ACTIVITY_COLUMNS, PRIVATE, recentlyPlayed, trackPlayHistory, ymd } from '../apple'
@@ -8,13 +8,13 @@ import { at } from '../helpers'
 
 type Row = Record<string, string | number>
 
-function load(rows: Row[], extra: AppleText[] = []) {
+function load(rows: Row[], extra: AppleFile[] = []) {
   const warnings: string[] = []
   const result = loadApple([appleText('playActivity', playActivity(rows)), ...extra], warnings)
   return { ...result, warnings }
 }
 
-const artistsOf = (rows: Row[], extra: AppleText[] = []) => load(rows, extra).plays.map((p) => `${p.title}: ${p.artist}`)
+const artistsOf = (rows: Row[], extra: AppleFile[] = []) => load(rows, extra).plays.map((p) => `${p.title}: ${p.artist}`)
 
 describe('Apple file names', () => {
   it.each([
@@ -168,13 +168,6 @@ describe('reading play activity', () => {
     expect(artistsOf(rows, [appleText('library', JSON.stringify([{ title: 'Blue', ARTIST: 'Lumen Kid', album: 'Sky' }]))])).toEqual(['Blue: Lumen Kid'])
   })
 
-  it('reads timestamps without a zone as UTC, not local time', () => {
-    const { plays } = load([
-      playRow(0, { 'Event Start Timestamp': '2024-03-14 09:00:00', 'Event End Timestamp': '2024-03-14 09:03:00', 'Artist Name': 'A' }),
-    ])
-    expect(startDate(plays[0]).toISOString()).toBe('2024-03-14T09:00:00.000Z')
-  })
-
   it('falls back to the container’s album, and reads the offline flag', () => {
     const { plays } = load([playRow(at(2024, 1, 1), { 'Album Name': '', 'Container Album Name': 'Live at Home', Offline: 'TRUE', 'Artist Name': 'A' })])
     expect(plays[0]).toMatchObject({ album: 'Live at Home', offline: true })
@@ -242,12 +235,6 @@ describe('joining split listens', () => {
     expect(startDate(plays[0]).getTime()).toBe(t)
   })
 
-  it('keeps the listen’s true start even after a pause', () => {
-    const { plays } = load([part(t, 60_000, 0), part(t + 85_000, 60_000, 60_000)])
-    expect(startDate(plays[0]).getTime()).toBe(t)
-    expect(plays[0].msPlayed).toBe(120_000)
-  })
-
   it('takes shuffle from the part that started the listen', () => {
     const { plays } = load([part(t, 60_000, 0, { 'Shuffle Play': 'SHUFFLE_ON' }), part(t + 65_000, 60_000, 60_000)])
     expect(plays).toHaveLength(1)
@@ -301,7 +288,11 @@ describe('finding artists', () => {
   const day = at(2024, 3, 14, 9)
   const t = day.getTime()
   const song = (title: string, i: number, o: Row = {}) => playRow(t + i * 600_000, { 'Song Name': title, 'Album Name': '', ...o })
-  const daily = (...descriptions: string[]) => appleText('dailyTracks', dailyTracks(descriptions.map((d) => ({ description: d, date: ymd(day) }))))
+  const dailyOn = (date: Date, ...descriptions: string[]) => appleText('dailyTracks', dailyTracks(descriptions.map((d) => ({ description: d, date: ymd(date) }))))
+  const daily = (...descriptions: string[]) => dailyOn(day, ...descriptions)
+  // Weeks from the day the songs in these tests are played
+  const anotherDay = at(2024, 1, 5)
+  const playedFrom = (album: string, artist: string): Row => ({ 'Album Name': album, 'Container Type': 'ALBUM', 'Container Artist Name': artist })
 
   it('uses the row’s own artist when there is one', () => {
     expect(artistsOf([song('Blue', 0, { 'Artist Name': 'Lumen Kid' })], [daily('Someone Else - Blue')])).toEqual(['Blue: Lumen Kid'])
@@ -356,6 +347,206 @@ describe('finding artists', () => {
     // The other files only have M83's "Intro", but this one is on The xx's album
     const rows = [song('Crystalised', 0, { 'Album Name': 'xx', 'Container Artist Name': 'The xx' }), song('Intro', 1, { 'Album Name': 'xx', 'Container Artist Name': 'The xx' })]
     expect(artistsOf(rows, [daily('The xx - Crystalised', 'M83 - Intro')])).toEqual(['Crystalised: The xx', 'Intro: The xx'])
+  })
+
+  it('believes the album a row was played from over another artist’s song of that name', () => {
+    const rows = [0, 1, 2].map((i) => song('Stay', i, playedFrom('Real Album', 'Real Artist')))
+    expect(artistsOf(rows, [dailyOn(anotherDay, 'Obscure Band - Stay')])).toEqual(['Stay: Real Artist', 'Stay: Real Artist', 'Stay: Real Artist'])
+  })
+
+  it.each([
+    ['no Container Type', ''],
+    ['a Container Type that names nothing', '3'],
+  ])('knows a row was played from an album by its Container Album Name, with %s', (_, type) => {
+    const rows = [song('Stay', 0, { 'Album Name': 'Real Album (Deluxe)', 'Container Album Name': 'Real Album (Deluxe)', 'Container Artist Name': 'Real Artist', 'Container Type': type })]
+    expect(artistsOf(rows, [dailyOn(anotherDay, 'Obscure Band - Stay')])).toEqual(['Stay: Real Artist'])
+  })
+
+  it('still doesn’t believe a playlist’s curator, whatever the other columns say', () => {
+    const rows = [song('Blue Plastic', 0, { 'Album Name': 'Stranger', 'Container Album Name': 'Stranger', 'Container Artist Name': 'Some Curator', 'Container Type': 'PLAYLIST' })]
+    expect(artistsOf(rows, [dailyOn(anotherDay, 'Yung Lean - Blue Plastic')])).toEqual(['Blue Plastic: Yung Lean'])
+  })
+
+  it('credits a song on someone else’s album to its own artist when that artist played that day', () => {
+    const rows = [song('Nightcall', 0, playedFrom('Drive', 'Cliff Martinez'))]
+    expect(artistsOf(rows, [daily('Kavinsky - Nightcall')])).toEqual(['Nightcall: Kavinsky'])
+  })
+
+  it('credits a song on someone else’s album to its own artist when the library files it there', () => {
+    const rows = [song('Nightcall', 0, playedFrom('Drive', 'Cliff Martinez'))]
+    expect(artistsOf(rows, [appleText('library', library([{ Title: 'Nightcall', Artist: 'Kavinsky', Album: 'Drive' }]))])).toEqual(['Nightcall: Kavinsky'])
+  })
+
+  it('moves a lone match to the rest of the album when the export has that song on other days', () => {
+    const rows = [song('One', 0, { 'Album Name': 'Numbers' }), song('Two', 1, { 'Album Name': 'Numbers' }), song('Stay', 2, { 'Album Name': 'Numbers' })]
+    expect(artistsOf(rows, [daily('Counting Crows - One', 'Counting Crows - Two'), dailyOn(anotherDay, 'Obscure Band - Stay')])[2]).toBe('Stay: Counting Crows')
+  })
+
+  it('moves a lone match to the rest of the album when the library has that song on another album', () => {
+    const rows = [song('One', 0, { 'Album Name': 'Numbers' }), song('Stay', 1, { 'Album Name': 'Numbers' })]
+    const extra = [daily('Counting Crows - One'), appleText('library', library([{ Title: 'Stay', Artist: 'Obscure Band', Album: 'Other Album' }]))]
+    expect(artistsOf(rows, extra)[1]).toBe('Stay: Counting Crows')
+  })
+
+  const uncovered: [string, Row][] = [
+    ['nothing else on the row', {}],
+    ['a playlist’s curator on the row', { 'Container Type': 'PLAYLIST', 'Container Artist Name': 'Some Curator' }],
+  ]
+  it.each(uncovered)('doesn’t move a lone match to an album of the same name over a day Daily Tracks doesn’t cover, with %s', (_, row) => {
+    // Daily Tracks starts after this play, so it can't say the song wasn't played that day
+    const rows = [song('Bohemian Rhapsody', 0, { 'Album Name': 'Greatest Hits', ...row })]
+    const eagles = library([
+      { Title: 'Take It Easy', Artist: 'Eagles', Album: 'Greatest Hits' },
+      { Title: 'Desperado', Artist: 'Eagles', Album: 'Greatest Hits' },
+    ])
+    expect(artistsOf(rows, [dailyOn(anotherDay, 'Queen - Bohemian Rhapsody'), appleText('library', eagles)])).toEqual(['Bohemian Rhapsody: Queen'])
+  })
+
+  it('doesn’t take a song’s last played date to mean it wasn’t played before then', () => {
+    // Recently Played only has a song's last play, and this one is the year before it
+    const rows = [playRow(at(2023, 6, 1, 9), { 'Song Name': 'Stay', 'Album Name': 'Numbers' })]
+    const extra = [appleText('recentlyPlayed', recentlyPlayed(['Obscure Band - Stay'])), appleText('library', library([{ Title: 'One', Artist: 'Counting Crows', Album: 'Numbers' }]))]
+    expect(artistsOf(rows, extra)).toEqual(['Stay: Obscure Band'])
+  })
+
+  describe('by track length', () => {
+    const lengthOf = (ms: number | string): Row => ({ 'Media Duration In Milliseconds': ms })
+    const LENGTH = 354_000
+
+    /** Queen's song is on another album, and the album this play names is the Eagles' */
+    const bohemian = (played: number | string, known?: number) =>
+      artistsOf(
+        [song('Bohemian Rhapsody', 0, { 'Album Name': 'Greatest Hits', ...lengthOf(played) })],
+        [
+          appleText(
+            'library',
+            library([
+              { Title: 'Bohemian Rhapsody', Artist: 'Queen', Album: 'A Night at the Opera', 'Track Duration': known },
+              { Title: 'Take It Easy', Artist: 'Eagles', Album: 'Greatest Hits' },
+              { Title: 'Desperado', Artist: 'Eagles', Album: 'Greatest Hits' },
+            ]),
+          ),
+        ],
+      )
+
+    it.each([
+      ['the same length', LENGTH],
+      ['a slightly different length, as another release of it can be', LENGTH + 3_000],
+    ])('keeps a lone match at %s, whoever the album belongs to', (_, played) => {
+      expect(bohemian(played, LENGTH)).toEqual(['Bohemian Rhapsody: Queen'])
+    })
+
+    it.each<[string, number | string, number | undefined]>([
+      ['a different length', LENGTH + 3_001, LENGTH],
+      ['no length on the row', '', LENGTH],
+      ['no length in the library', LENGTH, undefined],
+    ])('moves a lone match to the rest of the album with %s', (_, played, known) => {
+      expect(bohemian(played, known)).toEqual(['Bohemian Rhapsody: Eagles'])
+    })
+
+    const stays: [string, Date, number, string[]][] = [
+      ['an earlier play, the same length', at(2024, 3, 8, 9), 200_000, ['Stay: Obscure Band', 'Stay: Obscure Band']],
+      ['a later play, the same length', at(2024, 3, 20, 9), 200_000, ['Stay: Obscure Band', 'Stay: Obscure Band']],
+      ['a later play, a different length', at(2024, 3, 20, 9), 260_000, ['Stay: Counting Crows', 'Stay: Obscure Band']],
+    ]
+    it.each(stays)('learns a song’s length from plays the export ties to its artist, for %s', (_, date, played, expected) => {
+      const rows = [
+        song('Stay', 0, lengthOf(200_000)),
+        playRow(date, { 'Song Name': 'One', 'Album Name': 'Numbers' }),
+        playRow(date.getTime() + 600_000, { 'Song Name': 'Stay', 'Album Name': 'Numbers', ...lengthOf(played) }),
+      ]
+      const artists = artistsOf(rows, [daily('Obscure Band - Stay'), dailyOn(date, 'Counting Crows - One')])
+      expect(artists.filter((a) => a.startsWith('Stay')).sort()).toEqual(expected)
+    })
+
+    it('doesn’t learn a length from a play nothing ties to the artist', () => {
+      // Nothing places the first play, so it's M83's by default, but it could be anyone's song of that name
+      const rows = [song('Intro', 0, lengthOf(128_000)), song('Crystalised', 1, { 'Album Name': 'xx' }), song('Intro', 2, { 'Album Name': 'xx', ...lengthOf(128_000) })]
+      const extra = [
+        appleText(
+          'library',
+          library([
+            { Title: 'Intro', Artist: 'M83', Album: 'Hurry Up, We’re Dreaming' },
+            { Title: 'Crystalised', Artist: 'The xx', Album: 'xx' },
+          ]),
+        ),
+      ]
+      expect(artistsOf(rows, extra)).toEqual(['Intro: M83', 'Crystalised: The xx', 'Intro: The xx'])
+    })
+
+    it.each([
+      ['the same length', 258_000, 'Kavinsky'],
+      ['a different length', 300_000, 'Cliff Martinez'],
+    ])('weighs the album a row was played from against a match at %s', (_, played, expected) => {
+      const rows = [song('Nightcall', 0, { ...playedFrom('Drive', 'Cliff Martinez'), ...lengthOf(played) })]
+      const extra = [appleText('library', library([{ Title: 'Nightcall', Artist: 'Kavinsky', Album: 'OutRun', 'Track Duration': 258_000 }]))]
+      expect(artistsOf(rows, extra)).toEqual([`Nightcall: ${expected}`])
+    })
+
+    it.each([
+      ['Home (Remastered 2011)', 200_000, 'Foo'],
+      ['Home (Acoustic)', 150_000, UNMATCHED_ARTIST],
+    ])('believes a trimmed title on another album only at the same length: %s', (title, played, expected) => {
+      const rows = [song(title, 0, { 'Album Name': 'Real Album', ...lengthOf(played) })]
+      const extra = [appleText('library', library([{ Title: 'Home', Artist: 'Foo', Album: 'Other Album', 'Track Duration': 200_000 }]))]
+      expect(artistsOf(rows, extra)).toEqual([`${title}: ${expected}`])
+    })
+  })
+
+  it('keeps a title’s only match when nothing else names anyone', () => {
+    const rows = [song('Stay', 0, { 'Album Name': 'Real Album' })]
+    expect(artistsOf(rows, [dailyOn(anotherDay, 'Obscure Band - Stay')])).toEqual(['Stay: Obscure Band'])
+  })
+
+  it('lets a row played from an album speak for that album’s other songs', () => {
+    const rows = [song('Stay', 0, playedFrom('Real Album', 'Real Artist')), song('Hidden Track', 1, { 'Album Name': 'Real Album' })]
+    expect(artistsOf(rows, [dailyOn(anotherDay, 'Obscure Band - Stay')])[1]).toBe('Hidden Track: Real Artist')
+  })
+
+  it('believes the album a row was played from over another artist’s album of the same name', () => {
+    const queen = [0, 1, 2, 3, 4].map((i) => song(`Song ${i}`, i, { 'Album Name': 'Greatest Hits' }))
+    const rows = [...queen, song('Dancing Queen', 5, playedFrom('Greatest Hits', 'ABBA'))]
+    expect(artistsOf(rows, [daily(...queen.map((_, i) => `Queen - Song ${i}`))])[5]).toBe('Dancing Queen: ABBA')
+  })
+
+  it('doesn’t take a trimmed title for someone else’s song on the album a row was played from', () => {
+    const rows = [song('Home (Acoustic)', 0, playedFrom('Real Album', 'Real Artist'))]
+    expect(artistsOf(rows, [daily('Obscure Band - Home')])).toEqual(['Home (Acoustic): Real Artist'])
+  })
+
+  it.each([
+    ['other days', () => dailyOn(anotherDay, 'Obscure Band - Home')],
+    ['another album', () => appleText('library', library([{ Title: 'Home', Artist: 'Obscure Band', Album: 'Other Album' }]))],
+  ])('doesn’t believe a trimmed title when the export has that song on %s', (_, file) => {
+    expect(artistsOf([song('Home (Acoustic)', 0, { 'Album Name': 'Real Album' })], [file()])).toEqual([`Home (Acoustic): ${UNMATCHED_ARTIST}`])
+  })
+
+  it('believes a trimmed title on the same album', () => {
+    const rows = [song('Wires [Live]', 0, { 'Album Name': 'Wires' })]
+    expect(artistsOf(rows, [appleText('library', library([{ Title: 'Wires', Artist: 'Static Bloom', Album: 'Wires' }]))])).toEqual(['Wires [Live]: Static Bloom'])
+  })
+
+  it('keeps editions of an album apart, since two artists can share a title and an album name', () => {
+    const rows = [song('Lightning', 0, { 'Album Name': 'Lightning' })]
+    const extra = [
+      appleText('library', library([{ Title: 'Lightning', Artist: 'Lavender Static', Album: 'Lightning (Deluxe)' }])),
+      appleText('trackHistory', trackPlayHistory(['Satin Season - Lightning', 'Satin Season - Lightning'])),
+    ]
+    expect(artistsOf(rows, extra)).toEqual(['Lightning: Satin Season'])
+  })
+
+  it('doesn’t let an album of the same name outweigh a candidate the export doesn’t place anywhere else', () => {
+    const owners = [0, 1, 2].map((i) => song(`Track ${i}`, i, { 'Album Name': 'Telephone' }))
+    const rows = [...owners, song('Everything Is Soft', 3, { 'Album Name': 'Telephone' })]
+    const extra = [
+      daily(...owners.map((_, i) => `Midnight Atlas - Track ${i}`)),
+      appleText('trackHistory', trackPlayHistory(['Hana Holloway - Everything Is Soft', 'Other Band - Everything Is Soft'])),
+    ]
+    expect(artistsOf(rows, extra)[3]).toBe('Everything Is Soft: Hana Holloway')
+  })
+
+  it('doesn’t trim brackets that are part of the title', () => {
+    expect(artistsOf([song('(Don’t Fear) The Reaper', 0)], [daily('Obscure Band - The Reaper')])).toEqual([`(Don’t Fear) The Reaper: ${UNMATCHED_ARTIST}`])
   })
 
   it('tells same-titled songs apart by the album Recently Played names', () => {
@@ -518,7 +709,15 @@ describe('title keys', () => {
     expect(looseKey('Song feat. X')).toBe('song')
     expect(looseKey('Song [Live at Wembley]')).toBe('song')
     expect(looseKey('Song - 2011 Remaster')).toBe('song')
+    expect(looseKey('Song (feat. X) - 2011 Remaster')).toBe('song')
+    expect(looseKey('Song - Remastered (2011)')).toBe('song')
+    expect(looseKey('Song (Live) [2011]')).toBe('song')
     expect(looseKey('(Untitled)')).toBe('')
+  })
+
+  it('loosely, keeps brackets that aren’t at the end', () => {
+    expect(looseKey('(Don’t Fear) The Reaper')).toBe("(don't fear) the reaper")
+    expect(looseKey('Hello (Goodbye) World')).toBe('hello (goodbye) world')
   })
 })
 

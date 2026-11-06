@@ -1072,6 +1072,12 @@ th {
   margin: 0;
 }
 
+.pressing p.pressing__sub {
+  margin-top: -12px;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
 .pressing__record {
   width: 180px;
   aspect-ratio: 1;
@@ -5066,6 +5072,22 @@ kbd {
 
 .settings__foot {
   color: var(--faint);
+}
+
+.missing__files {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.missing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .switch {

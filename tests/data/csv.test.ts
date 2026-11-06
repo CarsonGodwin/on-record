@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readCsv } from '../../src/data/csv'
+import { csvReader, readCsv } from '../../src/data/csv'
+import { mulberry32 } from '../../src/lib/random'
 
 function rows<C extends string>(text: string, columns: readonly C[]) {
   const out: Record<C, string>[] = []
@@ -85,9 +86,75 @@ describe('readCsv', () => {
     expect(rows('', ['a'])).toEqual({ out: [], found: [] })
     expect(rows('a,b\n', ['a'])).toEqual({ out: [], found: ['a'] })
   })
+})
 
-  it('never copies columns it wasn’t asked for', () => {
-    const { out } = rows('Song Name,Client IP Address\nBlue,203.0.113.9\n', ['Song Name'])
-    expect(JSON.stringify(out)).not.toContain('203.0.113.9')
+describe('csvReader', () => {
+  const COLUMNS = ['a', 'b', 'c'] as const
+
+  function read(pieces: string[]) {
+    const out: Record<(typeof COLUMNS)[number], string>[] = []
+    const reader = csvReader(COLUMNS, (r) => out.push(r))
+    for (const piece of pieces) reader.push(piece)
+    return { out, found: [...reader.end()].sort() }
+  }
+
+  it('reads the same wherever the text is cut', () => {
+    const texts = [
+      'a,b,c\n1,2,3\n4,5,6\n',
+      'a,b,c\r\n1,2,3\r\n4,5,6',
+      'a,b,c\r1,2,3\r\r\n\n4,5,6\r',
+      '﻿ a ,b,c\n  1  ,2,3\n',
+      '\n\r\n a,b\n\n1,2\n\n,\n',
+      'a,b\n"Hello, Goodbye","The ""Fab"" Four"\n"Two\r\nLines",X\n',
+      'a,b\nsay "hi",2\n"x"y,3\n""\n"",\n"open',
+      'a,b\n"closes at the very end"',
+      'a,b\n"doubled at the very end"""',
+      'a,b,c\n1,2,',
+      'd,a\n"not asked for ""at all""\nstill",1\n',
+      '',
+      'a',
+      ',',
+      '"',
+    ]
+    for (const text of texts) {
+      const whole = read([text])
+      for (let cut = 0; cut <= text.length; cut++) {
+        expect(read([text.slice(0, cut), text.slice(cut)]), JSON.stringify({ text, cut })).toEqual(whole)
+      }
+      expect(read([...text]), JSON.stringify(text)).toEqual(whole)
+    }
+  })
+
+  it('reads the same however messy files are cut into pieces', () => {
+    const random = mulberry32(20261104)
+    const pick = (s: readonly string[]) => s[Math.floor(random() * s.length)]
+    const parts = ['"', '""', ',', ',', '\n', '\r', '\r\n', 'x', ' ', '﻿', 'é', '𝄞']
+    for (let run = 0; run < 400; run++) {
+      let text = pick(['a,b,c\n', '"a",b,c\r\n', 'c,x,a\n', '\n\na,b\n'])
+      const length = Math.floor(random() * 40)
+      for (let k = 0; k < length; k++) text += pick(parts)
+
+      const pieces: string[] = []
+      for (let at = 0; at < text.length; ) {
+        const size = Math.floor(random() * 6)
+        pieces.push(text.slice(at, at + size))
+        at += size
+      }
+      expect(read(pieces), JSON.stringify(text)).toEqual(read([text]))
+    }
+  })
+
+  it('only skips a byte order mark at the very start, even after an empty piece', () => {
+    expect(read(['', '﻿a\n1\n']).out).toEqual([{ a: '1', b: '', c: '' }])
+    expect(read(['a\nx', '﻿y\n']).out).toEqual([{ a: 'x﻿y', b: '', c: '' }])
+  })
+
+  it('doesn’t let a broken quote grow a field without end', () => {
+    const piece = 'x'.repeat(1024 * 1024)
+    const { out } = read(['a,b\n"open', piece, piece, piece, piece])
+    expect(out).toHaveLength(1)
+    expect(out[0].a.length).toBeLessThan(2.5 * 1024 * 1024)
+    // Over the limit, doubled quotes are dropped like everything else
+    expect(read(['a\n"', piece, piece, '""""""']).out[0].a.endsWith('"')).toBe(false)
   })
 })

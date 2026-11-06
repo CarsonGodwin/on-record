@@ -1,4 +1,5 @@
-import type { AppleFileKind, AppleText } from '../src/data/appleFiles'
+import { playActivityReader } from '../src/data/apple'
+import type { AppleFile, AppleFileKind } from '../src/data/appleFiles'
 import { normalizePlatform } from '../src/data/parse'
 import type { RawStreamRecord } from '../src/types'
 
@@ -240,7 +241,7 @@ export function trackPlayHistory(descriptions: string[]): string {
   )
 }
 
-export function library(tracks: { Title: string; Artist: string; Album?: string }[]): string {
+export function library(tracks: { Title: string; Artist: string; Album?: string; 'Track Duration'?: number }[]): string {
   return JSON.stringify(tracks.map((t, i) => ({ 'Track Identifier': i + 1, ...t, Genre: 'Pop', 'Date Added To Library': '2020-01-01T00:00:00Z' })))
 }
 
@@ -252,8 +253,12 @@ export const FILE_NAMES: Record<AppleFileKind, string> = {
   library: 'Apple Music Library Tracks.json',
 }
 
-export function appleText(kind: AppleFileKind, text: string): AppleText {
-  return { kind, name: FILE_NAMES[kind], text }
+/** A file as the loader hands it over: the play activity already parsed, the rest as text */
+export function appleText(kind: AppleFileKind, text: string): AppleFile {
+  if (kind !== 'playActivity') return { kind, name: FILE_NAMES[kind], text }
+  const reader = playActivityReader()
+  reader.push(text)
+  return { kind, name: FILE_NAMES[kind], activity: reader.end() }
 }
 
 /** A local date as Daily Tracks writes it: 20240314 */
@@ -268,7 +273,7 @@ export function ymd(d: Date): string {
  * Apple's own playlists (its "artist" is Apple Music) and the rest have neither.
  * Songs played often are in the library.
  */
-export function appleExportFrom(records: RawStreamRecord[]): AppleText[] {
+export function appleExportFrom(records: RawStreamRecord[]): AppleFile[] {
   const tracks = records.filter((r) => r.master_metadata_track_name !== null)
   const lengths = new Map<string, number>()
   for (const r of tracks) lengths.set(r.spotify_track_uri ?? '', Math.max(lengths.get(r.spotify_track_uri ?? '') ?? 0, r.ms_played))
@@ -288,6 +293,8 @@ export function appleExportFrom(records: RawStreamRecord[]): AppleText[] {
         'Song Name': title,
         'Album Name': album,
         'Container Artist Name': from === 0 ? artist : from === 1 ? 'Apple Music' : '',
+        'Container Album Name': from === 0 ? album : '',
+        'Container Type': from === 0 ? 'ALBUM' : from === 1 ? 'PLAYLIST' : '',
         'Play Duration Milliseconds': r.ms_played,
         'Media Duration In Milliseconds': lengths.get(r.spotify_track_uri ?? '') ?? 0,
         'End Reason Type': r.skipped ? 'TRACK_SKIPPED_FORWARDS' : 'NATURAL_END_OF_TRACK',

@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 import type { DataSource, LoadResult, Play } from '../types'
-import { appleFileKind, isAppleArchiveName, type AppleText } from './appleFiles'
+import { appleFileKind, isAppleArchiveName, type AppleFile } from './appleFiles'
 import { isBasicHistoryRecord, isStreamRecord, toPlay } from './parse'
 import { generateSampleRecords } from './sample'
 
@@ -13,13 +13,21 @@ interface Batch {
 /** The history files found in what was dropped, by service, in the order they were found */
 interface Found {
   spotify: Batch[]
-  apple: AppleText[]
-  /** An Apple Music file or archive was skipped for its size, which has already been explained */
-  appleTooLarge: boolean
+  apple: AppleFile[]
+  /** An Apple Music file or archive couldn't be used, which has already been explained */
+  appleSkipped: boolean
+  /** The warnings about files that could have held history but weren't read */
+  failures: string[]
 }
 
 function nothing(): Found {
-  return { spotify: [], apple: [], appleTooLarge: false }
+  return { spotify: [], apple: [], appleSkipped: false, failures: [] }
+}
+
+/** A file that could have held history but wasn't read: a warning, and one the dashboard says up front */
+function failed(message: string, warnings: string[], appleSkipped = false): Found {
+  warnings.push(message)
+  return { ...nothing(), appleSkipped, failures: [message] }
 }
 
 /**
@@ -64,7 +72,8 @@ export function isImportFileName(path: string): boolean {
 /**
  * Everything is parsed in the visitor's own tab, so these caps guard against a
  * malicious or corrupt archive (a zip bomb) freezing or crashing it. Real
- * exports are far smaller: a decade of extended history is a few dozen MB.
+ * exports are far smaller: a decade of extended history is a few dozen MB. The
+ * exception is Apple's play activity, which has limits of its own below.
  */
 const MAX_FILE_BYTES = 512 * 1024 * 1024
 const MAX_ENTRY_BYTES = 256 * 1024 * 1024
@@ -74,15 +83,58 @@ const MAX_FILES = 500
 const MAX_ZIP_DEPTH = 2
 /** Zips opened inside one dropped zip. Apple's download needs two (Apple_Media_Services.zip and the zipped library). */
 const MAX_NESTED_ZIPS = 4
+/**
+ * Apple keeps every play in one file, which a heavy listener can push past both
+ * MAX_FILE_BYTES and the longest string a browser will hold (about 512 MiB, past which
+ * Chrome's file.text() quietly returns ''). So that file is read piece by piece, with
+ * limits of its own, which every play activity in an upload shares so that many files
+ * can't multiply them. Holding the plays is what costs memory, so very short rows are
+ * capped by count: years of daily listening come to a fraction of either limit.
+ */
+const PLAY_ACTIVITY_LIMITS: PlayActivityBudget = { bytes: 4 * 1024 * 1024 * 1024, events: 5_000_000 }
 
-/** Reads dropped or picked files (.zip, .json or Apple's .csv) entirely in the browser. */
-export async function loadFiles(files: File[]): Promise<LoadResult> {
+/** What an upload's play activities may still read */
+export interface PlayActivityBudget {
+  bytes: number
+  events: number
+}
+
+/** Hands a file's text to `onText` piece by piece. If `onText` throws, reading stops and the promise rejects with that error. */
+export type TextStream = (onText: (text: string) => void) => Promise<void>
+
+/** Whichever way a browser refuses to read a file, it says so with a DOMException. What a file holds never raises one. */
+function isReadError(err: unknown): boolean {
+  return err instanceof DOMException
+}
+
+/** A file the browser refused to read, usually an online-only iCloud, Dropbox or OneDrive file. Unless it's plainly Spotify's, it could have held the play activity. */
+function unreadable(name: string, warnings: string[]): Found {
+  const message = `${name}: couldn't be read from your computer. If it's in iCloud, Dropbox or OneDrive, make sure it's downloaded, then add it again`
+  return failed(message, warnings, !isHistoryFileName(name))
+}
+
+/**
+ * Reads dropped or picked files (.zip, .json or Apple's .csv) entirely in the browser.
+ * `unreadableNames` are files a dropped folder listed but the browser wouldn't hand over.
+ */
+export async function loadFiles(files: File[], unreadableNames: string[] = []): Promise<LoadResult> {
   const warnings: string[] = []
   if (files.length > MAX_FILES) {
     warnings.push(`Only the first ${MAX_FILES} of ${files.length} files were read`)
     files = files.slice(0, MAX_FILES)
   }
-  const found = await Promise.all(files.map((f) => readFile(f, warnings)))
+  const activity = { ...PLAY_ACTIVITY_LIMITS }
+  const found = await Promise.all(
+    files.map((f) =>
+      readFile(f, warnings, activity).catch((err) => {
+        // A file the browser won't read shouldn't sink the rest of the upload. Anything
+        // else is a bug or a failed import, which the page's own error reports as it is.
+        if (!isReadError(err)) throw err
+        return unreadable(f.name, warnings)
+      }),
+    ),
+  )
+  for (const name of unreadableNames) found.push(unreadable(name, warnings))
   const spotify = readSpotify(
     found.flatMap((f) => f.spotify),
     warnings,
@@ -91,54 +143,57 @@ export async function loadFiles(files: File[]): Promise<LoadResult> {
   // The Apple parser only downloads for people who drop an Apple export
   const apple =
     appleFiles.length > 0
-      ? (await import('./apple')).loadApple(appleFiles, warnings, { spotify: spotify.plays, skippedFiles: found.some((f) => f.appleTooLarge) })
+      ? (await import('./apple')).loadApple(appleFiles, warnings, { spotify: spotify.plays, skippedFiles: found.some((f) => f.appleSkipped) })
       : null
-  return collect({ spotify, apple }, warnings)
+  return collect({ spotify, apple }, warnings, found.flatMap((f) => f.failures))
 }
 
 /** Builds the same LoadResult from generated data, for visitors without an export. */
 export function loadSample(): LoadResult {
-  return collect({ spotify: readSpotify([{ name: 'Sample data', rows: generateSampleRecords() }], []), apple: null }, [])
+  return collect({ spotify: readSpotify([{ name: 'Sample data', rows: generateSampleRecords() }], []), apple: null }, [], [])
 }
 
-async function readFile(file: File, warnings: string[]): Promise<Found> {
+async function readFile(file: File, warnings: string[], activity: PlayActivityBudget): Promise<Found> {
   const lower = file.name.toLowerCase()
   const found = nothing()
+  const appleKind = appleFileKind(file.name)
+  const isJson = lower.endsWith('.json')
+  const isVideo = /video/i.test(lower)
 
-  if (file.size > MAX_FILE_BYTES) {
-    warnings.push(`${file.name}: skipped (too large to open safely in the browser)`)
-    found.appleTooLarge = appleFileKind(file.name) !== null
-    return found
+  // A large file that could never have held history gets the warning below like any other, not a report of history going missing
+  const couldHoldHistory = appleKind !== null || lower.endsWith('.zip') || (isJson && !isVideo)
+  if (couldHoldHistory && file.size > (appleKind === 'playActivity' ? PLAY_ACTIVITY_LIMITS.bytes : MAX_FILE_BYTES)) {
+    return failed(`${file.name}: skipped (too large to open safely in the browser)`, warnings, appleKind !== null)
   }
 
   if (lower.endsWith('.zip')) {
     let zip: JSZip
     try {
       zip = await JSZip.loadAsync(file)
-    } catch {
-      warnings.push(`${file.name}: couldn't open this zip file`)
-      return found
+    } catch (err) {
+      // A file the browser can't read isn't a bad zip; loadFiles explains that one
+      if (isReadError(err)) throw err
+      return failed(`${file.name}: couldn't open this zip file`, warnings)
     }
-    const inside = await readZip(zip, warnings, 0, { entries: MAX_ENTRIES, archives: MAX_NESTED_ZIPS })
-    if (inside.spotify.length === 0 && inside.apple.length === 0 && !inside.appleTooLarge) {
+    const inside = await readZip(zip, warnings, 0, { entries: MAX_ENTRIES, archives: MAX_NESTED_ZIPS }, activity)
+    if (inside.spotify.length === 0 && inside.apple.length === 0 && inside.failures.length === 0) {
       warnings.push(`${file.name}: no streaming history files found inside`)
     }
     return inside
   }
 
-  const appleKind = appleFileKind(file.name)
+  if (appleKind === 'playActivity') return readPlayActivity(file.name, fileText(file), warnings, activity)
   if (appleKind) {
     found.apple.push({ kind: appleKind, name: file.name, text: await file.text() })
     return found
   }
 
-  if (lower.endsWith('.json')) {
-    if (/video/i.test(lower)) {
+  if (isJson) {
+    if (isVideo) {
       warnings.push(`${file.name}: skipped (video history isn't supported yet)`)
       return found
     }
-    found.spotify.push({ name: file.name, rows: parseJson(await file.text(), file.name, warnings) })
-    return found
+    return spotifyFile(file.name, await file.text(), warnings)
   }
 
   warnings.push(
@@ -150,7 +205,7 @@ async function readFile(file: File, warnings: string[]): Promise<Found> {
 }
 
 /** Reads the history files in a zip, opening the zips Apple nests inside its export */
-async function readZip(zip: JSZip, warnings: string[], depth: number, budget: ZipBudget): Promise<Found> {
+async function readZip(zip: JSZip, warnings: string[], depth: number, budget: ZipBudget, activity: PlayActivityBudget): Promise<Found> {
   const found = nothing()
   const entries: JSZip.JSZipObject[] = []
   for (const e of Object.values(zip.files)) {
@@ -165,12 +220,12 @@ async function readZip(zip: JSZip, warnings: string[], depth: number, budget: Zi
 
     // The declared size isn't in JSZip's public types, and a lying header only
     // delays the check, so treat a missing value as unknown rather than unsafe.
-    // Apple keeps all its plays in one file, so that one gets the whole-file limit.
     const size = (e as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize
-    const limit = archive || kind === 'playActivity' ? MAX_FILE_BYTES : MAX_ENTRY_BYTES
+    const limit = kind === 'playActivity' ? PLAY_ACTIVITY_LIMITS.bytes : archive ? MAX_FILE_BYTES : MAX_ENTRY_BYTES
     if (typeof size === 'number' && size > limit) {
-      warnings.push(`${baseName(e.name)}: skipped (unusually large once unzipped)`)
-      if (kind !== 'spotify') found.appleTooLarge = true
+      const skipped = failed(`${baseName(e.name)}: skipped (unusually large once unzipped)`, warnings, kind !== 'spotify')
+      found.failures.push(...skipped.failures)
+      found.appleSkipped ||= skipped.appleSkipped
       continue
     }
     entries.push(e)
@@ -180,40 +235,114 @@ async function readZip(zip: JSZip, warnings: string[], depth: number, budget: Zi
   const results = await Promise.all(
     entries.map(async (e): Promise<Found> => {
       const name = baseName(e.name)
-      if (isHistoryFileName(e.name)) {
-        return { ...nothing(), spotify: [{ name, rows: parseJson(await e.async('string'), name, warnings) }] }
-      }
-      const kind = appleFileKind(e.name)
-      if (kind) return { ...nothing(), apple: [{ kind, name, text: await e.async('string') }] }
-
-      const bytes = await e.async('uint8array')
-      if (bytes.byteLength > MAX_FILE_BYTES) {
-        warnings.push(`${name}: skipped (unusually large once unzipped)`)
-        return { ...nothing(), appleTooLarge: true }
-      }
-      let inner: JSZip
       try {
-        inner = await JSZip.loadAsync(bytes)
-      } catch {
-        warnings.push(`${name}: couldn't open this zip file`)
-        return nothing()
+        if (isHistoryFileName(e.name)) return spotifyFile(name, await e.async('string'), warnings)
+        const kind = appleFileKind(e.name)
+        if (kind === 'playActivity') return await readPlayActivity(name, entryText(e), warnings, activity)
+        if (kind) return { ...nothing(), apple: [{ kind, name, text: await e.async('string') }] }
+
+        const bytes = await e.async('uint8array')
+        if (bytes.byteLength > MAX_FILE_BYTES) return failed(`${name}: skipped (unusually large once unzipped)`, warnings, true)
+        let inner: JSZip
+        try {
+          inner = await JSZip.loadAsync(bytes)
+        } catch {
+          return failed(`${name}: couldn't open this zip file`, warnings)
+        }
+        return await readZip(inner, warnings, depth + 1, budget, activity)
+      } catch (err) {
+        // A bug or a failed import, not a bad entry: the page's own error reports it as it is
+        if (err instanceof TypeError) throw err
+        // The zip's already in memory, so the browser isn't what stopped this. The other entries are still good.
+        return failed(`${name}: couldn't be unzipped, so the zip may be damaged. Try downloading it again`, warnings, !isHistoryFileName(e.name))
       }
-      return readZip(inner, warnings, depth + 1, budget)
     }),
   )
   return {
     spotify: results.flatMap((r) => r.spotify),
     apple: results.flatMap((r) => r.apple),
-    appleTooLarge: found.appleTooLarge || results.some((r) => r.appleTooLarge),
+    appleSkipped: found.appleSkipped || results.some((r) => r.appleSkipped),
+    failures: [...found.failures, ...results.flatMap((r) => r.failures)],
   }
 }
 
-function parseJson(text: string, name: string, warnings: string[]): unknown {
+/**
+ * Parses a play activity as it's read, so it never has to fit in one string. The limits
+ * are checked on what actually arrives, since a zip's stated size can be a lie, and what's
+ * read comes out of `budget`, which the upload's other play activities are drawing on too.
+ */
+export async function readPlayActivity(name: string, stream: TextStream, warnings: string[], budget: PlayActivityBudget): Promise<Found> {
+  const reader = (await import('./apple')).playActivityReader()
+  const tooLarge = new Error('too large')
+  let counted = 0
   try {
-    return JSON.parse(text)
+    await stream((text) => {
+      budget.bytes -= text.length
+      budget.events -= reader.events() - counted
+      counted = reader.events()
+      if (budget.bytes < 0 || budget.events < 0) throw tooLarge
+      reader.push(text)
+    })
+  } catch (err) {
+    if (err !== tooLarge) throw err
+    return failed(`${name}: skipped (too large to open safely in the browser)`, warnings, true)
+  }
+  return { ...nothing(), apple: [{ kind: 'playActivity', name, activity: reader.end() }] }
+}
+
+export function fileText(file: File): TextStream {
+  return async (onText) => {
+    const reader = file.stream().getReader()
+    const decoder = new TextDecoder()
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        onText(decoder.decode(value, { stream: true }))
+      }
+      onText(decoder.decode())
+    } finally {
+      // Stopping early mustn't leave the rest of the file open. Cancelling a stream that
+      // already failed rejects with the error being thrown here anyway, so that's ignored.
+      reader.cancel().catch(() => {})
+    }
+  }
+}
+
+/** The stream behind JSZip's async(), which its types leave out */
+interface EntryStream {
+  on(event: 'data', listener: (text: string) => void): EntryStream
+  on(event: 'end', listener: () => void): EntryStream
+  on(event: 'error', listener: (err: Error) => void): EntryStream
+  pause(): EntryStream
+  resume(): EntryStream
+}
+
+export function entryText(entry: JSZip.JSZipObject): TextStream {
+  return (onText) =>
+    new Promise((resolve, reject) => {
+      const stream = (entry as unknown as { internalStream(type: 'string'): EntryStream }).internalStream('string')
+      stream
+        .on('data', (text) => {
+          // JSZip calls this from its own timer, where nothing would catch an error
+          try {
+            onText(text)
+          } catch (err) {
+            stream.pause()
+            reject(err)
+          }
+        })
+        .on('error', reject)
+        .on('end', resolve)
+        .resume()
+    })
+}
+
+function spotifyFile(name: string, text: string, warnings: string[]): Found {
+  try {
+    return { ...nothing(), spotify: [{ name, rows: JSON.parse(text) }] }
   } catch {
-    warnings.push(`${name}: isn't valid JSON`)
-    return null
+    return failed(`${name}: isn't valid JSON`, warnings)
   }
 }
 
@@ -224,7 +353,6 @@ function readSpotify(batches: Batch[], warnings: string[]): Part {
   let skippedRows = 0
 
   for (const { name, rows } of batches) {
-    if (rows === null) continue // parseJson already warned
     if (!Array.isArray(rows)) {
       warnings.push(`${name}: doesn't look like a streaming history file`)
       continue
@@ -251,7 +379,7 @@ function readSpotify(batches: Batch[], warnings: string[]): Part {
 }
 
 /** Merges each service's plays, drops repeats and sorts the lot by end time */
-function collect(parts: Record<DataSource, Part | null>, warnings: string[]): LoadResult {
+function collect(parts: Record<DataSource, Part | null>, warnings: string[], failures: string[]): LoadResult {
   const plays: Play[] = []
   const filesRead: string[] = []
   const sources: DataSource[] = []
@@ -284,7 +412,7 @@ function collect(parts: Record<DataSource, Part | null>, warnings: string[]): Lo
   }
 
   plays.sort((a, b) => a.endTime - b.endTime)
-  return { plays, filesRead, sources, skippedRows, duplicateRows, unmatchedArtists, warnings }
+  return { plays, filesRead, sources, skippedRows, duplicateRows, unmatchedArtists, warnings, failures }
 }
 
 function baseName(path: string): string {

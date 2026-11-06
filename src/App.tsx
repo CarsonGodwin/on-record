@@ -1,5 +1,6 @@
 import { lazy, Suspense, useRef, useState } from 'react'
 import { DropZone } from './components/DropZone'
+import { isAppleArchiveName, appleFileKind } from './data/appleFiles'
 import { loadFiles, loadSample } from './data/load'
 import type { LoadResult } from './types'
 
@@ -8,7 +9,7 @@ const Dashboard = lazy(() => import('./components/Dashboard').then((m) => ({ def
 
 type State =
   | { status: 'idle' }
-  | { status: 'loading' }
+  | { status: 'loading'; slow: boolean }
   | { status: 'error'; message: string; warnings: string[] }
   | { status: 'ready'; result: LoadResult; isSample: boolean }
 
@@ -49,7 +50,7 @@ export default function App() {
   const howTo = useRef<HTMLDetailsElement>(null)
 
   async function load(getResult: () => Promise<LoadResult> | LoadResult, isSample: boolean) {
-    setState({ status: 'loading' })
+    setState({ status: 'loading', slow: false })
     // Let the loading state render before parsing, which can block the page briefly
     await new Promise((resolve) => setTimeout(resolve, 30))
     try {
@@ -67,13 +68,13 @@ export default function App() {
 
   if (state.status === 'ready') {
     return (
-      <Suspense fallback={<Pressing />}>
+      <Suspense fallback={<Pressing slow={false} />}>
         <Dashboard result={state.result} isSample={state.isSample} onReset={() => setState({ status: 'idle' })} />
       </Suspense>
     )
   }
 
-  if (state.status === 'loading') return <Pressing />
+  if (state.status === 'loading') return <Pressing slow={state.slow} />
 
   return (
     <div className="landing">
@@ -118,7 +119,19 @@ export default function App() {
 
         {/* Your own export is the main way in; the demo is the fallback underneath it */}
         <div className="landing__import">
-          <DropZone onFiles={(files) => load(() => loadFiles(files), false)} />
+          <DropZone
+            onFiles={(picked) =>
+              load(async () => {
+                const { files, unreadable } = await picked
+                // Apple's play activity is far bigger than Spotify's files, so it takes noticeably longer.
+                // A zip we can't name might be either, so only files that look like Apple's say so.
+                if (files.some((f) => appleFileKind(f.name) !== null || isAppleArchiveName(f.name) || /apple/i.test(f.name))) {
+                  setState((s) => (s.status === 'loading' ? { ...s, slow: true } : s))
+                }
+                return loadFiles(files, unreadable)
+              }, false)
+            }
+          />
 
           <div className="landing__demo">
             {/* The export takes days to arrive, so requesting it comes first; the demo is for the wait */}
@@ -256,13 +269,14 @@ export default function App() {
   )
 }
 
-function Pressing() {
+function Pressing({ slow }: { slow: boolean }) {
   return (
     <div className="pressing" role="status">
       <div className="pressing__record" aria-hidden="true" />
       <p>
         Pressing your <em>record</em>…
       </p>
+      {slow && <p className="pressing__sub">Apple Music uploads can take a bit longer.</p>}
     </div>
   )
 }

@@ -81,4 +81,6 @@ export interface LoadResult {
   /** Apple Music plays whose artist couldn't be found anywhere in the export, kept as UNMATCHED_ARTIST (data/stats.ts) */
   unmatchedArtists: number
   warnings: string[]
+  /** The warnings about files that could have held history but weren't read, so the plays may be missing some */
+  failures: string[]
 }
