@@ -118,7 +118,14 @@ export default function App() {
 
         {/* Your own export is the main way in; the demo is the fallback underneath it */}
         <div className="landing__import">
-          <DropZone onFiles={(files) => load(() => loadFiles(files), false)} />
+          <DropZone
+            onFiles={(picked) =>
+              load(async () => {
+                const { files, unreadable } = await picked
+                return loadFiles(files, unreadable)
+              }, false)
+            }
+          />
 
           <div className="landing__demo">
             {/* The export takes days to arrive, so requesting it comes first; the demo is for the wait */}

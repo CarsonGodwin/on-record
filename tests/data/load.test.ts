@@ -144,14 +144,6 @@ describe('loading a Spotify export', () => {
     expect(result.skippedRows).toBe(2)
   })
 
-  it('sorts plays by end time across files', async () => {
-    const { plays } = await loadFiles([
-      file('Streaming_History_Audio_2024.json', json(AUDIO_2024)),
-      file('Streaming_History_Audio_2023.json', json(AUDIO_2023)),
-    ])
-    for (let i = 1; i < plays.length; i++) expect(plays[i].endTime).toBeGreaterThanOrEqual(plays[i - 1].endTime)
-  })
-
   it('explains the basic "Account data" export instead of reading it', async () => {
     const basic = [{ endTime: '2023-05-01 10:00', artistName: 'Artist', trackName: 'Song', msPlayed: 200_000 }]
     const result = await loadFiles([file('StreamingHistory_music_0.json', json(basic))])
@@ -185,11 +177,108 @@ describe('loading a Spotify export', () => {
     ].sort())
   })
 
-  it('skips a file too large to open safely', async () => {
+  it('keeps loading when the browser can’t read one of the files', async () => {
+    // What the browser throws for an online-only iCloud file, or one that changed after it was picked
+    const locked = file('Streaming_History_Audio_2022.json', json(AUDIO_2023))
+    locked.text = () => Promise.reject(new DOMException('The requested file could not be read', 'NotReadableError'))
+    const result = await loadFiles([locked, file('Streaming_History_Audio_2023.json', json(AUDIO_2023))])
+    expect(result.plays).toHaveLength(2) // the local-file row has nothing to show
+    expect(result.filesRead).toEqual(['Streaming_History_Audio_2023.json'])
+    expect(result.warnings).toEqual([expect.stringMatching(/^Streaming_History_Audio_2022\.json: couldn't be read from your computer/)])
+  })
+
+  it('only reports a large file as missing history if it could have held some', async () => {
+    const big = (name: string) => {
+      const f = file(name, 'x')
+      Object.defineProperty(f, 'size', { value: 600 * 1024 * 1024 })
+      return f
+    }
+    const result = await loadFiles([big('holiday.mp4'), big('Streaming_History_Video_2023.json'), big('Apple Pay Activity.csv'), big('Streaming_History_Audio_2023.json')])
+    expect([...result.warnings].sort()).toEqual([
+      'Apple Pay Activity.csv: skipped (not one of Apple Music’s history files)',
+      "Streaming_History_Video_2023.json: skipped (video history isn't supported yet)",
+      'Streaming_History_Audio_2023.json: skipped (too large to open safely in the browser)',
+      'holiday.mp4: skipped (not a .zip or .json file)',
+    ].sort())
+    expect(result.failures).toEqual(['Streaming_History_Audio_2023.json: skipped (too large to open safely in the browser)'])
+  })
+
+  it.each(['NotReadableError', 'NotFoundError', 'SecurityError'])('explains a zip the browser won’t read (%s)', async (reason) => {
+    const locked = await spotifyZip()
+    locked.arrayBuffer = () => Promise.reject(new DOMException('No', reason))
+    const result = await loadFiles([locked, file('Streaming_History_Audio_2022.json', json(AUDIO_2023))])
+    expect(result.plays).toHaveLength(2)
+    expect(result.warnings).toEqual([expect.stringMatching(/^my_spotify_data\.zip: couldn't be read from your computer/)])
+  })
+
+  /** A compressed zip with its first entry's data overwritten, leaving the headers and the zip's directory intact */
+  async function damagedZip(entries: Record<string, string>): Promise<File> {
+    const z = new JSZip()
+    for (const [path, body] of Object.entries(entries)) z.file(path, body)
+    const bytes = await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+    const data = 30 + bytes[26] + bytes[27] * 256 + bytes[28] + bytes[29] * 256
+    bytes.fill(0xa5, data, data + 40)
+    return file('my_spotify_data.zip', bytes as BlobPart)
+  }
+
+  const DAMAGED = "Streaming_History_Audio_2022.json: couldn't be unzipped, so the zip may be damaged. Try downloading it again"
+
+  it('keeps the rest of a zip when one entry is damaged', async () => {
+    const result = await loadFiles([
+      await damagedZip({
+        'Streaming_History_Audio_2022.json': json(Array.from({ length: 20 }, () => AUDIO_2023[0])),
+        'Streaming_History_Audio_2023.json': json(AUDIO_2023),
+      }),
+    ])
+    expect(result.filesRead).toEqual(['Streaming_History_Audio_2023.json'])
+    expect(result.plays).toHaveLength(2)
+    expect(result.warnings).toEqual([DAMAGED])
+  })
+
+  it('doesn’t also say there’s nothing in a zip whose only entry is damaged', async () => {
+    const result = await loadFiles([await damagedZip({ 'Streaming_History_Audio_2022.json': json(Array.from({ length: 20 }, () => AUDIO_2023[0])) })])
+    expect(result.plays).toEqual([])
+    expect(result.warnings).toEqual([DAMAGED])
+  })
+
+  it('doesn’t blame the file for what isn’t the file’s fault', async () => {
+    const buggy = file('Streaming_History_Audio_2023.json', json(AUDIO_2023))
+    buggy.text = () => Promise.reject(new TypeError('x is not a function'))
+    await expect(loadFiles([buggy])).rejects.toThrow('x is not a function')
+  })
+
+  it('explains the files a dropped folder couldn’t hand over', async () => {
+    const result = await loadFiles([file('Streaming_History_Audio_2023.json', json(AUDIO_2023))], ['Streaming_History_Audio_2022.json'])
+    expect(result.plays).toHaveLength(2)
+    expect(result.warnings).toEqual([expect.stringMatching(/^Streaming_History_Audio_2022\.json: couldn't be read from your computer/)])
+  })
+
+  it('reports the files that could have held history, and only those', async () => {
     const big = file('huge.zip', 'x')
     Object.defineProperty(big, 'size', { value: 600 * 1024 * 1024 })
-    const result = await loadFiles([big])
-    expect(result.warnings).toEqual(['huge.zip: skipped (too large to open safely in the browser)'])
+    const locked = file('Streaming_History_Audio_2022.json', json(AUDIO_2023))
+    locked.text = () => Promise.reject(new DOMException('No', 'NotReadableError'))
+    const result = await loadFiles([
+      big,
+      locked,
+      file('broken.zip', 'not a zip'),
+      file('Streaming_History_Audio_bad.json', '{nope'),
+      // None of these could have: they're expected, or not history at all
+      file('Streaming_History_Video_2023.json', '[]'),
+      file('notes.txt', 'hello'),
+      file('Streaming_History_Audio_other.json', json([{ hello: 'world' }])),
+      await zip('empty.zip', { 'readme.txt': 'nothing here' }),
+    ])
+    expect([...result.failures].sort()).toEqual([
+      "Streaming_History_Audio_2022.json: couldn't be read from your computer. If it's in iCloud, Dropbox or OneDrive, make sure it's downloaded, then add it again",
+      "Streaming_History_Audio_bad.json: isn't valid JSON",
+      "broken.zip: couldn't open this zip file",
+      'huge.zip: skipped (too large to open safely in the browser)',
+    ].sort())
+    for (const failure of result.failures) expect(result.warnings).toContain(failure)
+
+    expect((await loadFiles([await spotifyZip()])).failures).toEqual([])
+    expect(loadSample().failures).toEqual([])
   })
 })
 

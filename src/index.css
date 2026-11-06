@@ -5068,6 +5068,22 @@ kbd {
   color: var(--faint);
 }
 
+.missing__files {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.missing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .switch {
   display: inline-flex;
   align-items: center;

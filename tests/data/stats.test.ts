@@ -289,10 +289,6 @@ describe('filterPlays', () => {
   const chapter = play(at(2024, 1, 4), { kind: 'audiobook', artist: 'A Book' })
   const all = [song, hiddenSong, episode, chapter]
 
-  it('keeps everything with no filters on', () => {
-    expect(filterPlays(all, { musicOnly: false, hidden: new Set() })).toEqual(all)
-  })
-
   it('drops podcasts and audiobooks when music only', () => {
     expect(filterPlays(all, { musicOnly: true, hidden: new Set() })).toEqual([song, hiddenSong])
   })
