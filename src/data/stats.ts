@@ -41,22 +41,63 @@ export function getYears(plays: Play[]): number[] {
   return [...new Set(plays.map((p) => startDate(p).getFullYear()))].sort((a, b) => a - b)
 }
 
+/** How many plays started in each year, for the years that have any */
+export function playsPerYear(plays: Play[]): Map<number, number> {
+  const counts = new Map<number, number>()
+  for (const p of plays) {
+    const y = startDate(p).getFullYear()
+    counts.set(y, (counts.get(y) ?? 0) + 1)
+  }
+  return counts
+}
+
 /** `year` of null means all time */
 export function filterByYear(plays: Play[], year: number | null): Play[] {
   return year === null ? plays : plays.filter((p) => startDate(p).getFullYear() === year)
 }
+
+/** First and last year kept, inclusive. A year is the one a play started in, like the year picker's. */
+export type YearRange = readonly [from: number, to: number]
 
 export interface PlayFilter {
   /** Leaves out podcast episodes and audiobook chapters */
   musicOnly: boolean
   /** Artists whose songs are left out. Only music is hidden, so a show that shares a name stays. */
   hidden: ReadonlySet<string>
+  /** Leaves out every year outside the range, for a history with a long gap in it. Absent or null keeps them all. */
+  years?: YearRange | null
+}
+
+function inYears(p: Play, years: YearRange): boolean {
+  const y = startDate(p).getFullYear()
+  return y >= years[0] && y <= years[1]
+}
+
+/** The plays that started within `years`; null keeps them all */
+export function filterByYears(plays: Play[], years: YearRange | null | undefined): Play[] {
+  return years ? plays.filter((p) => inYears(p, years)) : plays
 }
 
 /** Applied before everything else, so the whole page (colors, posters, the race video) leaves them out */
-export function filterPlays(plays: Play[], { musicOnly, hidden }: PlayFilter): Play[] {
-  if (!musicOnly && hidden.size === 0) return plays
-  return plays.filter((p) => (p.kind === 'track' ? !hidden.has(p.artist) : !musicOnly))
+export function filterPlays(plays: Play[], { musicOnly, hidden, years = null }: PlayFilter): Play[] {
+  if (!musicOnly && hidden.size === 0 && !years) return plays
+  return plays.filter((p) => (!years || inYears(p, years)) && (p.kind === 'track' ? !hidden.has(p.artist) : !musicOnly))
+}
+
+/**
+ * False when `years` would leave nothing to show: no plays at all, or music that's all hidden artists
+ * (Music only is on whenever there's music, so podcasts alone wouldn't save the page).
+ */
+export function canShowYears(plays: Play[], hidden: ReadonlySet<string>, years: YearRange): boolean {
+  let hiddenMusic = false
+  let other = false
+  for (const p of plays) {
+    if (!inYears(p, years)) continue
+    if (p.kind !== 'track') other = true
+    else if (!hidden.has(p.artist)) return true
+    else hiddenMusic = true
+  }
+  return other && !hiddenMusic
 }
 
 /**
@@ -72,6 +113,7 @@ export function canHide(artists: readonly Ranked[], hidden: ReadonlySet<string>,
 export function sameFilter(a: PlayFilter, b: PlayFilter): boolean {
   if (a === b) return true
   if (a.musicOnly !== b.musicOnly || a.hidden.size !== b.hidden.size) return false
+  if ((a.years?.[0] ?? null) !== (b.years?.[0] ?? null) || (a.years?.[1] ?? null) !== (b.years?.[1] ?? null)) return false
   for (const artist of a.hidden) if (!b.hidden.has(artist)) return false
   return true
 }

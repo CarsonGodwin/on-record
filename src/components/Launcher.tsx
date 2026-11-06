@@ -5,19 +5,19 @@ import { LAUNCH_KEY } from '../lib/keys'
 import { COARSE, PHONE } from '../lib/pointer'
 import { matches } from '../lib/search'
 import { arrow, hover, NO_SELECTION, settle, span, stretchTo } from '../lib/selection'
-import { Modal } from './Panels'
+import { Modal, YearsControl, type YearsProps } from './Panels'
 import type { Track } from './TrackMenu'
 
 /*
  * The ⌘K launcher: one search box over the commands, the tracklist and the
  * years, with pages stacked under it: the artists, where picking one hides
- * or unhides them, Help and About. Escape steps back up to the main list before it
+ * or unhides them, the years to leave out, Help and About. Escape steps back up to the main list before it
  * closes. Focus stays in the box; the arrow keys move a highlight through the
  * results. In the artist lists, Shift with the arrows (or a Shift-click)
  * stretches the highlight over a run of artists, and Enter acts on them all.
  */
 
-export type LauncherMode = 'root' | 'artists' | 'help' | 'about'
+export type LauncherMode = 'root' | 'artists' | 'years' | 'help' | 'about'
 
 interface Item {
   key: string
@@ -43,7 +43,7 @@ const MOD = LAUNCH_KEY.startsWith('⌘') ? '⌘' : 'Ctrl '
 
 const SOURCE = 'https://github.com/CarsonGodwin/on-record'
 
-interface Props {
+interface Props extends YearsProps {
   mode: LauncherMode | null
   onMode: (mode: LauncherMode | null) => void
   tracks: Track[]
@@ -76,6 +76,7 @@ function toggle(names: string[], hidden: ReadonlySet<string>): { verb: 'Hide' | 
 const TITLES: Record<LauncherMode, string> = {
   root: 'Launcher',
   artists: 'Hide artists',
+  years: 'Adjust years',
   help: 'Help',
   about: 'About My Listening Record',
 }
@@ -94,6 +95,8 @@ export function Launcher(props: Props) {
       {/* Keyed by mode, so each opening and each switch starts a fresh search */}
       {mode === 'help' || mode === 'about' ? (
         <LauncherPage key={mode} mode={mode} onBack={() => onMode('root')} />
+      ) : mode === 'years' ? (
+        <YearsPage key={mode} yearCounts={props.yearCounts} range={props.range} onRange={props.onRange} onBack={() => onMode('root')} />
       ) : (
         mode && <LauncherBody key={mode} {...props} mode={mode} />
       )}
@@ -108,6 +111,7 @@ function LauncherBody({
   sides,
   years,
   year,
+  range,
   musicOnly,
   artists,
   hidden,
@@ -162,6 +166,14 @@ function LauncherBody({
         terms: 'exclude remove filter unhide show restore manage',
         run: () => onMode('artists'),
       },
+      {
+        key: 'years',
+        group: 'Commands',
+        label: 'Adjust Years…',
+        hint: range ? (range[0] === range[1] ? String(range[0]) : `${range[0]}–${range[1]}`) : undefined,
+        terms: 'range gap leave out exclude trim remove slider timeframe period',
+        run: () => onMode('years'),
+      },
       { key: 'help', group: 'Commands', label: 'Help', hint: 'Getting your data, keys', terms: 'spotify apple music export download', run: () => onMode('help') },
       { key: 'about', group: 'Commands', label: 'About', hint: 'Source, license, credits', run: () => onMode('about') },
       { key: 'reset', group: 'Commands', label: 'Clear Data', hint: 'Back to the start', terms: 'new load reset export file zip drop open', run: onReset },
@@ -185,7 +197,7 @@ function LauncherBody({
     ]
     // The hint beside a command finds it too: "music" finds Settings, "license" finds About
     return all.filter((item) => matches(query, `${item.label} ${item.hint ?? ''} ${item.terms ?? ''}`))
-  }, [mode, query, artists, hidden, tracks, sides, years, year, musicOnly, onSettings, onReset, onMode, onJump, onYear])
+  }, [mode, query, artists, hidden, tracks, sides, years, year, range, musicOnly, onSettings, onReset, onMode, onJump, onYear])
 
   const firstPick = items[0]?.names ? 1 : 0
   const { current, from, to } = span(sel, items.length, firstPick)
@@ -339,6 +351,36 @@ function LauncherBody({
           </span>
         )}
       </footer>
+    </>
+  )
+}
+
+/** Adjust Years: the slider that leaves out years, with the way back on top */
+function YearsPage({ onBack, ...slider }: YearsProps & { onBack: () => void }) {
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => titleRef.current?.focus(), [])
+  return (
+    <>
+      <div className="launcher__search">
+        <button type="button" className="chip-button" onClick={onBack}>
+          ← Back
+        </button>
+        <h2 className="launcher__title" ref={titleRef} tabIndex={-1} data-autofocus>
+          {TITLES.years}
+        </h2>
+      </div>
+
+      <div className="launcher__page">
+        <YearsControl {...slider} />
+      </div>
+
+      {!COARSE && (
+        <footer className="launcher__foot">
+          <span>
+            <kbd>←</kbd> <kbd>→</kbd> to move a year, <kbd>Esc</kbd> to go back
+          </span>
+        </footer>
+      )}
     </>
   )
 }

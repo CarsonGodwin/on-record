@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { formatNumber } from '../lib/format'
 import { isLaunchKey } from '../lib/keys'
+import type { YearRange } from '../data/stats'
 
 interface ModalProps {
   open: boolean
@@ -171,5 +172,73 @@ export function SettingsPanel({ open, onClose, onGone, musicOnly, onMusicOnly, o
         </p>
       </section>
     </Modal>
+  )
+}
+
+export interface YearsProps {
+  /** Plays that started in each year of the whole export */
+  yearCounts: ReadonlyMap<number, number>
+  /** The years kept, or null for all of them */
+  range: YearRange | null
+  /** Asks for a new range; false when it would leave nothing to show, and the slider stays where it was */
+  onRange: (range: YearRange) => boolean
+}
+
+/**
+ * Two thumbs on one track over a bar for each year's plays, so a gap in the history shows up as the
+ * empty stretch it is and can be slid past. Years are whole calendar years, empty ones included.
+ */
+export function YearsControl({ yearCounts, range, onRange }: YearsProps) {
+  const [refused, setRefused] = useState(false)
+  const all = [...yearCounts.keys()]
+  const first = Math.min(...all)
+  const last = Math.max(...all)
+  if (last <= first) return <p className="settings__note">Everything here is from {first}, so there are no years to leave out.</p>
+  const [from, to] = range ?? [first, last]
+  const peak = Math.max(...yearCounts.values())
+  let left = 0
+  for (const [y, n] of yearCounts) if (y < from || y > to) left += n
+  const steps = last - first
+  const span = Array.from({ length: steps + 1 }, (_, i) => first + i)
+  const change = (next: YearRange) => setRefused(!onRange(next))
+  return (
+    <div className="years-control">
+      <h3>
+        Showing <span className="years__span">{from === to ? from : `${from}–${to}`}</span>
+      </h3>
+      <div className="years">
+        <div className="years__bars" aria-hidden="true">
+          {span.map((y) => (
+            <span key={y} className={y < from || y > to ? 'years__bar is-out' : 'years__bar'} style={{ height: `${((yearCounts.get(y) ?? 0) / peak) * 100}%` }} />
+          ))}
+        </div>
+        <div className="years__range" style={{ '--from': (from - first) / steps, '--to': (to - first) / steps } as CSSProperties}>
+          <span className="years__fill" aria-hidden="true" />
+          {/* The first-year thumb rides on top when both sit at the far end, or it could never be pulled back */}
+          <input
+            type="range"
+            className={from === last ? 'is-top' : undefined}
+            min={first}
+            max={last}
+            step={1}
+            value={from}
+            aria-label="First year"
+            onChange={(e) => change([Math.min(Number(e.target.value), to), to])}
+          />
+          <input type="range" min={first} max={last} step={1} value={to} aria-label="Last year" onChange={(e) => change([from, Math.max(Number(e.target.value), from)])} />
+        </div>
+        <div className="years__ends" aria-hidden="true">
+          <span>{first}</span>
+          <span>{last}</span>
+        </div>
+      </div>
+      <p className="settings__note" role="status">
+        {refused
+          ? 'Can’t leave out those years: that would leave nothing on the record.'
+          : left === 0
+            ? 'Slide the ends in to leave out years, like ones from a service you stopped using.'
+            : `Leaves out ${formatNumber(left)} play${left === 1 ? '' : 's'} from other years. The charts update when you close this.`}
+      </p>
+    </div>
   )
 }
