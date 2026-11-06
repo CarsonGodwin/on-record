@@ -26,7 +26,6 @@ interface Props {
 
 export function Race({ bins, race, colors }: Props) {
   const ref = useRef<HTMLDivElement>(null)
-  const boardRef = useRef<HTMLDivElement>(null)
   const roomRef = useRef<HTMLDivElement>(null)
   const cards = useContext(InCards)
   const offstage = useContext(Offstage)
@@ -122,7 +121,7 @@ export function Race({ bins, race, colors }: Props) {
   return (
     <div className="race" ref={ref}>
       <div className="race__room" ref={roomRef}>
-        <div className="race__board" ref={boardRef} style={{ height: rowH * TOP }} aria-hidden="true">
+        <div className="race__board" style={{ height: rowH * TOP }} aria-hidden="true">
           {values.map(({ name, ms }) => {
             const r = rank.get(name)!
             const visible = r < TOP && ms > 0
@@ -222,7 +221,6 @@ export function Race({ bins, race, colors }: Props) {
         bins={bins}
         race={race}
         colors={colors}
-        board={boardRef}
         onBusy={(busy) => {
           setExporting(busy)
           if (busy) setChoice(false)

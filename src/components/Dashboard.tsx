@@ -53,7 +53,7 @@ import { Hero } from './Hero'
 import { Launcher, type LauncherMode } from './Launcher'
 import { LinerNotes } from './LinerNotes'
 import { LoveHate, LoveHateTable } from './LoveHate'
-import { MissingHistoryPanel, SettingsPanel } from './Panels'
+import { MissingHistoryPanel } from './Panels'
 import { PosterStudio } from './PosterStudio'
 import { Pulse } from './Pulse'
 import { Race } from './Race'
@@ -119,19 +119,17 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const noShuffle = useMemo(() => inRange.filter((p) => p.shuffle === null).length, [inRange])
   const hasAnyMusic = otherPlays < inRange.length
   const [launcher, setLauncher] = useState<LauncherMode | null>(null)
-  // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [missingOpen, setMissingOpen] = useState(result.failures.length > 0)
   // A history with no music at all keeps its podcasts, or there would be nothing to show
   const chosen = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden, years: yearRange }), [musicOnly, hasAnyMusic, hidden, yearRange])
   /*
-   * The charts follow `applied`, which catches up with `chosen` once the launcher and Settings are
+   * The charts follow `applied`, which catches up with `chosen` once the launcher is
    * closed and an "Updating" note has painted. Re-running every chart over a long history holds the
    * page for a moment, so it happens once when you're done choosing, not once per artist, and never
    * without saying so. `version` counts the changes that have reached the charts, for `viewKey`.
    */
   const [applied, setApplied] = useState({ filter: chosen, version: 0 })
-  const choosing = launcher !== null || settingsOpen
+  const choosing = launcher !== null
   const updating = !choosing && !sameFilter(applied.filter, chosen)
   useEffect(() => {
     if (!updating) return
@@ -402,7 +400,6 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   }, [cards])
 
   useCloseOnBack(launcher !== null, () => setLauncher(null))
-  useCloseOnBack(settingsOpen, () => setSettingsOpen(false))
   useCloseOnBack(missingOpen, () => setMissingOpen(false))
 
   // Arrow keys deal cards too, except where a slider or the day details want them
@@ -481,17 +478,11 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     onReset()
   }
 
-  function openSettings() {
-    setLauncher(null)
-    setSettingsOpen(true)
-  }
-
   // ⌘K (Ctrl K) opens the launcher from anywhere, the tour included, and closes it again
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (!isLaunchKey(e)) return
       e.preventDefault()
-      setSettingsOpen(false)
       setLauncher((open) => (open ? null : 'root'))
     }
     window.addEventListener('keydown', onKey)
@@ -850,20 +841,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         onYear={pickYear}
         onHide={hideArtists}
         onUnhide={unhideArtists}
-        onSettings={openSettings}
-        onReset={clearData}
-      />
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => {
-          setSettingsOpen(false)
-          setLauncher('root')
-        }}
-        onGone={() => setSettingsOpen(false)}
-        musicOnly={musicOnly}
         onMusicOnly={setMusicOnly}
-        otherPlays={otherPlays}
-        hasAnyMusic={hasAnyMusic}
+        canToggleMusicOnly={hasAnyMusic && otherPlays > 0}
+        onReset={clearData}
       />
       <MissingHistoryPanel open={missingOpen} onClose={() => setMissingOpen(false)} onReset={clearData} failures={result.failures} />
       {/* Paints before the charts are worked out again, so the moment that takes doesn't look like a hang */}

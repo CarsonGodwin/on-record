@@ -20,7 +20,8 @@ export const DRAW_ORDER = [SLOT_OTHER, SLOT_PODCAST, ...Array.from({ length: TOP
 
 export const DISPLAY = '"Bricolage Grotesque Variable", system-ui, sans-serif'
 export const MONO = '"JetBrains Mono Variable", ui-monospace, monospace'
-export const SERIF = '"Instrument Serif", Georgia, serif'
+/** Kept as a name so the posters keep their shape; it is the display face now. Only the generated album covers still use Instrument Serif, as a record sleeve would */
+export const SERIF = DISPLAY
 
 /** Above this many plays the glow is left off by default: blurring a path that size can exhaust a phone's GPU and lose the canvas */
 export const GLOW_MAX = 60_000

@@ -1,10 +1,10 @@
 import { hashString, mulberry32 } from '../lib/random'
 import type { RawStreamRecord } from '../types'
+import { CORE, MID, TAIL } from './sampleCatalog'
+import type { CatalogArtist } from './sampleCatalog'
 import {
-  ALBUM_SHAPES, BAND_ADJECTIVES, BAND_NOUNS, CAROLS, CLASSIC_ARTISTS, CORE_ARTISTS, ELECTRO_ADJECTIVES,
-  ELECTRO_NOUNS, ELECTRONIC, ENDINGS, FIRST_NAMES, FOLK, FOLK_SHAPES, GENRES, HIPHOP, HOLIDAY_ARTISTS,
-  INDIE, INTERVIEW_TOPICS, LAST_NAMES, NEWS, NOUNS, PLACES, PLANTS, POP, POP_ADJECTIVES, POP_NOUNS,
-  RAP_WORDS, SCIENCE_SUBJECTS, SCIENCE_VERBS, SERIAL_CHAPTERS, SYLLABLES, TITLE_SHAPES, VENUES,
+  ELECTRONIC, FIRST_NAMES, FOLK, GENRES, HIPHOP, INDIE, INTERVIEW_TOPICS, LAST_NAMES, NEWS, POP,
+  SCIENCE_SUBJECTS, SCIENCE_VERBS, SERIAL_CHAPTERS,
 } from './sampleWords'
 import type { Words } from './sampleWords'
 
@@ -13,12 +13,13 @@ import type { Words } from './sampleWords'
  * format, so it runs through the same parser as real data. It's seeded, so
  * every load produces identical data.
  *
- * Every artist, song, show and book is invented (see sampleWords.ts), so the
- * demo never pins made-up habits on a real musician. The realism comes from
- * shape instead: a few dozen artists you love over a long tail you heard once
- * on a playlist, albums that come out and get played front to back, features
- * and sped-up singles, Christmas music in December, podcasts on the commute,
- * an audiobook at bedtime, a new phone, and a couple of trips abroad.
+ * The music is real (see sampleCatalog.ts) and the listening is invented, so
+ * the demo reads like a library but pins no habits on any musician. Shows and
+ * the audiobook are made up (sampleWords.ts). The realism comes from shape:
+ * a few dozen artists you love over a long tail you heard once on a
+ * playlist, albums that come out and get played front to back, Christmas
+ * music in December, podcasts on the commute, an audiobook at bedtime, a new
+ * phone, and a couple of trips abroad.
  *
  * There's enough for every chart to have something to say: tastes that rise
  * and fade, genres with their own time of day, songs that get skipped more
@@ -48,11 +49,6 @@ function fromDay(day: number): Date {
 const TOTAL_DAYS = dayOf(END.getFullYear(), END.getMonth(), END.getDate())
 const SPAN_YEARS = TOTAL_DAYS / 365
 
-/** Artists that come and go with your taste, besides the core ones */
-const MID_ARTISTS = 50
-/** Artists you only meet on a playlist or radio, and mostly hear a handful of times */
-const TAIL_ARTISTS = 320
-
 /** Relative listening likelihood for each hour of the day (0 = midnight) */
 const HOUR_WEIGHTS = [
   3, 2, 1, 0.4, 0.2, 0.5, 2, 6, 9, 6, 4, 4, 5, 5, 4, 4, 6, 9, 8, 7, 8, 9, 8, 5,
@@ -68,11 +64,6 @@ SONG_SECONDS[FOLK] = [170, 300]
 SONG_SECONDS[POP] = [140, 220]
 SONG_SECONDS[HIPHOP] = [120, 230]
 SONG_SECONDS[INDIE] = [170, 270]
-
-/** How often a song has a guest, by genre */
-const FEATURE_RATE = [0.2, 0.06, 0.15, 0.3, 0.06]
-/** How often titles are written in lowercase, by genre */
-const LOWERCASE_RATE = [0.35, 0.03, 0.08, 0.15, 0.08]
 
 /** The phone gets an upgrade in September 2023 and then follows iOS updates */
 const PHONE: [day: number, platform: string][] = [
@@ -523,232 +514,64 @@ function platformName(device: Device, day: number): string {
 
 // ---------- The catalog ----------
 
+/** Days since START for a release date like "2024-04-19" */
+function releaseDay(date: string): number {
+  const [year, month, day] = date.split('-').map(Number)
+  return dayOf(year, month - 1, day)
+}
+
 function buildArtists(w: Dice): Artist[] {
-  const used = new Set(CORE_ARTISTS.map(([name]) => name))
-  const freshName = (genre: number) => {
-    for (;;) {
-      const name = artistName(w, genre)
-      if (!used.has(name)) {
-        used.add(name)
-        return name
-      }
+  const blank = { tail: false, found: 0, peak: 0, width: 0, lead: 0, staple: false, fades: false, earliest: 0, popularity: 0 }
+  // Tail artists come last, so they're the end of the list in both
+  const entries = [...CORE, ...MID, ...TAIL]
+  const artists: Artist[] = entries.map((entry, i) => {
+    const base = { ...blank, name: entry.name, genre: entry.genre, albums: [] }
+    if (i < CORE.length) {
+      // The first few are staples from day one, and every third of the rest burns bright and disappears for good
+      return { ...base, popularity: 1 / Math.sqrt(i + 1), width: 0.3, lead: 0.6, staple: i < 4, fades: i >= 4 && i % 3 === 2 }
     }
-  }
-  const blank = { tail: false, found: 0, peak: 0, width: 0, lead: 0, staple: false, fades: false, earliest: 0 }
+    if (i < CORE.length + MID.length) {
+      return { ...base, popularity: w.between(0.05, 0.18), width: 0.12, lead: 0.35, fades: w.chance(0.4) }
+    }
+    return { ...base, tail: true }
+  })
 
-  const artists: Artist[] = CORE_ARTISTS.map(([name, genre], i) => ({
-    ...blank,
-    albums: [],
-    name,
-    genre,
-    popularity: 1 / Math.sqrt(i + 1),
-    peak: w.rand() * SPAN_YEARS,
-    width: 0.3,
-    lead: 0.6,
-    staple: i < 4,
-    // Every third artist burns bright and then disappears for good
-    fades: i % 3 === 2,
-  }))
-  for (let i = 0; i < MID_ARTISTS; i++) {
-    const genre = i % GENRES
-    artists.push({
-      ...blank,
-      albums: [],
-      name: freshName(genre),
-      genre,
-      popularity: w.between(0.05, 0.18),
-      peak: w.rand() * SPAN_YEARS,
-      width: 0.12,
-      lead: 0.35,
-      fades: w.chance(0.4),
-    })
-  }
-  for (let i = 0; i < TAIL_ARTISTS; i++) {
-    const genre = i % GENRES
-    artists.push({ ...blank, albums: [], name: freshName(genre), genre, tail: true, popularity: 0, found: w.between(-30, TOTAL_DAYS) })
-  }
-
-  const byGenre = Array.from({ length: GENRES }, (_, g) => artists.filter((a) => a.genre === g).map((a) => a.name))
   artists.forEach((a, i) => {
-    buildCatalog(w, a, i, byGenre[a.genre])
+    buildCatalog(w, a, i, entries[i])
     a.earliest = Math.min(...a.albums.map((al) => al.release))
+    if (a.tail) {
+      // Found some time after the music is out
+      a.found = w.between(Math.max(-30, a.earliest), TOTAL_DAYS)
+      return
+    }
+    // An artist peaks soon after the newest record of theirs that came out during the history,
+    // which is part of why it's their peak; older catalogs peak whenever
+    const fresh = a.albums.filter((al) => al.release >= 0 && !al.tracks[0].holiday).map((al) => al.release)
+    a.peak = fresh.length ? Math.min(Math.max(...fresh) + w.between(10, 70), TOTAL_DAYS - 30) / 365 : w.rand() * SPAN_YEARS
   })
   return artists
 }
 
-function buildCatalog(w: Dice, artist: Artist, index: number, peers: string[]): void {
-  const { genre } = artist
+function buildCatalog(w: Dice, artist: Artist, index: number, entry: CatalogArtist): void {
   let count = 0
-  const titles = new Set<string>()
-  const newTitle = () => {
-    for (;;) {
-      const t = songTitle(w, genre)
-      if (!titles.has(t.toLowerCase())) {
-        titles.add(t.toLowerCase())
-        return t
-      }
+  for (const { name, released, tracks, holiday } of entry.albums) {
+    const al: Album = { name, release: releaseDay(released), tracks: [] }
+    for (const spec of tracks.split('|')) {
+      const hit = spec.startsWith('*')
+      al.tracks.push({
+        title: hit ? spec.slice(1) : spec,
+        album: name,
+        artist: index,
+        uri: `spotify:track:sample${index}x${count++}`,
+        durationMs: Math.round(w.between(...SONG_SECONDS[artist.genre]) * 1000),
+        skipChance: Math.min(0.9, 0.02 + w.rand() ** 2.2 * 0.6 + (artist.tail ? 0.1 : 0)),
+        // The hits get most of the plays
+        appeal: holiday ? (hit ? 2.5 : 1) : hit ? w.between(3, 6) : w.between(0.4, 1.5),
+        holiday,
+      })
     }
-  }
-  const guest = () => {
-    if (!w.chance(FEATURE_RATE[genre])) return ''
-    const other = w.pick(peers.filter((p) => p !== artist.name))
-    return w.chance(0.2) ? ` (with ${other})` : ` (feat. ${other})`
-  }
-  const hitAppeal = () => (w.chance(0.25) ? w.between(3, 6) : w.between(0.4, 1.5))
-  const songSeconds = () => w.between(...SONG_SECONDS[genre])
-
-  const album = (release: number): Album => {
-    const al: Album = { name: '', release, tracks: [] }
     artist.albums.push(al)
-    return al
   }
-  const track = (al: Album, title: string, appeal: number, seconds = songSeconds(), extraSkip = 0, holiday = false) => {
-    al.tracks.push({
-      title,
-      album: al.name,
-      artist: index,
-      uri: `spotify:track:sample${index}x${count++}`,
-      durationMs: Math.round(seconds * 1000),
-      skipChance: Math.min(0.9, 0.02 + w.rand() ** 2.2 * 0.6 + extraSkip + (artist.tail ? 0.1 : 0)),
-      appeal,
-      holiday,
-    })
-  }
-  const name = (al: Album, albumName: string) => {
-    al.name = albumName
-    for (const t of al.tracks) t.album = albumName
-  }
-  const songs = (al: Album) => al.tracks.filter((t) => t.durationMs > 100_000)
-  const best = (al: Album) => songs(al).reduce((a, b) => (b.appeal > a.appeal ? b : a))
-  /** A record with a few songs, maybe an intro, an interlude and an outro */
-  const record = (release: number, size: number, suffix = '') => {
-    const al = album(release)
-    const extras = size > 6
-    if (extras && w.chance(0.15)) track(al, 'Intro', 0.2, w.between(30, 90), 0.3)
-    const interlude = extras && w.chance(0.25) ? w.int(3, size - 2) : -1
-    for (let k = 0; k < size; k++) {
-      if (k === interlude) track(al, `${w.pick(NOUNS)} (Interlude)`, 0.3, w.between(45, 95), 0.2)
-      track(al, newTitle() + guest() + suffix, hitAppeal())
-    }
-    if (extras && w.chance(0.1)) track(al, 'Outro', 0.2, w.between(40, 95), 0.3)
-    // Debuts are sometimes self-titled, and plenty of albums are named after a song on them
-    const roll = w.rand()
-    if (roll < 0.1 && artist.albums.length === 1) name(al, artist.name)
-    else if (roll < 0.4) name(al, bare(best(al).title))
-    else name(al, w.pick(ALBUM_SHAPES)(w))
-    return al
-  }
-  /** A one-song release, named after the song as Spotify does */
-  const single = (release: number, title: string, seconds = songSeconds(), appeal = hitAppeal()) => {
-    const al = album(release)
-    track(al, title, appeal, seconds)
-    name(al, title.replace(/ - (Sped Up|Extended Mix)$/, ' ($1)'))
-  }
-
-  if (artist.tail) {
-    // Often brand new when you find it (the weekly new-releases playlist), otherwise from the back catalog
-    const release = artist.found - (w.chance(0.4) ? w.between(0, 10) : w.between(10, 700))
-    if (w.chance(0.3)) record(release, w.int(3, 5))
-    else for (let k = w.int(1, 2); k > 0; k--) single(release - k * w.between(40, 200), newTitle() + guest())
-    return
-  }
-
-  const peakDay = artist.peak * 365
-  if (CLASSIC_ARTISTS.has(artist.name)) {
-    // Decades-old albums, reissued in remastered editions
-    const first = -365 * w.between(20, 28)
-    const last = -365 * w.between(4, 9)
-    for (let k = 0; k < 4; k++) {
-      const al = record(first + ((last - first) * k) / 3, w.int(9, 12), ` - Remastered ${w.int(2009, 2022)}`)
-      if (w.chance(0.5)) name(al, `${al.name} (Remastered)`)
-    }
-    return
-  }
-
-  const core = index < CORE_ARTISTS.length
-  // The latest album lands shortly before the artist's peak, which is part of why it's their peak
-  const latest = peakDay > 120 ? peakDay - w.between(20, 100) : -w.between(30, 400)
-  if (core) {
-    const albums = w.int(2, 4)
-    const first = Math.min(latest - 200, -w.between(500, 2200))
-    for (let k = 0; k < albums; k++) {
-      const release = first + ((latest - first) * k) / (albums - 1) + w.between(-30, 30)
-      const ep = k > 0 && k < albums - 1 && w.chance(0.25)
-      record(release, ep ? w.int(4, 6) : w.int(8, 12))
-    }
-    const last = artist.albums.at(-1)!
-    if (w.chance(0.3)) {
-      // A deluxe edition with an acoustic take and a couple of new songs
-      track(last, `${best(last).title} - Acoustic`, 0.6, songSeconds() * 0.9)
-      track(last, newTitle(), 0.8)
-      if (w.chance(0.5)) track(last, newTitle() + guest(), 0.8)
-      name(last, `${last.name} (Deluxe)`)
-    }
-    if (index < 12 && w.chance(0.25)) {
-      const live = album(w.between(60, TOTAL_DAYS - 60))
-      const hits = artist.albums.slice(0, -1).flatMap(songs).sort((a, b) => b.appeal - a.appeal).slice(0, 7)
-      for (const h of hits) track(live, `${h.title} - Live`, 0.25, (h.durationMs / 1000) * 1.1, 0.1)
-      name(live, `Live at ${w.pick(VENUES)}`)
-    }
-    if (HOLIDAY_ARTISTS.has(artist.name)) {
-      const xmas = album(-w.between(400, 1200))
-      for (const c of w.pickSome(CAROLS, 6)) track(xmas, c, 1, songSeconds(), 0, true)
-      track(xmas, `Christmas in ${w.pick(PLACES)}`, 2.5, songSeconds(), 0, true)
-      track(xmas, 'Home by December', 2, songSeconds(), 0, true)
-      name(xmas, w.chance(0.5) ? `A ${artist.name} Christmas` : `Christmas with ${artist.name}`)
-    }
-  } else {
-    record(latest, w.chance(0.5) ? w.int(4, 6) : w.int(8, 11))
-  }
-
-  // Singles between albums: new songs, and in some genres a sped-up or extended cut of a hit
-  for (let k = core ? w.int(0, 2) : w.int(0, 1); k > 0; k--) {
-    const hit = best(artist.albums[0])
-    const release = w.between(Math.max(artist.albums[0].release + 60, -400), TOTAL_DAYS - 20)
-    if ((genre === POP || genre === HIPHOP) && w.chance(0.4)) single(release, `${hit.title} - Sped Up`, (hit.durationMs / 1000) * 0.8, 1.5)
-    else if (genre === ELECTRONIC && w.chance(0.4)) single(release, `${hit.title} - Extended Mix`, (hit.durationMs / 1000) * 1.5, 1)
-    else single(release, newTitle() + guest())
-  }
-}
-
-/** A song title without its guests or edition, for naming an album after it */
-function bare(title: string): string {
-  return title.replace(/ \((feat\.|with) [^)]*\)/, '').replace(/ - .*$/, '')
-}
-
-function artistName(w: Dice, genre: number): string {
-  const person = () => `${w.pick(FIRST_NAMES)} ${w.pick(LAST_NAMES)}`
-  const roll = w.rand()
-  switch (genre) {
-    case ELECTRONIC:
-      return roll < 0.5 ? `${w.pick(SYLLABLES)}${w.pick(ENDINGS)}` : `${w.pick(ELECTRO_ADJECTIVES)} ${w.pick(ELECTRO_NOUNS)}`
-    case FOLK:
-      if (roll < 0.55) return person()
-      if (roll < 0.7) return `The ${w.pick(LAST_NAMES)} Sisters`
-      if (roll < 0.85) return `${w.pick(LAST_NAMES)} & the ${w.pick(BAND_NOUNS)}`
-      return `Wild ${w.pick(PLANTS)}`
-    case POP:
-      if (roll < 0.45) return person()
-      if (roll < 0.7) return w.pick(FIRST_NAMES).toUpperCase()
-      return `${w.pick(POP_ADJECTIVES)} ${w.pick(POP_NOUNS)}`
-    case HIPHOP:
-      if (roll < 0.4) return person()
-      if (roll < 0.6) return w.pick(FIRST_NAMES).toUpperCase()
-      if (roll < 0.75) return `Young ${w.pick(LAST_NAMES)}`
-      if (roll < 0.9) return `Kid ${w.pick(RAP_WORDS)}`
-      return `Lil ${w.pick(RAP_WORDS)}`
-    default:
-      if (roll < 0.4) return `The ${w.pick(BAND_ADJECTIVES)} ${w.pick(BAND_NOUNS)}`
-      if (roll < 0.75) return `${w.pick(BAND_ADJECTIVES)} ${w.pick(BAND_NOUNS)}`
-      return `The ${w.pick(BAND_NOUNS)}`
-  }
-}
-
-const SHAPE_WEIGHTS = TITLE_SHAPES.map(([weight]) => weight)
-
-function songTitle(w: Dice, genre: number): string {
-  const title = genre === FOLK && w.chance(0.2) ? w.pick(FOLK_SHAPES)(w) : TITLE_SHAPES[weightedIndex(SHAPE_WEIGHTS, w.rand)][1](w)
-  return w.chance(LOWERCASE_RATE[genre]) ? title.toLowerCase() : title
 }
 
 /** Spotify's timestamp format: "2024-03-01T12:34:56Z" */

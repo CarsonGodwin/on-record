@@ -220,7 +220,7 @@ function RiverPage({ bins, totals, eras, artists, colors }: Props) {
           {eras.map((era) => (
             <li key={`${era.artist}-${era.start}`} className="era" style={{ ['--era' as string]: colorFor(colors, era.artist) }}>
               <span className="era__name">
-                {/* "The The Paper Moons era" reads wrong; a name that starts with "The" brings its own */}
+                {/* "The The Beatles era" reads wrong; a name that starts with "The" brings its own */}
                 {/^the /i.test(era.artist) ? '' : 'The '}
                 <em>{era.artist}</em> era
               </span>

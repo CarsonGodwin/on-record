@@ -131,12 +131,10 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
           <ol className="podium">
             {items.slice(0, 3).map((item, i) => (
               <li key={item.key} className={`podium__spot podium__spot--${i + 1}`}>
-                <div className="podium__art">
-                  {cover(item, 120)}
-                  <span className="podium__rank" aria-hidden="true">
-                    {i + 1}
-                  </span>
-                </div>
+                <div className="podium__art">{cover(item, 120)}</div>
+                <span className="podium__rank" aria-hidden="true">
+                  {i + 1}
+                </span>
                 <strong className="podium__name">{item.label}</strong>
                 {item.sublabel && <span className="podium__sub">{item.sublabel}</span>}
                 <span className="podium__value">{primary(item)}</span>
@@ -198,10 +196,10 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
               <li key={item.key} className={`podium__spot podium__spot--${i + 1}`}>
                 <div className="podium__art">
                   <Cover name={item.sublabel ? `${item.label}|${item.sublabel}` : item.label} size={220} />
-                  <span className="podium__rank" aria-hidden="true">
-                    {i + 1}
-                  </span>
                 </div>
+                <span className="podium__rank" aria-hidden="true">
+                  {i + 1}
+                </span>
                 <strong className="podium__name">{item.label}</strong>
                 {item.sublabel && <span className="podium__sub">{item.sublabel}</span>}
                 <span className="podium__value">

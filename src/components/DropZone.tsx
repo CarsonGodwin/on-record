@@ -69,7 +69,7 @@ export function DropZone({ onFiles }: Props) {
               <br className="sleeve__break" />
               music export
               <br />
-              <em>here.</em>
+              here.
             </>
           )}
         </p>
