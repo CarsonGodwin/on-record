@@ -1072,6 +1072,12 @@ th {
   margin: 0;
 }
 
+.pressing p.pressing__sub {
+  margin-top: -12px;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
 .pressing__record {
   width: 180px;
   aspect-ratio: 1;
