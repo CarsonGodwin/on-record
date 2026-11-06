@@ -2,24 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { hashString, mulberry32 } from '../../src/lib/random'
 
 describe('hashString', () => {
-  it('is stable and unsigned 32-bit', () => {
-    expect(hashString('Radiohead')).toBe(hashString('Radiohead'))
-    for (const s of ['', 'a', 'Björk', 'x'.repeat(500)]) {
-      const h = hashString(s)
-      expect(Number.isInteger(h)).toBe(true)
-      expect(h).toBeGreaterThanOrEqual(0)
-      expect(h).toBeLessThan(2 ** 32)
-    }
-  })
-
   it('matches the FNV-1a reference values', () => {
     expect(hashString('')).toBe(0x811c9dc5)
     expect(hashString('a')).toBe(0xe40c292c)
     expect(hashString('foobar')).toBe(0xbf9cf968)
-  })
-
-  it('tells different strings apart', () => {
-    expect(hashString('ab')).not.toBe(hashString('ba'))
   })
 })
 

@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
-import { filesFromDrop } from '../lib/dropFiles'
+import { filesFromDrop, type PickedFiles } from '../lib/dropFiles'
 import { COARSE } from '../lib/pointer'
 
 interface Props {
-  onFiles: (files: File[]) => void
+  /** A promise, since walking a dropped folder can take a while and the loading screen should cover it */
+  onFiles: (picked: Promise<PickedFiles>) => void
 }
 
 /** The file drop target, dressed as a record sleeve. The record slides out when you hover or drag over it. */
@@ -34,9 +35,8 @@ export function DropZone({ onFiles }: Props) {
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
-        filesFromDrop(e.dataTransfer).then((files) => {
-          if (files.length > 0) onFiles(files)
-        })
+        // Text or a link dragged here isn't an upload, so it shouldn't end in one's error
+        if (e.dataTransfer.types.includes('Files')) onFiles(filesFromDrop(e.dataTransfer))
       }}
     >
       <input
@@ -48,7 +48,7 @@ export function DropZone({ onFiles }: Props) {
         onChange={(e) => {
           const files = Array.from(e.target.files ?? [])
           e.target.value = '' // so picking the same file again still fires onChange
-          if (files.length > 0) onFiles(files)
+          if (files.length > 0) onFiles(Promise.resolve({ files, unreadable: [] }))
         }}
       />
       <div className="sleeve__record" aria-hidden="true">

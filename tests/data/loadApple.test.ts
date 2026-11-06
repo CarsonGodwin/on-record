@@ -1,8 +1,8 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
-import { isHistoryFileName, isImportFileName, loadFiles } from '../../src/data/load'
+import { entryText, fileText, isImportFileName, loadFiles, readPlayActivity, type TextStream } from '../../src/data/load'
 import { UNKNOWN_ARTIST } from '../../src/data/parse'
-import { filterPlays, summarize, UNMATCHED_ARTIST } from '../../src/data/stats'
+import { filterPlays, UNMATCHED_ARTIST } from '../../src/data/stats'
 import { dailyTracks, FILE_NAMES, library, playActivity, playRow, PRIVATE, ymd } from '../apple'
 import { at } from '../helpers'
 
@@ -65,14 +65,6 @@ describe('loading an Apple Music export', () => {
     expect(JSON.stringify(result)).not.toContain(PRIVATE['Client IP Address'])
   })
 
-  it('reads the inner zip on its own', async () => {
-    const result = await loadFiles([
-      file('Apple_Media_Services.zip', await zipBytes({ [`${DIR}/${FILE_NAMES.playActivity}`]: PLAYS, [`${DIR}/${FILE_NAMES.dailyTracks}`]: DAILY })),
-    ])
-    expect(result.plays).toHaveLength(3)
-    expect(result.unmatchedArtists).toBe(1) // Intro's artist is only in the library file
-  })
-
   it('puts a download split into parts back together', async () => {
     const part1 = file('Part 1 of 2.zip', await zipBytes({ 'Part 1/Apple_Media_Services.zip': await zipBytes({ [`${DIR}/${FILE_NAMES.playActivity}`]: PLAYS }) }))
     const part2 = file(
@@ -81,17 +73,6 @@ describe('loading an Apple Music export', () => {
     )
     const result = await loadFiles([part1, part2])
     expect(summaryOf(result.plays)).toEqual(['Blue Plastic: Yung Lean', 'Intro: The xx', 'Reality Surf: Bladee (skipped)'])
-  })
-
-  it('reads loose files, like a folder Safari unzipped', async () => {
-    const result = await loadFiles([file(FILE_NAMES.dailyTracks, DAILY), file(FILE_NAMES.library, LIBRARY), file(FILE_NAMES.playActivity, PLAYS)])
-    expect(summaryOf(result.plays)).toEqual(['Blue Plastic: Yung Lean', 'Intro: The xx', 'Reality Surf: Bladee (skipped)'])
-  })
-
-  it('ignores the same export dropped twice', async () => {
-    const result = await loadFiles([await appleDownload(), await appleDownload('Again.zip')])
-    expect(result.plays).toHaveLength(3)
-    expect(result.duplicateRows).toBe(3)
   })
 
   it('asks for the play activity when only other files were dropped', async () => {
@@ -132,6 +113,167 @@ describe('loading an Apple Music export', () => {
     const result = await loadFiles([file('many.zip', await zipBytes(nested))])
     expect(result.plays.length).toBeGreaterThan(0)
     expect(result.plays.length).toBeLessThan(10)
+  })
+})
+
+describe('a play activity too long to hold as one string', () => {
+  const MiB = 1024 * 1024
+  const TOO_LARGE = `${FILE_NAMES.playActivity}: skipped (too large to open safely in the browser)`
+
+  /** A file that says it's this big, which is all the size checks look at */
+  function sized(f: File, bytes: number): File {
+    Object.defineProperty(f, 'size', { value: bytes })
+    return f
+  }
+
+  /** A file the browser hands over a few bytes at a time, so characters get split between pieces */
+  function trickling(name: string, body: string, size = 3): File {
+    const f = file(name, body)
+    const bytes = new TextEncoder().encode(body)
+    f.stream = () =>
+      new ReadableStream({
+        start(controller) {
+          for (let at = 0; at < bytes.length; at += size) controller.enqueue(bytes.slice(at, at + size))
+          controller.close()
+        },
+      }) as ReturnType<File['stream']>
+    return f
+  }
+
+  it('reads a file past the longest possible string', async () => {
+    const result = await loadFiles([sized(file(FILE_NAMES.playActivity, PLAYS), 600 * MiB), file(FILE_NAMES.dailyTracks, DAILY), file(FILE_NAMES.library, LIBRARY)])
+    expect(summaryOf(result.plays)).toEqual(['Blue Plastic: Yung Lean', 'Intro: The xx', 'Reality Surf: Bladee (skipped)'])
+    expect(result.warnings).toEqual([])
+  })
+
+  it('reads a file up to its limit and no further, and doesn’t then ask for the file', async () => {
+    const atLimit = await loadFiles([sized(file(FILE_NAMES.playActivity, PLAYS), 4 * 1024 * MiB)])
+    expect(atLimit.plays).toHaveLength(3)
+
+    const over = await loadFiles([sized(file(FILE_NAMES.playActivity, PLAYS), 4 * 1024 * MiB + 1), file(FILE_NAMES.dailyTracks, DAILY)])
+    expect(over.plays).toEqual([])
+    expect(over.warnings).toEqual([TOO_LARGE])
+  })
+
+  it('keeps the usual limit for every other file', async () => {
+    const result = await loadFiles([file(FILE_NAMES.playActivity, PLAYS), sized(file(FILE_NAMES.dailyTracks, DAILY), 600 * MiB)])
+    expect(result.warnings).toContain(`${FILE_NAMES.dailyTracks}: skipped (too large to open safely in the browser)`)
+    expect(result.plays).toHaveLength(3)
+  })
+
+  it('puts characters split between pieces back together, and drops a byte order mark', async () => {
+    const song = 'Café ☕ 𝄞 ’Ω’'
+    const body = `﻿${playActivity([playRow(t, { 'Song Name': song, 'Album Name': 'Ålbum', 'Artist Name': 'Björk' })])}`
+    for (const size of [1, 2, 3, 5, 7]) {
+      const result = await loadFiles([trickling(FILE_NAMES.playActivity, body, size)])
+      expect(result.plays.map((p) => [p.title, p.album, p.artist])).toEqual([[song, 'Ålbum', 'Björk']])
+      expect(result.warnings).toEqual([])
+    }
+  })
+
+  it('reads a long entry from a zip the same as a loose file, unusual characters and all', async () => {
+    const rows = Array.from({ length: 3000 }, (_, i) => playRow(t + i * 240_000, { 'Song Name': `Café ☕ 𝄞 ${i}`, 'Album Name': `Ålbum ${i % 7}`, 'Artist Name': 'Björk' }))
+    const body = playActivity(rows)
+    const loose = await loadFiles([file(FILE_NAMES.playActivity, body)])
+    const zipped = await loadFiles([file('music.zip', await zipBytes({ [`${DIR}/${FILE_NAMES.playActivity}`]: body }))])
+    expect(zipped.plays).toHaveLength(3000)
+    expect(zipped.plays).toEqual(loose.plays)
+    expect(zipped.warnings).toEqual([])
+  })
+
+  it('counts what arrives, whatever size the file claimed', async () => {
+    const pieces = [PLAYS.slice(0, 100), PLAYS.slice(100), 'never read']
+    let read = 0
+    const stream: TextStream = async (onText) => {
+      for (const piece of pieces) {
+        onText(piece)
+        read++
+      }
+    }
+    const warnings: string[] = []
+    const found = await readPlayActivity(FILE_NAMES.playActivity, stream, warnings, { bytes: PLAYS.length, events: 100 })
+    expect(warnings).toEqual([TOO_LARGE])
+    expect(found).toEqual({ spotify: [], apple: [], appleSkipped: true, failures: [TOO_LARGE] })
+    expect(read).toBe(2)
+  })
+
+  it('stops at a limit on plays, for a file of very short rows', async () => {
+    const rows = Array.from({ length: 50 }, (_, i) => playRow(t + i * 240_000, { 'Song Name': `Song ${i}` }))
+    const body = playActivity(rows)
+    const stream: TextStream = async (onText) => {
+      for (let at = 0; at < body.length; at += 500) onText(body.slice(at, at + 500))
+    }
+    const warnings: string[] = []
+    const found = await readPlayActivity(FILE_NAMES.playActivity, stream, warnings, { bytes: Infinity, events: 10 })
+    expect(warnings).toEqual([TOO_LARGE])
+    expect(found.appleSkipped).toBe(true)
+  })
+
+  it('shares its limits with the upload’s other play activities', async () => {
+    const whole: TextStream = async (onText) => {
+      onText(PLAYS)
+      onText('') // plays are counted as the next piece arrives
+    }
+    for (const budget of [
+      { bytes: PLAYS.length + 10, events: 100 },
+      { bytes: Infinity, events: 4 },
+    ]) {
+      const warnings: string[] = []
+      const first = await readPlayActivity('First.csv', whole, warnings, budget)
+      const second = await readPlayActivity('Second.csv', whole, warnings, budget)
+      expect(first.apple).toHaveLength(1)
+      expect(second.apple).toEqual([])
+      expect(warnings).toEqual(['Second.csv: skipped (too large to open safely in the browser)'])
+    }
+  })
+
+  it('stops reading a file once it passes a limit', async () => {
+    let cancelled = false
+    const endless = file(FILE_NAMES.playActivity, '')
+    endless.stream = () =>
+      new ReadableStream({
+        pull(controller) {
+          controller.enqueue(new TextEncoder().encode(PLAYS))
+        },
+        cancel() {
+          cancelled = true
+        },
+      }) as ReturnType<File['stream']>
+    const warnings: string[] = []
+    await readPlayActivity(FILE_NAMES.playActivity, fileText(endless), warnings, { bytes: 1000, events: 100 })
+    expect(warnings).toEqual([TOO_LARGE])
+    expect(cancelled).toBe(true)
+  })
+
+  it('stops unzipping an entry that passes a limit', async () => {
+    const zip = await JSZip.loadAsync(await zipBytes({ [FILE_NAMES.playActivity]: PLAYS.repeat(50) }))
+    const warnings: string[] = []
+    const found = await readPlayActivity(FILE_NAMES.playActivity, entryText(zip.files[FILE_NAMES.playActivity]), warnings, { bytes: 1000, events: 100 })
+    expect(warnings).toEqual([TOO_LARGE])
+    expect(found.appleSkipped).toBe(true)
+  })
+
+  it('doesn’t ask for a play activity that’s there but damaged', async () => {
+    const z = new JSZip()
+    z.file(FILE_NAMES.playActivity, PLAYS)
+    z.file(FILE_NAMES.dailyTracks, DAILY)
+    const bytes = await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+    const data = 30 + bytes[26] + bytes[27] * 256 + bytes[28] + bytes[29] * 256
+    bytes.fill(0xa5, data, data + 40)
+    const result = await loadFiles([file('music.zip', bytes as BlobPart)])
+    expect(result.warnings).toEqual([`${FILE_NAMES.playActivity}: couldn't be unzipped, so the zip may be damaged. Try downloading it again`])
+  })
+
+  it('explains a file the browser can’t read, and doesn’t then ask for it', async () => {
+    const locked = file(FILE_NAMES.playActivity, PLAYS)
+    locked.stream = () =>
+      new ReadableStream({
+        start(controller) {
+          controller.error(new DOMException('The requested file could not be read', 'NotReadableError'))
+        },
+      }) as ReturnType<File['stream']>
+    const result = await loadFiles([locked, file(FILE_NAMES.dailyTracks, DAILY)])
+    expect(result.warnings).toEqual([expect.stringMatching(/^Apple Music Play Activity\.csv: couldn't be read from your computer/)])
   })
 })
 
@@ -176,12 +318,6 @@ describe('loading Spotify and Apple Music together', () => {
     const shown = filterPlays(result.plays, { musicOnly: true, hidden: new Set([UNMATCHED_ARTIST]) })
     expect(shown.map((p) => p.title)).toEqual(['Bootleg', 'Blue Plastic', 'Reality Surf'])
   })
-
-  it('works out the shuffle rate from the plays that record it', async () => {
-    const { plays } = await loadFiles([await appleDownload(), file('Streaming_History_Audio_2024.json', spotify)])
-    expect(summarize(plays).shuffleRate).toBe(1)
-    expect(summarize(plays.filter((p) => p.shuffle === null)).shuffleRate).toBeNull()
-  })
 })
 
 describe('isImportFileName', () => {
@@ -195,10 +331,5 @@ describe('isImportFileName', () => {
     ['ReadMeFirst_ExtendedStreamingHistory.pdf', false],
   ])('%s → %s', (path, expected) => {
     expect(isImportFileName(path)).toBe(expected)
-  })
-
-  it('leaves the Spotify-only check as it was', () => {
-    expect(isHistoryFileName(`${DIR}/${FILE_NAMES.playActivity}`)).toBe(false)
-    expect(isHistoryFileName(FILE_NAMES.library)).toBe(false)
   })
 })

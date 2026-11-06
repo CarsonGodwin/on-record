@@ -17,17 +17,21 @@ import {
 } from '../data/insights'
 import {
   canHide,
+  canShowYears,
   filterByYear,
+  filterByYears,
   filterPlays,
   funStats,
   getYears,
   platforms,
+  playsPerYear,
   sameFilter,
   summarize,
   topItems,
   UNMATCHED_ARTIST,
   wearOut,
   weekHourGrid,
+  type YearRange,
 } from '../data/stats'
 import { formatHour, formatNumber, historyName } from '../lib/format'
 import { useMediaQuery } from '../lib/hooks'
@@ -49,7 +53,7 @@ import { Hero } from './Hero'
 import { Launcher, type LauncherMode } from './Launcher'
 import { LinerNotes } from './LinerNotes'
 import { LoveHate, LoveHateTable } from './LoveHate'
-import { SettingsPanel } from './Panels'
+import { MissingHistoryPanel, SettingsPanel } from './Panels'
 import { PosterStudio } from './PosterStudio'
 import { Pulse } from './Pulse'
 import { Race } from './Race'
@@ -101,15 +105,25 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() =>
     result.unmatchedArtists > 0 && result.plays.some((p) => p.kind === 'track' && p.artist !== UNMATCHED_ARTIST) ? new Set([UNMATCHED_ARTIST]) : new Set(),
   )
-  const otherPlays = useMemo(() => result.plays.filter((p) => p.kind !== 'track').length, [result.plays])
+  // Years to leave out, for a history with a long gap in it (one service, then years on another). Null keeps them all.
+  const [yearRange, setYearRange] = useState<YearRange | null>(null)
+  const yearCounts = useMemo(() => playsPerYear(result.plays), [result.plays])
+  const yearBounds = useMemo(() => {
+    const ys = [...yearCounts.keys()]
+    return [Math.min(...ys), Math.max(...ys)] as const
+  }, [yearCounts])
+  // Everything the settings and the hide list talk about is what's inside the range
+  const inRange = useMemo(() => filterByYears(result.plays, yearRange), [result.plays, yearRange])
+  const otherPlays = useMemo(() => inRange.filter((p) => p.kind !== 'track').length, [inRange])
   // Older Apple Music rows don't say whether shuffle was on
-  const noShuffle = useMemo(() => result.plays.filter((p) => p.shuffle === null).length, [result.plays])
-  const hasAnyMusic = otherPlays < result.plays.length
+  const noShuffle = useMemo(() => inRange.filter((p) => p.shuffle === null).length, [inRange])
+  const hasAnyMusic = otherPlays < inRange.length
   const [launcher, setLauncher] = useState<LauncherMode | null>(null)
   // Settings opens from the launcher and goes back to it on close, like the launcher's own pages
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [missingOpen, setMissingOpen] = useState(result.failures.length > 0)
   // A history with no music at all keeps its podcasts, or there would be nothing to show
-  const chosen = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden }), [musicOnly, hasAnyMusic, hidden])
+  const chosen = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden, years: yearRange }), [musicOnly, hasAnyMusic, hidden, yearRange])
   /*
    * The charts follow `applied`, which catches up with `chosen` once the launcher and Settings are
    * closed and an "Updating" note has painted. Re-running every chart over a long history holds the
@@ -183,10 +197,10 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const firstHeard = useMemo(() => firstListens(all), [all])
   // Every music artist, most-listened first, ranked once. The launcher's lists split it by what's hidden,
   // which stays quick with thousands of artists.
-  const musicArtists = useMemo(() => topItems(result.plays, 'artist', 'time', Infinity), [result.plays])
+  const musicArtists = useMemo(() => topItems(inRange, 'artist', 'time', Infinity), [inRange])
   const hiddenPlays = useMemo(
-    () => (applied.filter.hidden.size === 0 ? 0 : result.plays.filter((p) => p.kind === 'track' && applied.filter.hidden.has(p.artist)).length),
-    [result.plays, applied.filter.hidden],
+    () => (applied.filter.hidden.size === 0 ? 0 : inRange.filter((p) => p.kind === 'track' && applied.filter.hidden.has(p.artist)).length),
+    [inRange, applied.filter.hidden],
   )
   const pulseArtists = useMemo(
     () =>
@@ -389,6 +403,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
   useCloseOnBack(launcher !== null, () => setLauncher(null))
   useCloseOnBack(settingsOpen, () => setSettingsOpen(false))
+  useCloseOnBack(missingOpen, () => setMissingOpen(false))
 
   // Arrow keys deal cards too, except where a slider or the day details want them
   useEffect(() => {
@@ -419,6 +434,15 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   function hideArtists(artists: string[]): boolean {
     if (!canHide(musicArtists, hidden, artists)) return false
     setHidden((prev) => new Set([...prev, ...artists]))
+    return true
+  }
+
+  /** Leaves out years outside the range, unless that would leave nothing to show (see canShowYears) */
+  function pickYears(next: YearRange): boolean {
+    const [first, last] = yearBounds
+    const full = next[0] <= first && next[1] >= last
+    if (!full && !canShowYears(result.plays, hidden, next)) return false
+    setYearRange(full ? null : next)
     return true
   }
 
@@ -752,6 +776,11 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                       {formatNumber(result.skippedRows)} rows without track info ignored ({skippedRowsHint(result.sources)})
                     </li>
                     {applied.filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
+                    {applied.filter.years && (
+                      <li>
+                        Plays outside {applied.filter.years[0]}–{applied.filter.years[1]} left out (Years)
+                      </li>
+                    )}
                     {applied.filter.hidden.size > 0 && (
                       <li>
                         {formatNumber(hiddenPlays)} plays by {applied.filter.hidden.size} hidden artist{applied.filter.hidden.size === 1 ? '' : 's'} left out
@@ -811,6 +840,9 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         sides={SIDES}
         years={years}
         year={year}
+        yearCounts={yearCounts}
+        range={yearRange}
+        onRange={pickYears}
         musicOnly={chosen.musicOnly}
         artists={musicArtists}
         hidden={hidden}
@@ -833,6 +865,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         otherPlays={otherPlays}
         hasAnyMusic={hasAnyMusic}
       />
+      <MissingHistoryPanel open={missingOpen} onClose={() => setMissingOpen(false)} onReset={clearData} failures={result.failures} />
       {/* Paints before the charts are worked out again, so the moment that takes doesn't look like a hang */}
       <p className="dash__updating" role="status">
         {updating ? 'Updating the charts…' : ''}

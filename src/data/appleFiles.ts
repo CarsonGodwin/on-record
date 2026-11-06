@@ -10,14 +10,25 @@
  * different name.
  */
 
+import type { PlayActivity } from './apple'
+
 export type AppleFileKind = 'playActivity' | 'dailyTracks' | 'recentlyPlayed' | 'trackHistory' | 'library'
 
 /** An Apple Music file, read but not yet parsed: the files only make sense together */
 export interface AppleText {
-  kind: AppleFileKind
+  kind: Exclude<AppleFileKind, 'playActivity'>
   name: string
   text: string
 }
+
+/** The play activity, parsed as it was read, since it can be too long to hold as text */
+export interface ApplePlays {
+  kind: 'playActivity'
+  name: string
+  activity: PlayActivity
+}
+
+export type AppleFile = AppleText | ApplePlays
 
 const FILES: Record<string, AppleFileKind> = {
   // One row per playback event: the plays themselves
