@@ -22,7 +22,8 @@
   --radius: 20px;
 
   --display: 'Bricolage Grotesque Variable', system-ui, -apple-system, sans-serif;
-  --serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  /* The old narrow serif voice read as a stock "editorial" accent, so every place that asked for it now speaks in the display face */
+  --serif: var(--display);
   --mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 
   font-family: var(--display);
@@ -69,9 +70,8 @@ code {
 }
 
 em {
-  font-family: var(--serif);
   font-style: normal;
-  font-weight: 400;
+  font-weight: bolder;
 }
 
 ::selection {
@@ -498,10 +498,13 @@ th {
   font-family: var(--mono);
 }
 
+/* Square-cornered like card stock, with a hairline so a black sleeve doesn't melt into the page */
 .cover {
   display: block;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 2px;
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
 }
 
 .cover--empty {
@@ -587,25 +590,13 @@ th {
 }
 
 .landing__title {
-  font-size: clamp(3.4rem, 9.5vw, 8.4rem);
-  font-weight: 800;
-  line-height: 0.86;
-  letter-spacing: -0.05em;
-  margin: 0 0 26px;
-}
-
-/* The eyebrow sits inside the h1 so the heading says what the site is, but keeps its own voice */
-.landing__title .eyebrow {
-  display: block;
-  margin-bottom: 18px;
-  font-weight: 400;
-  letter-spacing: normal;
-}
-
-.landing__title em {
-  font-size: 1.08em;
-  letter-spacing: -0.02em;
-  color: var(--accent);
+  max-width: 11ch;
+  margin: 0 0 22px;
+  font-size: clamp(3rem, 7.2vw, 6rem);
+  font-weight: 560;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
 }
 
 .landing__lede {
@@ -997,8 +988,8 @@ th {
   }
 
   .landing__title {
-    margin: 0 0 14px;
-    font-size: clamp(3rem, 15vw, 3.6rem);
+    margin: 0 0 12px;
+    font-size: clamp(2.6rem, 13vw, 3.4rem);
   }
 
   .landing__lede {
@@ -2255,7 +2246,7 @@ th {
 }
 
 .race__cover {
-  border-radius: 6px;
+  border-radius: 2px;
 }
 
 .race__track {
@@ -3127,7 +3118,6 @@ th {
 .duel__cover {
   width: 96px;
   height: 96px;
-  border-radius: 10px;
 }
 
 .duel__info {
@@ -3232,7 +3222,7 @@ th {
   border-radius: 24px;
   overflow: hidden;
   border: 1px solid var(--line);
-  background: #07060c;
+  background: var(--bg);
 }
 
 .constellation svg {
@@ -3258,7 +3248,7 @@ th {
   position: absolute;
   top: 12px;
   right: 12px;
-  background: #07060c;
+  background: var(--bg);
 }
 
 /* Zoom: − 1.0× + and a reset, shared by the record and the constellation */
@@ -3331,17 +3321,6 @@ th {
   }
 }
 
-.constellation__star {
-  fill: #fff;
-  opacity: 0.5;
-  animation: twinkle 4s ease-in-out infinite alternate;
-}
-
-@keyframes twinkle {
-  from { opacity: 0.08; }
-  to { opacity: 0.7; }
-}
-
 .constellation__link {
   stroke: var(--text);
   transition: stroke-opacity 0.25s;
@@ -3360,9 +3339,9 @@ th {
 .constellation__label {
   fill: var(--text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   paint-order: stroke;
-  stroke: #07060c;
+  stroke: var(--bg);
   stroke-width: 4px;
   stroke-linejoin: round;
   pointer-events: none;
@@ -3548,17 +3527,25 @@ th {
 .podium {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
-  align-items: end;
-  gap: clamp(14px, 3vw, 32px);
+  column-gap: clamp(14px, 3vw, 32px);
   margin: 0 0 40px;
   padding: 0;
   list-style: none;
 }
 
+/* Each spot shares the podium's rows, so the covers line up along their bottoms however far a name wraps */
 .podium__spot {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-row: span 5;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: subgrid;
+  column-gap: 12px;
+  align-items: start;
   min-width: 0;
+}
+
+.podium__spot > * {
+  grid-column: 2;
 }
 
 .podium__spot--1 {
@@ -3581,43 +3568,47 @@ th {
     order: 0;
     grid-column: 1 / -1;
   }
+  .podium__spot--1 > :last-child {
+    margin-bottom: 24px;
+  }
 }
 
 .podium__art {
-  position: relative;
-  margin-bottom: 18px;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  align-self: end;
+  margin-bottom: 14px;
 }
 
 .podium__art .cover {
   width: 100%;
   height: auto;
   aspect-ratio: 1;
-  border-radius: 14px;
+  border-radius: 3px;
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.8);
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .podium__spot:hover .cover {
-  transform: rotate(-2deg) scale(1.02);
+  transform: translateY(-4px);
 }
 
+/* Beside the name rather than over the art: the type on a cover is the picture, and a numeral would sit on it */
 .podium__rank {
-  position: absolute;
-  left: -6px;
-  bottom: -26px;
-  font-size: clamp(4.5rem, 10vw, 8rem);
+  grid-column: 1;
+  grid-row: 2 / span 4;
+  font-size: clamp(2.6rem, 5vw, 4rem);
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.06em;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
   color: var(--text);
-  -webkit-text-stroke: 3px var(--bg);
-  paint-order: stroke fill;
 }
 
 .podium__name {
+  grid-row: 2;
   font-size: clamp(1.1rem, 2.2vw, 1.5rem);
   line-height: 1.15;
-  margin-top: 8px;
   overflow-wrap: anywhere;
 }
 
@@ -3626,11 +3617,13 @@ th {
 }
 
 .podium__sub {
+  grid-row: 3;
   color: var(--muted);
   font-size: 0.9rem;
 }
 
 .podium__value {
+  grid-row: 4;
   margin-top: 4px;
   font-family: var(--mono);
   font-size: 0.82rem;
@@ -4727,6 +4720,64 @@ html.tour-open {
    Launcher (⌘K), Settings and Help
    ================================================================= */
 
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch__track {
+  position: relative;
+  flex-shrink: 0;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  transition: background 0.2s;
+}
+
+.switch__track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.switch input:checked + .switch__track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch input:checked + .switch__track::after {
+  transform: translateX(18px);
+  background: var(--accent-ink);
+}
+
+.switch input:focus-visible + .switch__track {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.switch input:disabled ~ * {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .topbar__launch {
   position: relative;
   display: inline-flex;
@@ -5104,6 +5155,11 @@ kbd {
   color: var(--muted);
 }
 
+.launcher__switch {
+  flex-shrink: 0;
+  align-self: center;
+}
+
 .launcher__tag {
   flex-shrink: 0;
   align-self: center;
@@ -5207,63 +5263,6 @@ kbd {
   margin-top: 18px;
 }
 
-.switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  font-weight: 650;
-}
-
-.switch input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-}
-
-.switch__track {
-  position: relative;
-  width: 42px;
-  height: 24px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  transition: background 0.2s;
-}
-
-.switch__track::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--muted);
-  transition: transform 0.2s, background 0.2s;
-}
-
-.switch input:checked + .switch__track {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.switch input:checked + .switch__track::after {
-  transform: translateX(18px);
-  background: var(--accent-ink);
-}
-
-.switch input:focus-visible + .switch__track {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
-
-.switch input:disabled ~ * {
-  opacity: 0.5;
-  cursor: default;
-}
-
 .help__keys {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -5305,7 +5304,8 @@ kbd {
 }
 
 .podium__spot .chart-hide {
-  align-self: flex-start;
+  grid-row: 5;
+  justify-self: start;
   margin-top: 8px;
 }
 
@@ -5688,6 +5688,8 @@ html.cards-open body {
 }
 
 .vinyl__date em {
+  display: inline-block;
+  white-space: nowrap;
   margin-left: 6px;
   color: var(--accent);
   font-style: normal;
@@ -6987,7 +6989,7 @@ html.cards-open body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #07060c;
+  background: var(--bg);
 }
 
 .dash.is-cards .constellation.is-card .constellation__sky {
@@ -7001,19 +7003,9 @@ html.cards-open body {
   inset: 0;
 }
 
-/* Background stars and halos stay, just quieter, so they don't read as artists on a small screen */
-.dash.is-cards .constellation.is-card .constellation__star {
-  opacity: 0.16;
-  animation-name: twinkle-faint;
-}
-
-@keyframes twinkle-faint {
-  from { opacity: 0.04; }
-  to { opacity: 0.3; }
-}
-
-.dash.is-cards .constellation.is-card .constellation__halo {
-  opacity: 0.14;
+/* Background stars stay, just quieter, so they don't read as artists on a small screen */
+.dash.is-cards .constellation.is-card .constellation__field {
+  opacity: 0.45;
 }
 
 .constellation__reset {
@@ -7024,7 +7016,7 @@ html.cards-open body {
   padding: 0 18px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
-  background: rgba(7, 6, 12, 0.82);
+  background: rgba(11, 10, 15, 0.82);
   color: var(--text);
   font: inherit;
   font-size: 0.92rem;
@@ -7317,12 +7309,16 @@ html.cards-open body {
   grid-column: auto;
 }
 
+.dash.is-cards .charts.is-card .podium__spot--1 > :last-child {
+  margin-bottom: 0;
+}
+
 .dash.is-cards .charts.is-card .podium__art {
   margin-bottom: 10px;
 }
 
 .dash.is-cards .charts.is-card .podium__art .cover {
-  border-radius: 10px;
+  border-radius: 2px;
   box-shadow: 0 16px 30px -14px rgba(0, 0, 0, 0.8);
 }
 
@@ -7330,15 +7326,39 @@ html.cards-open body {
   transform: none;
 }
 
+/* A narrow column, so only the name shares its line with the numeral */
+.dash.is-cards .charts.is-card .podium__spot {
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 6px;
+}
+
+.dash.is-cards .charts.is-card .podium__art {
+  grid-row: 1;
+}
+
 .dash.is-cards .charts.is-card .podium__rank {
-  left: 0;
-  bottom: -12px;
-  font-size: 2.3rem;
-  -webkit-text-stroke: 2.5px var(--bg);
+  grid-row: 2;
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-top: 2px;
 }
 
 .dash.is-cards .charts.is-card .podium__spot--1 .podium__rank {
-  font-size: 2.8rem;
+  font-size: 1.5rem;
+}
+
+.dash.is-cards .charts.is-card .podium__name {
+  grid-row: 2;
+}
+
+.dash.is-cards .charts.is-card .podium__sub {
+  grid-row: 3;
+  grid-column: 1 / -1;
+}
+
+.dash.is-cards .charts.is-card .podium__value {
+  grid-row: 4;
+  grid-column: 1 / -1;
 }
 
 .dash.is-cards .charts.is-card .podium__name {

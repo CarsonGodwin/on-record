@@ -87,14 +87,9 @@ export default function App() {
 
       <main className="landing__main">
         <div className="landing__copy">
-          <h1 className="landing__title">
-            <span className="eyebrow">An in-depth analysis of your entire Spotify or Apple Music history</span>{' '}
-            My life,
-            <br />
-            <em>my listening record.</em>
-          </h1>
+          <h1 className="landing__title">One groove for every day you listened.</h1>
           <p className="landing__lede">
-            Drop in your Spotify or Apple Music export and get every day of your listening pressed into vinyl.
+            Drop in your Spotify or Apple Music export and your whole history is pressed into a record.
             {/* A phone's first screen keeps to the one sentence, so the sleeve and the demo fit on it too */}
             <span className="landing__more">
               {' '}
@@ -114,7 +109,6 @@ export default function App() {
               )}
             </div>
           )}
-
         </div>
 
         {/* Your own export is the main way in; the demo is the fallback underneath it */}

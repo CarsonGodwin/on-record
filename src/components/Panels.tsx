@@ -139,42 +139,6 @@ export function MissingHistoryPanel({ open, onClose, onReset, failures }: Missin
   )
 }
 
-interface SettingsProps {
-  open: boolean
-  onClose: () => void
-  onGone: () => void
-  musicOnly: boolean
-  onMusicOnly: (on: boolean) => void
-  /** Podcast and audiobook plays in the whole export; 0 hides the switch's effect */
-  otherPlays: number
-  /** False when the export has no music at all, so music only would leave nothing */
-  hasAnyMusic: boolean
-}
-
-export function SettingsPanel({ open, onClose, onGone, musicOnly, onMusicOnly, otherPlays, hasAnyMusic }: SettingsProps) {
-  const canToggle = hasAnyMusic && otherPlays > 0
-  return (
-    <Modal open={open} onClose={onClose} onGone={onGone} label="Settings" className="modal--panel">
-      <ModalHead title="Settings" onClose={onClose} />
-
-      <section className="settings__row">
-        <label className="switch">
-          <input type="checkbox" checked={musicOnly && hasAnyMusic} disabled={!canToggle} onChange={(e) => onMusicOnly(e.target.checked)} />
-          <span className="switch__track" aria-hidden="true" />
-          <span className="switch__label">Music only</span>
-        </label>
-        <p className="settings__note">
-          {!hasAnyMusic
-            ? 'There’s no music in this history, so podcasts and audiobooks stay in.'
-            : otherPlays === 0
-              ? 'There are no podcasts or audiobooks in this history.'
-              : `Leaves out ${formatNumber(otherPlays)} podcast and audiobook play${otherPlays === 1 ? '' : 's'}.`}
-        </p>
-      </section>
-    </Modal>
-  )
-}
-
 export interface YearsProps {
   /** Plays that started in each year of the whole export */
   yearCounts: ReadonlyMap<number, number>

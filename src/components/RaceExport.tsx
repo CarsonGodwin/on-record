@@ -1,6 +1,7 @@
-import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import type { Bins, RaceData } from '../data/insights'
 import { InCards } from '../lib/stage'
+import { coverFor, drawCover, whenCoverFonts } from '../viz/cover'
 import { makeRaceVideo, raceVideoMode } from '../viz/raceVideo'
 
 /*
@@ -18,13 +19,11 @@ interface Props {
   bins: Bins
   race: RaceData
   colors: Map<string, string>
-  /** The page's race board: its covers are reused for the video */
-  board: RefObject<HTMLElement | null>
   /** Told when a render starts, and when it and the video it made are put away */
   onBusy?: (busy: boolean) => void
 }
 
-export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
+export function RaceExport({ bins, race, colors, onBusy }: Props) {
   const cards = useContext(InCards)
   const [mode] = useState(raceVideoMode)
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
@@ -50,7 +49,8 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
     const controller = new AbortController()
     abort.current = controller
     setPhase({ kind: 'rendering', progress: 0 })
-    const { covers, urls } = await loadCovers(board.current, race.names)
+    await whenCoverFonts()
+    const covers = paintCovers(race.names)
     try {
       const file = await makeRaceVideo(
         { bins, race, colors, covers },
@@ -63,8 +63,6 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
       if ((err as Error).name === 'AbortError' || controller.signal.aborted) return
       console.error(err)
       setPhase({ kind: 'error' })
-    } finally {
-      urls.forEach((u) => URL.revokeObjectURL(u))
     }
   }
 
@@ -195,32 +193,18 @@ function ShareIcon() {
   )
 }
 
-/** The board's generated covers as images, in `names` order (the board renders a row per name, in that order) */
-async function loadCovers(board: HTMLElement | null, names: string[]) {
+/** The same covers as the page's, painted for the video. A serialized SVG can't reach the page's fonts */
+function paintCovers(names: string[]) {
   const covers = new Map<string, CanvasImageSource>()
-  const urls: string[] = []
-  const svgs = board ? [...board.querySelectorAll<SVGSVGElement>('svg.race__cover')] : []
-  await Promise.all(
-    names.map(async (name, i) => {
-      const svg = svgs[i]
-      if (!svg) return
-      const clone = svg.cloneNode(true) as SVGSVGElement
-      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-      clone.setAttribute('width', '256')
-      clone.setAttribute('height', '256')
-      const href = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }))
-      urls.push(href)
-      const img = new Image()
-      img.src = href
-      try {
-        await img.decode()
-        covers.set(name, img)
-      } catch {
-        // Falls back to a plain colour square
-      }
-    }),
-  )
-  return { covers, urls }
+  for (const name of names) {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 256
+    const ctx = canvas.getContext('2d')
+    if (!ctx) continue
+    drawCover(ctx, coverFor(name), 0, 0, 256)
+    covers.set(name, canvas)
+  }
+  return covers
 }
 
 function canShareFile(file: File): boolean {
