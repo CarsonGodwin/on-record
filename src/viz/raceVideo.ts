@@ -139,7 +139,7 @@ export function makeRaceFilm({ bins, race, colors, covers }: RaceScene): RaceFil
       const cx = pad + 6 * u
       ctx.save()
       ctx.beginPath()
-      ctx.roundRect(cx, cy - coverS / 2, coverS, coverS, 1.1 * u)
+      ctx.roundRect(cx, cy - coverS / 2, coverS, coverS, 0.3 * u)
       ctx.clip()
       const cover = covers.get(name)
       if (cover) ctx.drawImage(cover, cx, cy - coverS / 2, coverS, coverS)

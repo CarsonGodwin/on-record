@@ -31,6 +31,8 @@ interface Item {
   terms?: string
   /** Artists have none: picking them goes through the selection */
   run?: () => void
+  /** A switch in place of the hint: the row flips it without closing the launcher */
+  toggle?: boolean
   /** The "all matches" row: every artist the search finds, past the ones listed too */
   names?: string[]
 }
@@ -50,7 +52,7 @@ interface Props extends YearsProps {
   sides: Record<string, string>
   years: number[]
   year: number | null
-  /** Whether podcasts and audiobooks are left out, shown beside Settings */
+  /** Whether podcasts and audiobooks are left out, its switch is in the Commands */
   musicOnly: boolean
   /** Every music artist, hidden ones too, most-listened first */
   artists: Ranked[]
@@ -60,7 +62,9 @@ interface Props extends YearsProps {
   /** Returns false when hiding them would leave nothing to show */
   onHide: (artists: string[]) => boolean
   onUnhide: (artists: string[]) => void
-  onSettings: () => void
+  onMusicOnly: (on: boolean) => void
+  /** False when there's nothing to leave out, or no music to keep: the row is left off */
+  canToggleMusicOnly: boolean
   onReset: () => void
 }
 
@@ -119,7 +123,8 @@ function LauncherBody({
   onYear,
   onHide,
   onUnhide,
-  onSettings,
+  onMusicOnly,
+  canToggleMusicOnly,
   onReset,
 }: Props & { mode: 'root' | 'artists' }) {
   const [query, setQuery] = useState('')
@@ -157,7 +162,18 @@ function LauncherBody({
       return [all, ...listed]
     }
     const all: Item[] = [
-      { key: 'settings', group: 'Commands', label: 'Settings', hint: musicOnly ? 'Music only' : 'Music + Podcasts and Audiobooks', run: onSettings },
+      ...(canToggleMusicOnly
+        ? [
+            {
+              key: 'podcasts',
+              group: 'Commands',
+              label: 'Include podcasts and audiobooks?',
+              toggle: !musicOnly,
+              terms: 'music only spoken',
+              run: () => onMusicOnly(!musicOnly),
+            },
+          ]
+        : []),
       {
         key: 'artists',
         group: 'Commands',
@@ -195,9 +211,9 @@ function LauncherBody({
         run: () => onYear(y),
       })),
     ]
-    // The hint beside a command finds it too: "music" finds Settings, "license" finds About
+    // The hint beside a command finds it too: "podcast" finds the switch, "license" finds About
     return all.filter((item) => matches(query, `${item.label} ${item.hint ?? ''} ${item.terms ?? ''}`))
-  }, [mode, query, artists, hidden, tracks, sides, years, year, range, musicOnly, onSettings, onReset, onMode, onJump, onYear])
+  }, [mode, query, artists, hidden, tracks, sides, years, year, range, musicOnly, canToggleMusicOnly, onMusicOnly, onReset, onMode, onJump, onYear])
 
   const firstPick = items[0]?.names ? 1 : 0
   const { current, from, to } = span(sel, items.length, firstPick)
@@ -308,6 +324,7 @@ function LauncherBody({
                 id={`launcher-${item.key}`}
                 role="option"
                 aria-selected={i === current || inPick}
+                aria-checked={item.toggle}
                 className={`launcher__item${i === current ? ' is-active' : ''}${isHidden ? ' is-hidden' : ''}`}
                 // Focus (and so the arrows and Enter) stays in the search box, and a Shift-click doesn't select text
                 onMouseDown={(e) => e.preventDefault()}
@@ -320,6 +337,12 @@ function LauncherBody({
               >
                 <span className="launcher__label">{item.label}</span>
                 {isHidden && <span className="launcher__tag">Hidden</span>}
+                {item.toggle !== undefined && (
+                  <span className="switch launcher__switch" aria-hidden="true">
+                    <input type="checkbox" checked={item.toggle} tabIndex={-1} readOnly />
+                    <span className="switch__track" />
+                  </span>
+                )}
                 {item.hint && <span className="launcher__hint">{item.hint}</span>}
                 {item.shortcut && <kbd className="launcher__shortcut">{item.shortcut}</kbd>}
               </div>

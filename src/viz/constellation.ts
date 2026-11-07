@@ -57,6 +57,41 @@ export interface Star {
   r: number
 }
 
+type Disc = Pick<Star, 'x' | 'y' | 'r'>
+
+export interface Box {
+  x0: number
+  x1: number
+  y0: number
+  y1: number
+}
+
+/** Whether a name's box comes within `clearance` of a star, measured to its round edge rather than a square around it */
+export function boxTouchesDisc(box: Box, disc: Disc, clearance: number): boolean {
+  const dx = disc.x - Math.max(box.x0, Math.min(box.x1, disc.x))
+  const dy = disc.y - Math.max(box.y0, Math.min(box.y1, disc.y))
+  return Math.hypot(dx, dy) < disc.r + clearance
+}
+
+/**
+ * The line between two stars, stopping `gap` short of each edge the way a star
+ * atlas draws it. Null when the stars are too close to leave any line to draw.
+ */
+export function linkEnds(a: Disc, b: Disc, gap: number): { x1: number; y1: number; x2: number; y2: number } | null {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const length = Math.hypot(dx, dy)
+  const fromA = a.r + gap
+  const fromB = b.r + gap
+  if (length <= fromA + fromB) return null
+  return {
+    x1: a.x + (dx / length) * fromA,
+    y1: a.y + (dy / length) * fromA,
+    x2: b.x - (dx / length) * fromB,
+    y2: b.y - (dy / length) * fromB,
+  }
+}
+
 /**
  * The star a tap at (x, y) means: the one whose edge is nearest, as long as the tap
  * is within `reach` of that edge. Small stars make small targets, so a phone

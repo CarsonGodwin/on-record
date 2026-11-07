@@ -6,7 +6,7 @@ import { isHover } from '../lib/pointer'
 import { mulberry32 } from '../lib/random'
 import { InCards } from '../lib/stage'
 import { usePanZoom } from '../lib/zoom'
-import { layoutConstellation, nearestStar, starSize, trimGraph } from '../viz/constellation'
+import { boxTouchesDisc, layoutConstellation, linkEnds, nearestStar, starSize, trimGraph, type Box } from '../viz/constellation'
 import { ZoomControls } from './ZoomControls'
 
 /*
@@ -21,7 +21,12 @@ interface Props {
   onPoster?: () => void
 }
 
-const STARLIGHT = '#d9d4ff'
+/** For artists outside the colored top few: muted, so they don't outshine the stars that matter most */
+const STARLIGHT = 'var(--muted)'
+/** How far a line stops short of each star's edge */
+const LINK_GAP = 3
+/** How far a name stays from any star it isn't next to */
+const LABEL_CLEARANCE = 2
 /** On a phone's card a tap takes the nearest star this far past its edge, since the stars themselves are small targets */
 const REACH = 30
 
@@ -86,9 +91,15 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   }
   const grow = Math.pow(view.s, 0.3)
 
+  // A still field of mostly faint stars and a few bright ones, tying size to brightness as a real sky does
   const stars = useMemo(() => {
     const rand = mulberry32(99)
-    return Array.from({ length: 160 }, () => ({ x: rand(), y: rand(), r: rand() * 1.1 + 0.2, delay: rand() * 6 }))
+    return Array.from({ length: 60 }, () => {
+      const x = rand()
+      const y = rand()
+      const bright = rand() ** 3
+      return { x, y, r: 0.4 + bright * 1.1, opacity: 0.12 + bright * 0.5 }
+    })
   }, [])
 
   const neighbors = useMemo(() => {
@@ -108,6 +119,7 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   // More names fit as the stars spread out
   const labelled = new Set(nodes.slice(0, Math.round((narrow ? 8 : 14) * view.s * view.s)).map((n) => n.id))
   const radius = (n: GraphNode) => starSize(n.ms, maxMs) * (narrow ? 0.85 : 1) * grow
+  const byId = new Map(nodes.map((n) => [n.id, n]))
 
   const activeLinks = shown
     ? links
@@ -122,10 +134,12 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
   type Label = { x: number; y: number; anchor: 'middle' | 'start' | 'end' }
   const labels = (() => {
     const placed = new Map<string, Label>()
-    const charW = narrow ? 7.4 : 7
-    const boxes: { x0: number; x1: number; y0: number; y1: number }[] = []
-    // A name that would land on another, or off the card, waits until zooming spreads the stars out
-    const off = (b: (typeof boxes)[number]) => b.x0 < 0 || b.x1 > width || (card && (b.y0 < 0 || b.y1 > height))
+    const charW = narrow ? 7.1 : 7
+    const boxes: Box[] = []
+    // Dimmed stars can sit under a name; with one selected, only the stars still lit need to stay readable
+    const discs = nodes.filter((n) => isLit(n.id)).map((n) => ({ ...pos(n.id), r: radius(n) }))
+    // A name that would land on another, on a star, or off the card, waits until zooming spreads the stars out
+    const off = (b: Box) => b.x0 < 0 || b.x1 > width || (card && (b.y0 < 0 || b.y1 > height))
     const place = (n: GraphNode, avoid: boolean) => {
       const p = pos(n.id)
       const r = radius(n)
@@ -139,10 +153,29 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
         { x: cx, y: p.y - r - 7, anchor: 'middle', x0: cx - w / 2 },
         { x: p.x + r + 5, y: p.y + 4, anchor: 'start', x0: p.x + r + 2 },
         { x: p.x - r - 5, y: p.y + 4, anchor: 'end', x0: p.x - r - 2 - w },
+        // Hemmed in on all four sides: slide along above or below, still over the star, so a big star doesn't lose its name
+        ...[0.25, -0.25, 0.45, -0.45].flatMap((slide) => {
+          const x = Math.max(w / 2, Math.min(width - w / 2, p.x + slide * w))
+          return [
+            { x, y: p.y + r + 14, anchor: 'middle' as const, x0: x - w / 2 },
+            { x, y: p.y - r - 7, anchor: 'middle' as const, x0: x - w / 2 },
+          ]
+        }),
+        // Then the corners
+        { x: p.x + r * 0.8 + 5, y: p.y + r * 0.8 + 14, anchor: 'start', x0: p.x + r * 0.8 + 2 },
+        { x: p.x - r * 0.8 - 5, y: p.y + r * 0.8 + 14, anchor: 'end', x0: p.x - r * 0.8 - 2 - w },
+        { x: p.x + r * 0.8 + 5, y: p.y - r * 0.8 - 6, anchor: 'start', x0: p.x + r * 0.8 + 2 },
+        { x: p.x - r * 0.8 - 5, y: p.y - r * 0.8 - 6, anchor: 'end', x0: p.x - r * 0.8 - 2 - w },
       ]
       for (const { x0, ...spot } of avoid ? spots : spots.slice(0, 1)) {
         const box = { x0, x1: x0 + w, y0: spot.y - 12, y1: spot.y + 4 }
-        if (avoid && (off(box) || boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1))) continue
+        if (
+          avoid &&
+          (off(box) ||
+            boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1) ||
+            discs.some((d) => boxTouchesDisc(box, d, LABEL_CLEARANCE)))
+        )
+          continue
         boxes.push(box)
         placed.set(n.id, spot)
         return
@@ -153,13 +186,7 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
     } else if (!narrow) {
       for (const n of nodes) if (isLit(n.id)) place(n, false)
     } else {
-      const byId = new Map(nodes.map((n) => [n.id, n]))
-      const self = byId.get(shown)!
-      const p = pos(shown)
-      const r = radius(self)
-      // The selected star itself stays clear
-      boxes.push({ x0: p.x - r, x1: p.x + r, y0: p.y - r, y1: p.y + r })
-      place(self, true)
+      place(byId.get(shown)!, true)
       for (const l of activeLinks) place(byId.get(l.other)!, true)
     }
     return placed
@@ -191,33 +218,24 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
           setActive(null)
         }}
       >
-        <defs>
-          <filter id="star-glow" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="7" />
-          </filter>
-        </defs>
-        {stars.map((s, i) => (
-          <circle
-            key={i}
-            cx={s.x * width}
-            cy={s.y * height}
-            r={s.r}
-            className="constellation__star"
-            style={{ animationDelay: `${s.delay}s` }}
-          />
-        ))}
+        <g className="constellation__field" aria-hidden="true">
+          {stars.map((s, i) => (
+            <circle key={i} cx={s.x * width} cy={s.y * height} r={s.r} fill="var(--text)" opacity={s.opacity} />
+          ))}
+        </g>
 
         {links.map((l) => {
-          const a = pos(l.source)
-          const b = pos(l.target)
+          const ends = linkEnds(
+            { ...pos(l.source), r: radius(byId.get(l.source)!) },
+            { ...pos(l.target), r: radius(byId.get(l.target)!) },
+            LINK_GAP,
+          )
+          if (!ends) return null
           const on = shown && (l.source === shown || l.target === shown)
           return (
             <line
               key={`${l.source}-${l.target}`}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
+              {...ends}
               className={on ? 'constellation__link is-on' : 'constellation__link'}
               strokeWidth={0.6 + (l.count / maxCount) * 2.4}
               strokeOpacity={shown ? (on ? 0.9 : 0.04) : 0.1 + (l.count / maxCount) * 0.4}
@@ -252,15 +270,13 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
               onFocus={(e) => (!card || e.currentTarget.matches(':focus-visible')) && setActive(n.id)}
               onBlur={() => setActive(null)}
             >
-              <circle cx={p.x} cy={p.y} r={r * 1.9} fill={color} opacity={0.35} filter="url(#star-glow)" className="constellation__halo" />
               <circle cx={p.x} cy={p.y} r={r} fill={color} />
-              <circle cx={p.x} cy={p.y} r={r * 0.35} fill="#fff" opacity={0.75} />
               <circle cx={p.x} cy={p.y} r={Math.max(r + 8, 14)} fill="transparent" />
             </g>
           )
         })}
 
-        {/* Names sit above every star so a neighbor's glow never covers them */}
+        {/* Names sit above every star so a neighbor never covers them */}
         <g aria-hidden="true" pointerEvents="none">
           {[...labels].map(([id, label]) => (
             <text key={id} x={label.x} y={label.y} textAnchor={label.anchor} className="constellation__label">
@@ -329,8 +345,7 @@ export function Constellation({ nodes: allNodes, links: allLinks, colors, onPost
           </>
         ) : (
           <span className="muted">
-            Bigger stars got more of your time. Lines join artists you play back to back, thicker for more often.{' '}
-            {narrow ? 'Tap a star.' : 'Hover a star, click to keep it selected.'}
+            Bigger stars got more of your time. {narrow ? 'Tap a star.' : 'Hover a star, click to keep it.'}
           </span>
         )}
         </div>
