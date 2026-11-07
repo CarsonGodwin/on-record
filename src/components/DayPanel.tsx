@@ -84,10 +84,12 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
         <dt>Artists</dt>
         <dd>{formatNumber(detail.artists.length)}</dd>
       </div>
-      <div>
-        <dt>Skipped</dt>
-        <dd>{formatNumber(detail.skips)}</dd>
-      </div>
+      {detail.skips !== null && (
+        <div>
+          <dt>Skipped</dt>
+          <dd>{formatNumber(detail.skips)}</dd>
+        </div>
+      )}
     </dl>
   )
 

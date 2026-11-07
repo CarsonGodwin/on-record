@@ -33,11 +33,12 @@ export interface RawStreamRecord {
 export type PlayKind = 'track' | 'episode' | 'audiobook'
 
 /** The service an export came from */
-export type DataSource = 'spotify' | 'apple'
+export type DataSource = 'spotify' | 'apple' | 'lastfm'
 
 /**
  * A cleaned-up stream. Every chart works from Play[], whichever service it came from.
- * Apple Music listens are converted into the same shape in data/apple.ts.
+ * Apple Music listens are converted into the same shape in data/apple.ts, and Last.fm
+ * scrobbles in data/lastfm.ts, where msPlayed is an estimate.
  */
 export interface Play {
   /**
@@ -61,9 +62,10 @@ export interface Play {
   /** Spotify's reason_start / reason_end vocabulary ("trackdone", "fwdbtn", ...); Apple's end reasons are mapped onto it */
   reasonStart: string
   reasonEnd: string
-  /** null when the export doesn't say (older Apple Music rows don't) */
+  /** null when the export doesn't say (older Apple Music rows and Last.fm don't) */
   shuffle: boolean | null
-  skipped: boolean
+  /** null when the export can't say (Last.fm never records a skipped song) */
+  skipped: boolean | null
   offline: boolean
   incognito: boolean
 }
@@ -78,6 +80,8 @@ export interface LoadResult {
   skippedRows: number
   /** Rows seen more than once, e.g. the same file dropped twice */
   duplicateRows: number
+  /** Last.fm scrobbles left out because a Spotify or Apple Music export covers those days */
+  overlapRows: number
   /** Apple Music plays whose artist couldn't be found anywhere in the export, kept as UNMATCHED_ARTIST (data/stats.ts) */
   unmatchedArtists: number
   warnings: string[]

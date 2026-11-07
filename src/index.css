@@ -1516,6 +1516,13 @@ th {
   color: var(--text);
 }
 
+.hero__note {
+  max-width: 56ch;
+  margin: -22px 0 34px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
 .hero .button {
   align-self: flex-start;
 }

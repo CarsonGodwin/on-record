@@ -34,7 +34,7 @@ export function fromDayNumber(n: number): Date {
 }
 
 export function isSkip(p: Play): boolean {
-  return p.skipped || p.reasonEnd === 'fwdbtn'
+  return p.skipped === true || p.reasonEnd === 'fwdbtn'
 }
 
 export function getYears(plays: Play[]): number[] {
@@ -130,8 +130,8 @@ export interface Summary {
   /** Different songs with a play of 30s or more, the same rule as `streams` */
   tracks: number
   activeDays: number
-  /** Share of music plays that were skipped, 0–1 */
-  skipRate: number
+  /** Share of music plays that were skipped, 0–1, out of the plays that say; null when none do (Last.fm) */
+  skipRate: number | null
   /** Share of music plays with shuffle on, 0–1, out of the plays that say; null when none do (older Apple Music plays) */
   shuffleRate: number | null
   /** Share of listening time that was offline, 0–1 */
@@ -146,6 +146,7 @@ export function summarize(plays: Play[]): Summary {
   let streams = 0
   let musicPlays = 0
   let skips = 0
+  let skipKnown = 0
   let shuffles = 0
   let shuffleKnown = 0
   const artists = new Set<string>()
@@ -161,6 +162,7 @@ export function summarize(plays: Play[]): Summary {
     if (p.kind === 'track') {
       musicMs += p.msPlayed
       musicPlays++
+      if (p.skipped !== null) skipKnown++
       if (isSkip(p)) skips++
       if (p.shuffle !== null) shuffleKnown++
       if (p.shuffle) shuffles++
@@ -179,8 +181,8 @@ export function summarize(plays: Play[]): Summary {
     artists: artists.size,
     tracks: tracks.size,
     activeDays: days.size,
-    skipRate: musicPlays ? skips / musicPlays : 0,
     // With no music at all there's nothing unknown about it, so that stays 0 as it always was
+    skipRate: skipKnown ? skips / skipKnown : musicPlays ? null : 0,
     shuffleRate: shuffleKnown ? shuffles / shuffleKnown : musicPlays ? null : 0,
     offlineShare: totalMs ? offlineMs / totalMs : 0,
   }
@@ -225,6 +227,8 @@ export function wearOut(allPlays: Play[], year: number | null): WearOut {
     heard.set(key, n)
     if ((totals.get(key) ?? 0) < WEAR_MIN_SONG_PLAYS) continue
     if (year !== null && startDate(p).getFullYear() !== year) continue
+    // A play that can't say still counts toward how many times the song's been heard, just not here
+    if (p.skipped === null) continue
     const step = Math.min(n, WEAR_MAX) - 1
     plays[step]++
     if (isSkip(p)) skips[step]++
@@ -257,6 +261,26 @@ export function wearOut(allPlays: Play[], year: number | null): WearOut {
   })
   const back = rates[bestIndex] < average ? rates.findIndex((r, i) => i > bestIndex && r >= average) : -1
   return { rates, average, best: bestIndex + 1, wornOut: back === -1 ? null : back + 1 }
+}
+
+/** A step of replayCurve needs this many songs behind it */
+const REPLAY_MIN_SONGS = 5
+
+/**
+ * The share of songs played at least once, twice, three times and so on, from the 1st play.
+ * It's what the poster shows for a history that can't say what got skipped.
+ */
+export function replayCurve(plays: Play[]): number[] {
+  const counts = new Map<string, number>()
+  for (const p of plays) if (p.kind === 'track') counts.set(trackKey(p), (counts.get(trackKey(p)) ?? 0) + 1)
+  const out: number[] = []
+  for (let n = 1; n <= WEAR_MAX; n++) {
+    let reached = 0
+    for (const count of counts.values()) if (count >= n) reached++
+    if (reached < REPLAY_MIN_SONGS) break
+    out.push(reached / counts.size)
+  }
+  return out
 }
 
 // ---------- Rankings ----------
@@ -315,6 +339,8 @@ export function topItems(plays: Play[], category: Category, rankBy: RankBy, limi
 export function platforms(plays: Play[]): Ranked[] {
   const totals = new Map<string, Ranked>()
   for (const p of plays) {
+    // Last.fm doesn't say, which isn't the same as a device Spotify couldn't name
+    if (!p.platform) continue
     const item = totals.get(p.platform) ?? { key: p.platform, label: p.platform, ms: 0, plays: 0 }
     item.ms += p.msPlayed
     if (p.msPlayed >= COUNTED_PLAY_MS) item.plays++

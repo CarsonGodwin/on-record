@@ -26,7 +26,21 @@ Everything runs entirely in your browser. There are no servers, and your data is
 2. Wait for the email link (usually takes a few days).
 3. Download all parts and drop them (or the `.zip` files) onto the site.
 
-*Note: You can drop a Spotify and Apple Music export in together to merge your timelines.*
+**Last.fm** *(Beta)*
+1. Get a `.csv` of your scrobbles with four columns and no header: artist, album, track and a UTC time like `06 Nov 2026, 20:57`.
+2. Drop the file onto the site by itself (a CSV inside a zip or folder isn't opened).
+
+Last.fm records what started and when, and nothing else, so it differs from the other two:
+
+| | Spotify | Apple Music | Last.fm |
+|---|---|---|---|
+| Time played | Recorded | Recorded | Estimated from the gaps between scrobbles |
+| Skips | Recorded | Recorded | Never recorded, so Love / Hate and the skip stats are off |
+| Shuffle | Recorded | Newer plays only | Not recorded |
+| Devices | Recorded | Recorded | Not recorded |
+| Podcasts and audiobooks | Recorded | Not in the export | Can't be told apart from songs |
+
+*Note: You can drop exports from several services in together to merge your timelines. On any day a Spotify or Apple Music export covers, its plays replace Last.fm's, since Last.fm usually scrobbled those same listens.*
 
 ## Project Structure
 
@@ -36,6 +50,7 @@ src/
 ├── data/          # File parsing (JSON/CSV), stream deduping, and stats engines
 │   ├── load.ts    # Archive unpacker, format detection, and stream validation
 │   ├── apple.ts   # Apple Music reconciliation (track heuristics, split-joins)
+│   ├── lastfm.ts  # Last.fm scrobble exports (format check, estimated durations)
 │   └── stats.ts   # Metric aggregation (streaks, listening curves, ranks)
 ├── viz/           # Canvas renderers, vinyl drawing math, and poster generators
 │   ├── record.ts  # Vinyl groove projection and tonearm kinematics
@@ -59,4 +74,4 @@ npm run build     # Type-check and build to dist/
 
 Distributed under the [MIT License](LICENSE). Bundled typefaces (*Bricolage Grotesque*, *Instrument Serif*, *JetBrains Mono*) are licensed under the [SIL Open Font License 1.1](https://openfontlicense.org).
 
-*My Listening Record is an independent project and is not affiliated with, endorsed by, or sponsored by Spotify AB or Apple Inc.*
+*My Listening Record is an independent project and is not affiliated with, endorsed by, or sponsored by Spotify AB, Apple Inc. or Last.fm Ltd.*

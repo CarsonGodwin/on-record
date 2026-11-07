@@ -25,13 +25,19 @@ export interface CsvReader<C extends string> {
   end(): Set<C>
 }
 
+export interface CsvOptions {
+  /** The file has no header, so `columns` name its fields in order. Fields past them are still never copied. */
+  headerless?: boolean
+}
+
 /** Reads a whole CSV file at once. See csvReader. */
 export function readCsv<C extends string>(
   text: string,
   columns: readonly C[],
   onRow: (row: Record<C, string>) => void,
+  options: CsvOptions = {},
 ): Set<C> {
-  const reader = csvReader(columns, onRow)
+  const reader = csvReader(columns, onRow, options)
   reader.push(text)
   return reader.end()
 }
@@ -50,12 +56,12 @@ export function readCsv<C extends string>(
  * becomes a string the app holds on to. A column missing from the file reads
  * as ''.
  */
-export function csvReader<C extends string>(columns: readonly C[], onRow: (row: Record<C, string>) => void): CsvReader<C> {
+export function csvReader<C extends string>(columns: readonly C[], onRow: (row: Record<C, string>) => void, { headerless = false }: CsvOptions = {}): CsvReader<C> {
   const header: string[] = []
-  let inHeader = true
+  let inHeader = !headerless
   // Which asked-for column each field position holds, once the header has been read
-  const slots: (C | undefined)[] = []
-  const found = new Set<C>()
+  const slots: (C | undefined)[] = headerless ? [...columns] : []
+  const found = new Set<C>(headerless ? columns : [])
   const blank = () => Object.fromEntries(columns.map((c) => [c, ''])) as Record<C, string>
   const byKey = new Map(columns.map((c) => [headerKey(c), c]))
 

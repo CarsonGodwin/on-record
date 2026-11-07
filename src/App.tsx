@@ -245,6 +245,14 @@ export default function App() {
           </a>{' '}
           with what Load details says (it lists file names and counts, never your listening).
         </p>
+        <h3>
+          Last.fm <span className="beta">Beta</span>
+        </h3>
+        <p className="how-to__note">
+          Drop a <code>.csv</code> of your scrobbles with four columns and no header: artist, album, track and a time like{' '}
+          <code>06 Nov 2026, 20:57</code>. Last.fm doesn’t record how long a song played or what you skipped, so hours are
+          estimated and Love / Hate stays off. On days a Spotify or Apple Music export also covers, that export’s plays are kept.
+        </p>
       </details>
 
       <p className="colophon">
@@ -256,8 +264,8 @@ export default function App() {
       </p>
 
       <p className="disclaimer">
-        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
-        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
+        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB, Apple Inc. or Last.fm Ltd.
+        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc. Last.fm is a trademark of Last.fm Ltd.
       </p>
     </div>
   )

@@ -291,9 +291,11 @@ function posOf(count: number): number {
 const CLOSE = 5
 
 function Habits({ summary }: { summary: Summary }) {
-  const habits: Habit[] = [
-    { key: 'skip', question: 'How many songs do you skip?', value: summary.skipRate, note: 'Songs you skipped before they ended' },
-  ]
+  const habits: Habit[] = []
+  // Last.fm never records a skip, so "0%" would be wrong rather than impressive
+  if (summary.skipRate !== null) {
+    habits.push({ key: 'skip', question: 'How many songs do you skip?', value: summary.skipRate, note: 'Songs you skipped before they ended' })
+  }
   // Only newer Apple Music plays record shuffle, so an Apple-only history may have none
   if (summary.shuffleRate !== null) {
     habits.push({ key: 'shuffle', question: 'How often is shuffle on?', value: summary.shuffleRate, note: 'Songs played with shuffle on' })

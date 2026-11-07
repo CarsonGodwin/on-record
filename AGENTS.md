@@ -4,7 +4,7 @@ Guidance for coding agents working in this repo. The [README](README.md) covers 
 
 ## What this is
 
-My Listening Record is a client-only React 19 + Vite + TypeScript app that visualizes a Spotify Extended Streaming History export or an Apple Music privacy export (or both together). There is no backend. Data is parsed, aggregated and drawn entirely in the browser, and the built site's CSP sets `connect-src 'none'`.
+My Listening Record is a client-only React 19 + Vite + TypeScript app that visualizes a Spotify Extended Streaming History export, an Apple Music privacy export or a Last.fm scrobble CSV (or any of them together). There is no backend. Data is parsed, aggregated and drawn entirely in the browser, and the built site's CSP sets `connect-src 'none'`.
 
 ## Commands
 
@@ -30,14 +30,14 @@ TZ=Pacific/Auckland npm test
 - **Nothing is stored.** The landing page promises nothing is uploaded or stored. Settings such as Music only and hidden artists live in React state and reset with the page; don't add `localStorage`, IndexedDB or cookies to keep them.
 - **Never commit real listening data.** `.gitignore` excludes Spotify and Apple Music exports; use `data/sample.ts` (seeded fake history) for demos and fixtures, and `tests/apple.ts` to build Apple-format fixtures.
 - **Don't copy private fields.** `RawStreamRecord` leaves out `ip_addr`, `user_agent`, `username` etc. on purpose, and `toPlay()` must never copy them. Apple's play activity also holds IP addresses and account and device IDs: `readCsv` only copies the columns in `PLAY_COLUMNS` (`data/apple.ts`), so never add a private column there.
-- **Only open Apple Music files.** Apple's export also holds purchases, Apple Pay activity and account details. `data/appleFiles.ts` matches files and nested zips by exact name; keep it an allowlist.
+- **Only open Apple Music files.** Apple's export also holds purchases, Apple Pay activity and account details. `data/appleFiles.ts` matches files and nested zips by exact name; keep it an allowlist. A Last.fm export has no fixed name, so it's recognized by its contents (`looksLikeLastfm` in `data/lastfm.ts`), but only for a CSV dropped by itself: never look for one inside a zip or a dropped folder.
 - **Keep the loader's safety caps** (`MAX_FILE_BYTES`, `MAX_ENTRIES`, `MAX_ZIP_DEPTH`, `MAX_NESTED_ZIPS`, `PLAY_ACTIVITY_LIMITS`, … in `data/load.ts`). They guard against zip bombs in the visitor's tab. A zip's nested zips share its budget (`ZipBudget`) and an upload's play activities share theirs (`PlayActivityBudget`), so neither nesting nor many files can multiply them.
 - **Never read Apple's play activity whole.** It can be longer than the longest string a browser will hold (about 512 MiB, past which Chrome's `file.text()` quietly returns `''`), so it's parsed as it's read: `readPlayActivity` in `data/load.ts`, `playActivityReader` in `data/apple.ts`, `csvReader` in `data/csv.ts`. Strings kept from it go through `stringPool`, because a string cut from a piece of the file can keep that whole piece in memory.
 - If you change the CSP, update both the meta tag and the `_headers` output in `vite.config.ts` (they share the `CSP` constant).
 
 ## Architecture
 
-- `src/types.ts`: `RawStreamRecord` (Spotify's row) and `Play` (the cleaned row every chart uses, from either service). `Play.endTime` is when playback **stopped**; use `startDate()` from `data/stats.ts` for the start. `Play.shuffle` is `null` when the export doesn't record it (older Apple Music rows), and `Summary.shuffleRate` counts only the plays that say, so it's `null` when none do.
+- `src/types.ts`: `RawStreamRecord` (Spotify's row) and `Play` (the cleaned row every chart uses, from either service). `Play.endTime` is when playback **stopped**; use `startDate()` from `data/stats.ts` for the start. `Play.shuffle` is `null` when the export doesn't record it (older Apple Music rows, Last.fm), and `Summary.shuffleRate` counts only the plays that say, so it's `null` when none do. `Play.skipped` and `Summary.skipRate` work the same way for Last.fm, which never records a skip: a skip view must leave those plays out or hide, never treat them as let play. Last.fm's `msPlayed` is an estimate (`estimateDurations` in `data/lastfm.ts`).
 - `src/data/`: pure functions. `parse` (Spotify rows) and `apple` (Apple Music files) → `load` (zip/JSON/CSV, validate, dedupe, sort by `endTime`) → `stats` / `insights` (aggregations). No React here. `load` imports `apple` dynamically so Spotify visitors never download it; it only needs `appleFiles` up front.
 - Apple Music differs from Spotify in what it records (no artist in the play activity, shuffle only on newer rows, no podcasts, listens split by pauses). The README's "Spotify vs. Apple Music" table lists the differences; keep it current when either side changes.
 - `src/viz/`: canvas/SVG drawing shared between on-screen charts, posters and the race video. `posterShared.ts` holds helpers for all posters and the video.

@@ -23,7 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# Personal Spotify and Apple Music exports: never commit real listening data
+# Personal Spotify, Apple Music and Last.fm exports: never commit real listening data
+# (a Last.fm export is named after its user, so that takes every CSV)
+*.csv
 *.zip
 Streaming_History*.json
 StreamingHistory*.json

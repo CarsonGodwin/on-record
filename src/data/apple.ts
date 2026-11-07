@@ -267,7 +267,7 @@ function addPlayActivity(activity: PlayActivity, parts: AppleParts): boolean {
  * title holds its whole piece of the file in memory, and between them every piece.
  * Sharing the copies also means a song played a thousand times is stored once.
  */
-function stringPool(): (s: string) => string {
+export function stringPool(): (s: string) => string {
   const pool = new Map<string, string>()
   return (s) => {
     let own = pool.get(s)
@@ -544,7 +544,7 @@ function listenToPlay(l: AppleEvent, artist: string): Play {
  * count as two. Where Spotify has several IDs for a song (a single and its album),
  * the most played one wins.
  */
-function shareSpotifyIds(plays: Play[], spotify: Play[]) {
+export function shareSpotifyIds(plays: Play[], spotify: Play[]) {
   if (spotify.length === 0) return
   const ids = new Map<string, Map<string, number>>()
   for (const p of spotify) {

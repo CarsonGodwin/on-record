@@ -9,6 +9,11 @@ import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from 
  * The record is the centerpiece, fully annotated, with small charts that unpack it underneath.
  */
 
+function ordinal(k: number): string {
+  const teen = k % 100 >= 11 && k % 100 <= 13
+  return `${k}${teen ? 'th' : ['th', 'st', 'nd', 'rd'][k % 10] ?? 'th'}`
+}
+
 /** Apple's own typeface where there is one (San Francisco), else the platform's */
 const SYSTEM = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif'
 
@@ -508,7 +513,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
 
   // 3. How songs wear out: the skip rate by how many times I'd already heard the song, against my average.
   // It usually dips once a song is familiar, then climbs back as I tire of it
-  {
+  if (data.wearOut) {
     const x = panel(2, 'How songs wear out', 'Skip rate by times heard')
     const { rates, average, best, wornOut } = data.wearOut
     const bh = chartH - 2.2 * u
@@ -616,15 +621,56 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       })
 
       // Play numbers along the bottom
-      const ordinal = (k: number) => {
-        const teen = k % 100 >= 11 && k % 100 <= 13
-        return `${k}${teen ? 'th' : ['th', 'st', 'nd', 'rd'][k % 10] ?? 'th'}`
-      }
       ctx.fillStyle = soft
       ctx.font = font(500, 1.2 * u)
       ctx.fillText('1st play', x, chartTop + chartH)
       ctx.textAlign = 'center'
       for (const k of [10, 20]) if (k < n - 3) ctx.fillText(ordinal(k), px(k - 1), chartTop + chartH)
+      ctx.textAlign = 'right'
+      ctx.fillText(n === WEAR_MAX ? `${WEAR_MAX}th+` : ordinal(n), x + pw, chartTop + chartH)
+    }
+  } else {
+    // A history that can't say what got skipped still knows what got played again
+    const x = panel(2, 'Back for more', 'Songs played again, by times heard')
+    const rates = data.replays
+    const floor = chartTop + chartH - 2.2 * u
+    const n = rates.length
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = soft
+    ctx.font = font(500, 1.2 * u)
+    ctx.textAlign = 'left'
+
+    if (n < 3) {
+      ctx.fillText('Not enough repeat plays yet', x, floor - 0.6 * u)
+    } else {
+      const px = (i: number) => x + (i / (n - 1)) * pw
+      const py = (r: number) => floor - r * (floor - chartTop)
+
+      ctx.fillStyle = faint
+      ctx.fillRect(x, floor, pw, Math.max(1, 0.12 * u))
+
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 0.32 * u
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      rates.forEach((r, i) => (i === 0 ? ctx.moveTo(px(i), py(r)) : ctx.lineTo(px(i), py(r))))
+      ctx.stroke()
+
+      // The curve only falls: a steep one leaves the top right free, a shallow one the space under it
+      const under = rates[n >> 1] > 0.5
+      const noteY = under ? floor - 2.3 * u : chartTop + 0.9 * u
+      ctx.textAlign = under ? 'left' : 'right'
+      const noteX = under ? x + 0.4 * u : x + pw
+      ctx.fillStyle = ink
+      ctx.font = font(700, 1.3 * u)
+      ctx.fillText(`${Math.round(rates[1] * 100)}% came back`, noteX, noteY)
+      ctx.font = font(500, 1.2 * u)
+      ctx.fillText('for a 2nd play', noteX, noteY + 1.55 * u)
+
+      ctx.fillStyle = soft
+      ctx.textAlign = 'left'
+      ctx.fillText('1st play', x, chartTop + chartH)
       ctx.textAlign = 'right'
       ctx.fillText(n === WEAR_MAX ? `${WEAR_MAX}th+` : ordinal(n), x + pw, chartTop + chartH)
     }

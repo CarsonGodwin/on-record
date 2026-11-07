@@ -64,8 +64,10 @@ export interface PosterData {
   colors: Map<string, string>
   pulse: { artists: string[]; series: Map<string, number[]> }
   stats: { hours: number; streams: number; artists: number; songs: number; peak: string }
-  /** How the skip rate climbs or falls the more times a song has been played */
-  wearOut: WearOut
+  /** How the skip rate climbs or falls the more times a song has been played; null when the history can't say what got skipped */
+  wearOut: WearOut | null
+  /** The share of songs played at least once, twice and so on, drawn when there's no wearOut */
+  replays: number[]
   /** Standout days and runs, for the designs that point them out on the record */
   moments: PosterMoment[]
   /** Where the data came from, for the credit line: "Spotify Extended Streaming History" */

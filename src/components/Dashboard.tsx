@@ -29,6 +29,7 @@ import {
   summarize,
   topItems,
   UNMATCHED_ARTIST,
+  replayCurve,
   wearOut,
   weekHourGrid,
   type YearRange,
@@ -215,7 +216,12 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const fun = useMemo(() => funStats(plays), [plays])
   const lines = useMemo(() => takes(plays, summary, rec, fun, hours, year === null), [plays, summary, rec, fun, hours, year])
   const devices = useMemo(() => platforms(plays), [plays])
-  const wear = useMemo(() => wearOut(all, year), [all, year])
+  // Love / Hate, the wear-out curve and every line about skips need a history that records them
+  const skipsKnown = summary.skipRate !== null
+  const wear = useMemo(() => (skipsKnown ? wearOut(all, year) : null), [skipsKnown, all, year])
+  const replays = useMemo(() => replayCurve(plays), [plays])
+  const estimated = result.sources.includes('lastfm')
+  const pageTracks = skipsKnown ? TRACKS : TRACKS.filter((t) => t.id !== 'lovehate')
 
   const span = years.length > 1 ? `${years[0]}–${years[years.length - 1]}` : String(years[0])
   const hasMusic = summary.musicMs > 0
@@ -235,7 +241,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    */
   const viewKey = `${year ?? 'all'}|${applied.version}`
   const recordTitle = year === null ? 'All time' : String(year)
-  const recordSubtitle = `${formatNumber(summary.totalMs / 3_600_000)} hours, ${formatNumber(summary.artists)} artists`
+  const hoursLabel = `${estimated ? 'About ' : ''}${formatNumber(summary.totalMs / 3_600_000)} hours`
+  const recordSubtitle = `${hoursLabel}, ${formatNumber(summary.artists)} artists`
 
   const posterData = useMemo<PosterData>(
     () => ({
@@ -250,10 +257,11 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       pulse: { artists: pulseArtists, series: artistSeries(totals, pulseArtists, bins.size === 'month' ? 1 : 2) },
       stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, songs: summary.tracks, peak: formatHour(peak.hour) },
       wearOut: wear,
+      replays,
       moments: posterMoments(record, fun, rec),
       source: historyName(result.sources),
     }),
-    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, fun, rec, result.sources],
+    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, replays, peak, fun, rec, result.sources],
   )
 
   /*
@@ -261,7 +269,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    * time, so every chart is the real one. A period with no music gets the
    * shorter record of what it can still draw.
    */
-  const tourTracks = hasMusic ? TRACKS : TRACKS.filter((t) => t.id === 'charts' || t.id === 'notes' || t.id === 'poster')
+  const tourTracks = hasMusic ? pageTracks : TRACKS.filter((t) => t.id === 'charts' || t.id === 'notes' || t.id === 'poster')
   const tourStops = tourTracks.map((t) => t.id)
   const tourStep = !touring || tourAt === null ? null : resolveStop(tourStops, tourAt, TRACKS.map((t) => t.id))
   const setTourStep = (step: number | null) => setTourAt(step === null ? null : (tourStops[step] ?? null))
@@ -534,7 +542,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
-        {!cards && <TrackMenu tracks={TRACKS} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />}
+        {!cards && <TrackMenu tracks={pageTracks} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />}
         <Segmented
           className="topbar__years"
           label="Time period"
@@ -580,7 +588,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
       <nav className="tracklist" aria-label="Sections">
         <ol>
-          {TRACKS.map((t) => (
+          {pageTracks.map((t) => (
             <li key={t.id}>
               <a href={`#${t.id}`} aria-current={current === t.id ? 'true' : undefined}>
                 <span>{t.num}</span>
@@ -603,6 +611,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 isSample={isSample}
                 topArtist={topArtists[0]}
                 biggestDay={fun.biggestDay}
+                estimated={estimated}
                 onPlay={() => openTour(true)}
                 onPoster={() => makePoster(posterDesign)}
               />
@@ -612,7 +621,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
             <Side label="Side A" title={SIDES.A} />
 
-            <Chapter id="record" num="A1" title="The Record" hint={`${formatNumber(summary.totalMs / 3_600_000)} hours, a ring for every day. Drag the needle, pinch to zoom.`} lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
+            <Chapter id="record" num="A1" title="The Record" hint={`${hoursLabel}, a ring for every day. Drag the needle, pinch to zoom.`} lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
               <Vinyl
                 key={viewKey}
                 plays={plays}
@@ -665,16 +674,18 @@ export function Dashboard({ result, isSample, onReset }: Props) {
               <Calendar days={days} years={year === null ? years : [year]} plays={plays} firstHeard={firstHeard} colors={colors} />
             </Chapter>
 
-            <Chapter
-              id="lovehate"
-              num="B3"
-              title="Love / Hate"
-              hint="The song you let play, and the one you skip."
-              lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
-              table={() => <LoveHateTable songs={songs} />}
-            >
-              {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
-            </Chapter>
+            {summary.skipRate !== null && (
+              <Chapter
+                id="lovehate"
+                num="B3"
+                title="Love / Hate"
+                hint="The song you let play, and the one you skip."
+                lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
+                table={() => <LoveHateTable songs={songs} />}
+              >
+                {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
+              </Chapter>
+            )}
 
             <Side label="Side C" title={SIDES.C} />
 
@@ -778,6 +789,15 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                       </li>
                     )}
                     {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
+                    {estimated && (
+                      <li>
+                        Last.fm’s hours are estimated from the gaps between scrobbles, and its times are taken as UTC. It doesn’t record skips, shuffle or
+                        devices, so anything built on those leaves its plays out.
+                      </li>
+                    )}
+                    {result.overlapRows > 0 && (
+                      <li>{formatNumber(result.overlapRows)} Last.fm scrobbles left out, on days your Spotify or Apple Music export already covers</li>
+                    )}
                     {result.unmatchedArtists > 0 && (
                       <li>
                         {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export.{' '}
@@ -787,7 +807,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                       </li>
                     )}
                     {noShuffle > 0 && (
-                      <li>{formatNumber(noShuffle)} Apple Music plays don’t say whether shuffle was on, so shuffle stats leave them out</li>
+                      <li>{formatNumber(noShuffle)} plays don’t say whether shuffle was on, so shuffle stats leave them out</li>
                     )}
                     {result.warnings.map((w) => (
                       <li key={w}>{w}</li>
@@ -802,8 +822,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                   .
                 </p>
                 <p className="disclaimer">
-                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
-                  Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
+                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB, Apple Inc. or Last.fm Ltd.
+                  Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc. Last.fm is a trademark of Last.fm Ltd.
                 </p>
               </footer>
             )}
@@ -813,7 +833,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
       {cards && (
         <CardNav
-          tracks={TRACKS}
+          tracks={pageTracks}
           sides={SIDES}
           deck={tourTracks}
           step={cardStep}
@@ -827,7 +847,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       <Launcher
         mode={launcher}
         onMode={setLauncher}
-        tracks={TRACKS}
+        tracks={pageTracks}
         sides={SIDES}
         years={years}
         year={year}
@@ -871,6 +891,7 @@ function NotEnough() {
 
 /** What usually leaves a row without track info, for the load details */
 function skippedRowsHint(sources: DataSource[]): string {
+  if (sources.length === 1 && sources[0] === 'lastfm') return 'usually a song still playing, or a scrobble with no real date'
   if (sources.includes('apple')) return sources.includes('spotify') ? 'usually local files on Spotify, radio on Apple Music' : 'usually radio'
   return 'usually local files'
 }

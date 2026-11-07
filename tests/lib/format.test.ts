@@ -47,5 +47,8 @@ describe('historyName', () => {
     expect(historyName(['apple'])).toBe('Apple Music listening history')
     expect(historyName(['spotify', 'apple'])).toBe('Spotify and Apple Music listening history')
     expect(historyName([])).toBe('Spotify Extended Streaming History')
+    expect(historyName(['lastfm'])).toBe('Last.fm scrobbles, hours estimated')
+    expect(historyName(['spotify', 'lastfm'])).toBe('Spotify and Last.fm listening history')
+    expect(historyName(['spotify', 'apple', 'lastfm'])).toBe('Spotify, Apple Music and Last.fm listening history')
   })
 })
