@@ -8,6 +8,7 @@ import type { ReactNode } from 'react'
 
 const SPOTIFY = 'guides/spotify-extended-streaming-history/'
 const APPLE = 'guides/apple-music-listening-history/'
+const LASTFM = 'guides/lastfm-scrobbles-csv/'
 
 /** A guide's links are relative to its own folder, so the built site still works below a sub-path */
 const FROM_GUIDE = '../../'
@@ -19,7 +20,7 @@ function GuidePage({ home, children }: { home: string; children: ReactNode }) {
         <a className="brand" href={home}>
           My Listening Record<span className="brand__dot" aria-hidden="true" />
         </a>
-        <span className="landing__tag">A Spotify &amp; Apple Music history visualizer</span>
+        <span className="landing__tag">A Spotify, Apple Music &amp; Last.fm history visualizer</span>
       </header>
 
       <main>{children}</main>
@@ -32,20 +33,25 @@ function GuidePage({ home, children }: { home: string; children: ReactNode }) {
         .
       </p>
       <p className="disclaimer">
-        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
-        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
+        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB, Apple Inc. or Last.fm Ltd.
+        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc. Last.fm is a trademark of Last.fm Ltd.
       </p>
     </div>
   )
 }
 
 /** Where every guide ends: the app, and the promise that the file stays put */
-function Start({ children }: { children: ReactNode }) {
+function Start({
+  children,
+  shows = 'your eras, your 3 AM artist, the songs you always skip and a poster to share',
+}: {
+  children: ReactNode
+  shows?: string
+}) {
   return (
     <section className="guide__start" aria-label="See your history">
       <p>
-        <strong>{children}</strong> My Listening Record presses every day of it into a vinyl record, with your eras, your
-        3 AM artist, the songs you always skip and a poster to share. It runs in your browser: the file is never
+        <strong>{children}</strong> My Listening Record presses every day of it into a vinyl record, with {shows}. It runs in your browser: the file is never
         uploaded.
       </p>
       <a className="button" href={FROM_GUIDE}>
@@ -236,6 +242,93 @@ export function AppleGuide() {
   )
 }
 
+export function LastfmGuide() {
+  return (
+    <GuidePage home={FROM_GUIDE}>
+      <article>
+        <h1>
+          How to export your <em>Last.fm scrobbles</em> to a CSV
+        </h1>
+        <p className="guide__intro">
+          Last.fm has a record of every song you’ve scrobbled. A free tool called lastfm-to-csv saves all of it as one file.
+          It only needs your username, and it takes a few minutes or longer, depending on how much you’ve scrobbled.
+        </p>
+
+        <h2>Save it</h2>
+        <ol>
+          <li>
+            In your Last.fm privacy settings, make sure <strong>Hide recent listening information</strong> is off. The tool
+            can’t read your scrobbles while it’s on.
+          </li>
+          <li>
+            Go to{' '}
+            <a href="https://benjaminbenben.com/lastfm-to-csv/" target="_blank" rel="noreferrer">
+              lastfm-to-csv
+            </a>
+            , type your Last.fm username and choose <strong>Fetch tracks</strong>.
+          </li>
+          <li>
+            Keep the tab open until it says <strong>finished</strong>.
+          </li>
+          <li>
+            Choose <strong>Save</strong>. The file is named after your username, like <code>yourname.csv</code>.
+          </li>
+        </ol>
+        <p>
+          lastfm-to-csv is made by someone else, not by My Listening Record. It never asks for your password, because it
+          reads the listening your Last.fm profile already shows.
+        </p>
+
+        <h2>Check you got all of it</h2>
+        <p>
+          Save works while the tool is still fetching, and that gives you only part of your history. If a red{' '}
+          <strong>errors</strong> label appears, 200 scrobbles are missing for each error. Fetch again, and if the errors come
+          back, open <strong>Settings</strong> on that page and set a request delay.
+        </p>
+        <p>
+          To check the file, compare the scrobble count on your Last.fm profile with the plays listed under Load details at
+          the bottom of your record. They should be close. A row count that’s an exact multiple of 200 is a sign the last
+          page never arrived.
+        </p>
+
+        <h2>What’s in the file</h2>
+        <p>Each row is one scrobble, with four columns and no header:</p>
+        <ul>
+          <li>the artist</li>
+          <li>the album, which can be empty</li>
+          <li>the track</li>
+          <li>
+            when it started, to the minute and in UTC, like <code>06 Nov 2026, 20:57</code>
+          </li>
+        </ul>
+        <p>Another tool’s CSV works too, as long as it has the same columns in the same order.</p>
+
+        <h2>What to expect</h2>
+        <p>Last.fm records what started and when, and nothing else, so a few things work differently:</p>
+        <ul>
+          <li>
+            Hours are estimates. My Listening Record works out each song’s length from the time between scrobbles, and says
+            so on the page.
+          </li>
+          <li>Skips aren’t recorded, so Love / Hate and skip rates stay off rather than showing a made-up number.</li>
+          <li>Shuffle and devices aren’t recorded either, and neither are podcasts.</li>
+        </ul>
+
+        <h2>See it</h2>
+        <p>
+          Drop the <code>.csv</code> onto the record sleeve on the <a href={FROM_GUIDE}>home page</a>. Don’t put it in a zip or
+          a folder: those are only searched for Spotify and Apple Music files. If you also have{' '}
+          <a href={`${FROM_GUIDE}${SPOTIFY}`}>your Spotify export</a> or{' '}
+          <a href={`${FROM_GUIDE}${APPLE}`}>your Apple Music export</a>, drop them in with it. On any day they cover, their
+          plays replace Last.fm’s, because they record more.
+        </p>
+      </article>
+
+      <Start shows="your eras, your 3 AM artist and a poster to share">Got your CSV?</Start>
+    </GuidePage>
+  )
+}
+
 /**
  * Served for any address that doesn't exist, at any depth, so its links are absolute
  * (vite.config.ts makes its asset paths absolute too).
@@ -259,6 +352,9 @@ export function NotFound() {
         </li>
         <li>
           <a href={`/${APPLE}`}>How to see your Apple Music listening history</a>
+        </li>
+        <li>
+          <a href={`/${LASTFM}`}>How to export your Last.fm scrobbles to a CSV</a>
         </li>
       </ul>
     </GuidePage>
