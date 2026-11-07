@@ -31,9 +31,11 @@ export type PosterDesign = 'record' | 'deep' | 'sleeve' | 'annotated' | 'macro' 
 export type PosterSize = 'post' | 'story' | 'print'
 /**
  * The studio's backgrounds: 'midnight' is the black one. 'glass' is the Deep dive on pale gray with a label
- * of clear glass and system type, and the other designs draw it as plain pale gray
+ * of clear glass and system type, and the other designs draw it as plain pale gray. 'scrobble' is the
+ * Deep dive on white with a red label and Helvetica, a nod to Last.fm's pages.
+ * The Deep dive isn't drawn on 'cream'
  */
-export type PosterPaper = 'midnight' | 'cream' | 'glass'
+export type PosterPaper = 'midnight' | 'cream' | 'glass' | 'scrobble'
 
 export const isDarkPaper = (paper: PosterPaper) => paper === 'midnight'
 
@@ -64,12 +66,16 @@ export interface PosterData {
   colors: Map<string, string>
   pulse: { artists: string[]; series: Map<string, number[]> }
   stats: { hours: number; streams: number; artists: number; songs: number; peak: string }
-  /** How the skip rate climbs or falls the more times a song has been played */
-  wearOut: WearOut
+  /** How the skip rate climbs or falls the more times a song has been played; null when the history can't say what got skipped */
+  wearOut: WearOut | null
+  /** The share of songs played at least once, twice and so on, drawn when there's no wearOut */
+  replays: number[]
   /** Standout days and runs, for the designs that point them out on the record */
   moments: PosterMoment[]
   /** Where the data came from, for the credit line: "Spotify Extended Streaming History" */
   source: string
+  /** What one listen is called, which follows the data rather than the background */
+  playWord: 'play' | 'scrobble'
 }
 
 export interface PosterMoment {
@@ -91,7 +97,7 @@ export interface PosterMoment {
 }
 
 /** Picks out the moments worth calling out, as grooves and times on the record */
-export function posterMoments(model: RecordModel, fun: FunStats, rec: Records): PosterMoment[] {
+export function posterMoments(model: RecordModel, fun: FunStats, rec: Records, playWord: PosterData['playWord'] = 'play'): PosterMoment[] {
   const ringOf = (d: Date) => dayNumber(d) - model.firstDay
   const minuteOf = (d: Date) => d.getHours() * 60 + d.getMinutes()
   const out: PosterMoment[] = []
@@ -125,7 +131,7 @@ export function posterMoments(model: RecordModel, fun: FunStats, rec: Records): 
       kind: 'week',
       label: 'Most played in a week',
       value: title,
-      detail: `${artist}, ${formatNumber(count)} plays the week of ${formatDate(start)}`,
+      detail: `${artist}, ${formatNumber(count)} ${playWord}s the week of ${formatDate(start)}`,
       ring: ringOf(start),
       ringEnd: ringOf(end),
       plays: plays.map((d) => ({ ring: ringOf(d), minute: minuteOf(d) })),
@@ -147,6 +153,7 @@ const PAPERS: Record<PosterPaper, Paper> = {
   midnight: { bg: '#0e0d12', ink: '#f4f1ea', muted: 'rgba(244, 241, 234, 0.62)', rule: 'rgba(244, 241, 234, 0.2)', dark: true },
   cream: { bg: '#efe8da', ink: '#17141d', muted: 'rgba(23, 20, 29, 0.64)', rule: 'rgba(23, 20, 29, 0.22)', dark: false },
   glass: { bg: '#ececf0', ink: '#0b0b0d', muted: 'rgba(60, 60, 67, 0.7)', rule: 'rgba(60, 60, 67, 0.2)', dark: false },
+  scrobble: { bg: '#ffffff', ink: '#222222', muted: 'rgba(34, 34, 34, 0.66)', rule: 'rgba(34, 34, 34, 0.16)', dark: false },
 }
 
 const CAPTIONS: Record<PosterDesign, string> = {

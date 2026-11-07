@@ -26,14 +26,17 @@ import {
   platforms,
   playsPerYear,
   sameFilter,
+  scrobblesLeftOut,
+  withRepeats,
   summarize,
   topItems,
   UNMATCHED_ARTIST,
+  replayCurve,
   wearOut,
   weekHourGrid,
   type YearRange,
 } from '../data/stats'
-import { formatHour, formatNumber, historyName } from '../lib/format'
+import { formatHour, formatNumber, historyName, playWord } from '../lib/format'
 import { useMediaQuery } from '../lib/hooks'
 import { isLaunchKey, LAUNCH_KEY } from '../lib/keys'
 import { COARSE } from '../lib/pointer'
@@ -53,7 +56,7 @@ import { Hero } from './Hero'
 import { Launcher, type LauncherMode } from './Launcher'
 import { LinerNotes } from './LinerNotes'
 import { LoveHate, LoveHateTable } from './LoveHate'
-import { MissingHistoryPanel } from './Panels'
+import { LeftOutScrobblesPanel, MissingHistoryPanel } from './Panels'
 import { PosterStudio } from './PosterStudio'
 import { Pulse } from './Pulse'
 import { Race } from './Race'
@@ -107,21 +110,32 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   )
   // Years to leave out, for a history with a long gap in it (one service, then years on another). Null keeps them all.
   const [yearRange, setYearRange] = useState<YearRange | null>(null)
-  const yearCounts = useMemo(() => playsPerYear(result.plays), [result.plays])
+  // Last.fm's repeated scrobbles start left out. Not stored either.
+  const [allScrobbles, setAllScrobbles] = useState(false)
+  const everyScrobble = useMemo(() => withRepeats(result.plays, result.repeatScrobbles), [result.plays, result.repeatScrobbles])
+  const chosenPlays = allScrobbles ? everyScrobble : result.plays
+  const yearCounts = useMemo(() => playsPerYear(chosenPlays), [chosenPlays])
   const yearBounds = useMemo(() => {
     const ys = [...yearCounts.keys()]
     return [Math.min(...ys), Math.max(...ys)] as const
   }, [yearCounts])
   // Everything the settings and the hide list talk about is what's inside the range
-  const inRange = useMemo(() => filterByYears(result.plays, yearRange), [result.plays, yearRange])
+  const inRange = useMemo(() => filterByYears(chosenPlays, yearRange), [chosenPlays, yearRange])
   const otherPlays = useMemo(() => inRange.filter((p) => p.kind !== 'track').length, [inRange])
   // Older Apple Music rows don't say whether shuffle was on
   const noShuffle = useMemo(() => inRange.filter((p) => p.shuffle === null).length, [inRange])
   const hasAnyMusic = otherPlays < inRange.length
   const [launcher, setLauncher] = useState<LauncherMode | null>(null)
   const [missingOpen, setMissingOpen] = useState(result.failures.length > 0)
+  const leftOut = useMemo(() => scrobblesLeftOut(result), [result])
+  const [leftOutSeen, setLeftOutSeen] = useState(false)
+  // Waits for the missing files panel, since files that didn't load matter more and only one dialog can be up
+  const leftOutOpen = leftOut !== null && !leftOutSeen && !missingOpen
   // A history with no music at all keeps its podcasts, or there would be nothing to show
-  const chosen = useMemo(() => ({ musicOnly: musicOnly && hasAnyMusic, hidden, years: yearRange }), [musicOnly, hasAnyMusic, hidden, yearRange])
+  const chosen = useMemo(
+    () => ({ musicOnly: musicOnly && hasAnyMusic, hidden, years: yearRange, allScrobbles }),
+    [musicOnly, hasAnyMusic, hidden, yearRange, allScrobbles],
+  )
   /*
    * The charts follow `applied`, which catches up with `chosen` once the launcher is
    * closed and an "Updating" note has painted. Re-running every chart over a long history holds the
@@ -143,7 +157,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       window.clearTimeout(timer)
     }
   }, [updating, chosen])
-  const all = useMemo(() => filterPlays(result.plays, applied.filter), [result.plays, applied.filter])
+  const all = useMemo(() => filterPlays(applied.filter.allScrobbles ? everyScrobble : result.plays, applied.filter), [everyScrobble, result.plays, applied.filter])
   const years = useMemo(() => getYears(all), [all])
   const [pickedYear, setYear] = useState<number | null>(null)
   // Hiding an artist can empty a year; the page then falls back to all time
@@ -215,7 +229,12 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   const fun = useMemo(() => funStats(plays), [plays])
   const lines = useMemo(() => takes(plays, summary, rec, fun, hours, year === null), [plays, summary, rec, fun, hours, year])
   const devices = useMemo(() => platforms(plays), [plays])
-  const wear = useMemo(() => wearOut(all, year), [all, year])
+  // Love / Hate, the wear-out curve and every line about skips need a history that records them
+  const skipsKnown = summary.skipRate !== null
+  const wear = useMemo(() => (skipsKnown ? wearOut(all, year) : null), [skipsKnown, all, year])
+  const replays = useMemo(() => replayCurve(plays), [plays])
+  const estimated = result.sources.includes('lastfm')
+  const pageTracks = skipsKnown ? TRACKS : TRACKS.filter((t) => t.id !== 'lovehate')
 
   const span = years.length > 1 ? `${years[0]}–${years[years.length - 1]}` : String(years[0])
   const hasMusic = summary.musicMs > 0
@@ -235,7 +254,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    */
   const viewKey = `${year ?? 'all'}|${applied.version}`
   const recordTitle = year === null ? 'All time' : String(year)
-  const recordSubtitle = `${formatNumber(summary.totalMs / 3_600_000)} hours, ${formatNumber(summary.artists)} artists`
+  const hoursLabel = `${estimated ? 'About ' : ''}${formatNumber(summary.totalMs / 3_600_000)} hours`
+  const recordSubtitle = `${hoursLabel}, ${formatNumber(summary.artists)} artists`
 
   const posterData = useMemo<PosterData>(
     () => ({
@@ -250,10 +270,12 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       pulse: { artists: pulseArtists, series: artistSeries(totals, pulseArtists, bins.size === 'month' ? 1 : 2) },
       stats: { hours: summary.totalMs / 3_600_000, streams: summary.streams, artists: summary.artists, songs: summary.tracks, peak: formatHour(peak.hour) },
       wearOut: wear,
-      moments: posterMoments(record, fun, rec),
+      replays,
+      moments: posterMoments(record, fun, rec, playWord(result.sources)),
       source: historyName(result.sources),
+      playWord: playWord(result.sources),
     }),
-    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, peak, fun, rec, result.sources],
+    [year, span, record, slotColors, recordTitle, topArtists, colors, graph, pulseArtists, totals, bins, summary, wear, replays, peak, fun, rec, result.sources],
   )
 
   /*
@@ -261,7 +283,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
    * time, so every chart is the real one. A period with no music gets the
    * shorter record of what it can still draw.
    */
-  const tourTracks = hasMusic ? TRACKS : TRACKS.filter((t) => t.id === 'charts' || t.id === 'notes' || t.id === 'poster')
+  const tourTracks = hasMusic ? pageTracks : TRACKS.filter((t) => t.id === 'charts' || t.id === 'notes' || t.id === 'poster')
   const tourStops = tourTracks.map((t) => t.id)
   const tourStep = !touring || tourAt === null ? null : resolveStop(tourStops, tourAt, TRACKS.map((t) => t.id))
   const setTourStep = (step: number | null) => setTourAt(step === null ? null : (tourStops[step] ?? null))
@@ -401,6 +423,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
   useCloseOnBack(launcher !== null, () => setLauncher(null))
   useCloseOnBack(missingOpen, () => setMissingOpen(false))
+  useCloseOnBack(leftOutOpen, () => setLeftOutSeen(true))
 
   // Arrow keys deal cards too, except where a slider or the day details want them
   useEffect(() => {
@@ -438,7 +461,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   function pickYears(next: YearRange): boolean {
     const [first, last] = yearBounds
     const full = next[0] <= first && next[1] >= last
-    if (!full && !canShowYears(result.plays, hidden, next)) return false
+    if (!full && !canShowYears(chosenPlays, hidden, next)) return false
     setYearRange(full ? null : next)
     return true
   }
@@ -503,7 +526,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     }
   }, [touring])
 
-  // Light up the current track in the side nav
+  // Light up the current track in the side nav. Love / Hate comes and goes with skipsKnown when only some years are Last.fm's
   useEffect(() => {
     if (cards) return
     const sections = TRACKS.map((t) => document.getElementById(t.id)).filter((el): el is HTMLElement => el !== null)
@@ -515,7 +538,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
     )
     sections.forEach((s) => observer.observe(s))
     return () => observer.disconnect()
-  }, [hasMusic, cards])
+  }, [hasMusic, skipsKnown, cards])
 
   return (
     <div className={['dash', touring && 'is-touring', cards && 'is-cards', updating && 'is-updating'].filter(Boolean).join(' ')}>
@@ -534,7 +557,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
-        {!cards && <TrackMenu tracks={TRACKS} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />}
+        {!cards && <TrackMenu tracks={pageTracks} sides={SIDES} current={current} onPoster={() => makePoster(posterDesign)} onReset={onReset} />}
         <Segmented
           className="topbar__years"
           label="Time period"
@@ -580,7 +603,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
       <nav className="tracklist" aria-label="Sections">
         <ol>
-          {TRACKS.map((t) => (
+          {pageTracks.map((t) => (
             <li key={t.id}>
               <a href={`#${t.id}`} aria-current={current === t.id ? 'true' : undefined}>
                 <span>{t.num}</span>
@@ -603,6 +626,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 isSample={isSample}
                 topArtist={topArtists[0]}
                 biggestDay={fun.biggestDay}
+                estimated={estimated}
                 onPlay={() => openTour(true)}
                 onPoster={() => makePoster(posterDesign)}
               />
@@ -612,7 +636,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
             <Side label="Side A" title={SIDES.A} />
 
-            <Chapter id="record" num="A1" title="The Record" hint={`${formatNumber(summary.totalMs / 3_600_000)} hours, a ring for every day. Drag the needle, pinch to zoom.`} lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
+            <Chapter id="record" num="A1" title="The Record" hint={`${hoursLabel}, a ring for every day. Drag the needle, pinch to zoom.`} lede="Every day you listened, pressed into vinyl. Each groove represents a day, one arc per song, placed by the time it played.">
               <Vinyl
                 key={viewKey}
                 plays={plays}
@@ -665,16 +689,18 @@ export function Dashboard({ result, isSample, onReset }: Props) {
               <Calendar days={days} years={year === null ? years : [year]} plays={plays} firstHeard={firstHeard} colors={colors} />
             </Chapter>
 
-            <Chapter
-              id="lovehate"
-              num="B3"
-              title="Love / Hate"
-              hint="The song you let play, and the one you skip."
-              lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
-              table={() => <LoveHateTable songs={songs} />}
-            >
-              {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
-            </Chapter>
+            {summary.skipRate !== null && (
+              <Chapter
+                id="lovehate"
+                num="B3"
+                title="Love / Hate"
+                hint="The song you let play, and the one you skip."
+                lede={`The song you let play the most against the one you skip the most. Then your ${formatNumber(songs.length)} most-played songs: how often you start them (across) and how often you bail (up).`}
+                table={() => <LoveHateTable songs={songs} />}
+              >
+                {songs.length >= 5 ? <LoveHate key={viewKey} songs={songs} skipRate={summary.skipRate} plays={plays} /> : <NotEnough />}
+              </Chapter>
+            )}
 
             <Side label="Side C" title={SIDES.C} />
 
@@ -735,7 +761,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
               id="poster"
               num="D2"
               title="The Poster"
-              hint="Touch and hold the poster to save it."
+              hint="Pinch to zoom. Touch and hold to save."
               lede="Take it home. Pick a design, a size and a background, then download it or send it straight from your phone."
             >
               <PosterStudio data={posterData} design={posterDesign} onDesign={setPosterDesign} />
@@ -764,8 +790,27 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                       {result.filesRead.length} file{result.filesRead.length === 1 ? '' : 's'} read: {result.filesRead.join(', ')}
                     </li>
                     <li>
-                      {formatNumber(result.skippedRows)} rows without track info ignored ({skippedRowsHint(result.sources)})
+                      {formatNumber(result.skippedRows - result.undatedRows)} rows without track info ignored ({skippedRowsHint(result.sources)})
                     </li>
+                    {result.repeatScrobbles.length > 0 &&
+                      (applied.filter.allScrobbles ? (
+                        <li>
+                          {formatNumber(result.repeatScrobbles.length)} repeats of a song in the same minute are counted (Show all scrobbles), at 30 seconds each. Most are
+                          probably a device or app sending the same scrobbles again.
+                        </li>
+                      ) : (
+                        <li>
+                          {formatNumber(result.repeatScrobbles.length)} Last.fm scrobble{result.repeatScrobbles.length === 1 ? '' : 's'} left out for repeating a song in the same minute. Most are probably a device or
+                          app sending the same scrobbles again, so counting them would inflate your top songs and busiest days. Last.fm still counts them, which is why its total
+                          is higher. Show all scrobbles in the {LAUNCH_KEY} menu adds them back.
+                        </li>
+                      ))}
+                    {result.undatedRows > 0 && (
+                      <li>
+                        {formatNumber(result.undatedRows)} Last.fm scrobble{result.undatedRows === 1 ? '' : 's'} left out for being listed as 1 January 1970. The real time is lost, so they can’t go on a
+                        timeline, even with Show all scrobbles on.
+                      </li>
+                    )}
                     {applied.filter.musicOnly && otherPlays > 0 && <li>{formatNumber(otherPlays)} podcast and audiobook plays left out (Music only)</li>}
                     {applied.filter.years && (
                       <li>
@@ -778,6 +823,15 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                       </li>
                     )}
                     {result.duplicateRows > 0 && <li>{formatNumber(result.duplicateRows)} duplicate rows ignored</li>}
+                    {estimated && (
+                      <li>
+                        Last.fm’s hours are estimated from the gaps between scrobbles, and its times are taken as UTC. It doesn’t record skips, shuffle or
+                        devices, so anything built on those leaves its plays out.
+                      </li>
+                    )}
+                    {result.overlapRows > 0 && (
+                      <li>{formatNumber(result.overlapRows)} Last.fm scrobbles left out, on days your Spotify or Apple Music export already covers</li>
+                    )}
                     {result.unmatchedArtists > 0 && (
                       <li>
                         {formatNumber(result.unmatchedArtists)} Apple Music plays had no artist anywhere in the export.{' '}
@@ -787,7 +841,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                       </li>
                     )}
                     {noShuffle > 0 && (
-                      <li>{formatNumber(noShuffle)} Apple Music plays don’t say whether shuffle was on, so shuffle stats leave them out</li>
+                      <li>{formatNumber(noShuffle)} plays don’t say whether shuffle was on, so shuffle stats leave them out</li>
                     )}
                     {result.warnings.map((w) => (
                       <li key={w}>{w}</li>
@@ -802,8 +856,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                   .
                 </p>
                 <p className="disclaimer">
-                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
-                  Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
+                  My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB, Apple Inc. or Last.fm Ltd.
+                  Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc. Last.fm is a trademark of Last.fm Ltd.
                 </p>
               </footer>
             )}
@@ -813,7 +867,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
 
       {cards && (
         <CardNav
-          tracks={TRACKS}
+          tracks={pageTracks}
           sides={SIDES}
           deck={tourTracks}
           step={cardStep}
@@ -827,7 +881,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
       <Launcher
         mode={launcher}
         onMode={setLauncher}
-        tracks={TRACKS}
+        tracks={pageTracks}
         sides={SIDES}
         years={years}
         year={year}
@@ -843,9 +897,23 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         onUnhide={unhideArtists}
         onMusicOnly={setMusicOnly}
         canToggleMusicOnly={hasAnyMusic && otherPlays > 0}
+        allScrobbles={allScrobbles}
+        repeatScrobbles={result.repeatScrobbles.length}
+        onAllScrobbles={setAllScrobbles}
         onReset={clearData}
       />
       <MissingHistoryPanel open={missingOpen} onClose={() => setMissingOpen(false)} onReset={clearData} failures={result.failures} />
+      {leftOut && (
+        <LeftOutScrobblesPanel
+          open={leftOutOpen}
+          onClose={() => setLeftOutSeen(true)}
+          onShowAll={() => {
+            setAllScrobbles(true)
+            setLeftOutSeen(true)
+          }}
+          leftOut={leftOut}
+        />
+      )}
       {/* Paints before the charts are worked out again, so the moment that takes doesn't look like a hang */}
       <p className="dash__updating" role="status">
         {updating ? 'Updating the charts…' : ''}
@@ -871,6 +939,7 @@ function NotEnough() {
 
 /** What usually leaves a row without track info, for the load details */
 function skippedRowsHint(sources: DataSource[]): string {
+  if (sources.length === 1 && sources[0] === 'lastfm') return 'usually the song playing as the export ran'
   if (sources.includes('apple')) return sources.includes('spotify') ? 'usually local files on Spotify, radio on Apple Music' : 'usually radio'
   return 'usually local files'
 }

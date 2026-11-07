@@ -1,5 +1,6 @@
 import { WEAR_MAX, fromDayNumber } from '../data/stats'
 import { formatDate, formatNumber } from '../lib/format'
+import { SCROBBLE_RED, SPOTIFY_GREEN } from '../lib/palette'
 import { isDarkPaper, type PosterData, type PosterPaper } from './poster'
 import { DISPLAY, MINUTES, SLOT_OTHER, TAU, drawRecord, mix, quietestMinute, recordGeometry, type RecordModel } from './record'
 import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from './posterShared'
@@ -9,8 +10,16 @@ import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from 
  * The record is the centerpiece, fully annotated, with small charts that unpack it underneath.
  */
 
+function ordinal(k: number): string {
+  const teen = k % 100 >= 11 && k % 100 <= 13
+  return `${k}${teen ? 'th' : ['th', 'st', 'nd', 'rd'][k % 10] ?? 'th'}`
+}
+
 /** Apple's own typeface where there is one (San Francisco), else the platform's */
 const SYSTEM = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif'
+
+/** Last.fm's pages are set in Helvetica, and it's on nearly every device a poster gets made on */
+const HELVETICA = '"Helvetica Neue", Helvetica, Arial, sans-serif'
 
 /** Lines of callout detail that fit in a callout's block */
 const DETAIL_LINES = 3
@@ -30,24 +39,30 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   // The Glass background: a pale gray backdrop with the black record resting on it, a label of clear glass
   // that splits the light at its edge, and the system typeface
   const glass = paper === 'glass'
-  const bg = glass ? '#ececf0' : dark ? '#0e0d12' : '#efe8da'
-  const ink = glass ? '#0b0b0d' : dark ? '#f4f1ea' : '#17141d'
-  const soft = glass ? 'rgba(60, 60, 67, 0.7)' : dark ? 'rgba(244, 241, 234, 0.64)' : 'rgba(23, 20, 29, 0.64)'
-  const faint = glass ? 'rgba(60, 60, 67, 0.16)' : dark ? 'rgba(244, 241, 234, 0.14)' : 'rgba(23, 20, 29, 0.14)'
-  const otherColor = glass ? '#a1a1a8' : dark ? '#5d5868' : '#a8a2b3'
-  // What the charts sit on: a white card on the Glass background, the paper otherwise
-  const card = glass ? '#f9f9fb' : bg
-  const accent = accentPick ?? data.tracklist[0]?.color ?? '#ff277c'
-  const family = glass ? SYSTEM : DISPLAY
+  // The Scrobble background: plain white and Helvetica, with red kept to the label and the markers
+  const scrobble = paper === 'scrobble'
+  // Glass and Black share a layout: charts on cards, rounded marks, big type set tight. On Black, those cards
+  // and the green are a nod to Spotify; the rest keeps this app's own colors
+  const carded = glass || dark
+  const bg = scrobble ? '#ffffff' : glass ? '#ececf0' : '#0e0d12'
+  const ink = scrobble ? '#222222' : glass ? '#0b0b0d' : '#f4f1ea'
+  const soft = scrobble ? 'rgba(34, 34, 34, 0.66)' : glass ? 'rgba(60, 60, 67, 0.7)' : 'rgba(244, 241, 234, 0.64)'
+  const faint = scrobble ? 'rgba(34, 34, 34, 0.14)' : glass ? 'rgba(60, 60, 67, 0.16)' : 'rgba(244, 241, 234, 0.14)'
+  const otherColor = scrobble ? '#a9a9a9' : glass ? '#a1a1a8' : '#5d5868'
+  // What the charts sit on: a card on the Glass and Black backgrounds, the paper otherwise
+  const card = glass ? '#f9f9fb' : dark ? '#1a1920' : bg
+  const accent = accentPick ?? (scrobble ? SCROBBLE_RED : dark ? SPOTIFY_GREEN : data.tracklist[0]?.color ?? '#ff277c')
+  const family = glass ? SYSTEM : scrobble ? HELVETICA : DISPLAY
   const font = (weight: number, px: number) => `${weight} ${px}px ${family}`
-  // The system face is set tight at big sizes on the Glass background; canvas doesn't do that on its own
+  // Big type is set tight on the carded backgrounds; canvas doesn't do that on its own
   const tight = (px: number) => {
-    if (glass && 'letterSpacing' in ctx) ctx.letterSpacing = `${-0.025 * px}px`
+    if (carded && 'letterSpacing' in ctx) ctx.letterSpacing = `${-0.025 * px}px`
   }
   const untight = () => {
     if ('letterSpacing' in ctx) ctx.letterSpacing = '0px'
   }
   const model = data.record
+  const { playWord } = data
   const multiYear = data.period.includes('–')
   const months = monthly(model, 'month', multiYear)
   const driftBins = monthly(model, driftScale(model, multiYear), multiYear)
@@ -81,7 +96,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   // The headline numbers, big, in a row under the title
   const figures = [
     { value: data.stats.hours, label: 'hours listened' },
-    { value: data.stats.streams, label: 'plays' },
+    { value: data.stats.streams, label: `${playWord}s` },
     { value: data.stats.songs, label: 'different songs' },
     { value: data.stats.artists, label: 'artists' },
   ]
@@ -104,13 +119,13 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.font = font(500, 1.7 * u)
   y = wrap(
     ctx,
-    `Each ring is one day, from the center (${formatDate(firstDate)}) to the edge (${formatDate(lastDate)}). Each colored mark is a play, placed at the time of day it happened, midnight at the top.`,
+    `Each ring is one day, from the center (${formatDate(firstDate)}) to the edge (${formatDate(lastDate)}). Each colored mark is a ${playWord}, placed at the time of day it happened, midnight at the top.`,
     pad,
     y + 3 * u,
     W - 2 * pad,
     2.35 * u,
   )
-  if (!glass) {
+  if (!carded) {
     ctx.fillStyle = faint
     ctx.fillRect(pad, y + 2 * u, W - 2 * pad, Math.max(1, 0.1 * u))
   }
@@ -140,10 +155,11 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     size: s,
     colors: data.recordColors,
     focus: null,
-    // The Glass background lays its own glass label over this one
-    title: glass ? '' : data.recordTitle,
+    // The Glass and Scrobble backgrounds set their own label's words over this one
+    title: glass || scrobble ? '' : data.recordTitle,
     subtitle: '',
-    labelColor: accent,
+    // Fixed, unlike the charts' color: the label's white words wouldn't read on every pick
+    labelColor: scrobble ? SCROBBLE_RED : accent,
     sheen: true,
     ink: 'rgba(0, 0, 0, 0)',
     guides: [],
@@ -176,6 +192,13 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     ctx.fill()
     glassEdge(ctx, (grow) => ctx.arc(cx, cy, g.label + grow, 0, TAU), cx - g.label, cy - g.label, cx + g.label, cy + g.label, u)
     ctx.fillStyle = ink
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    fit(ctx, data.recordTitle, cx, cy + 0.2 * u, g.label * 1.3, 2.6 * u, (px) => font(800, px))
+  }
+
+  if (scrobble) {
+    ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     fit(ctx, data.recordTitle, cx, cy + 0.2 * u, g.label * 1.3, 2.6 * u, (px) => font(800, px))
@@ -272,7 +295,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     } else if (m.kind === 'session' && m.from !== undefined && m.to !== undefined) {
       callouts.push({ label: 'Longest session', value: m.value, detail: `${m.detail}, from ${clock(m.from)}`, anchors: [polar(ringR(m.ring + 0.5), (m.from + m.to) / 2)] })
     } else if (m.kind === 'first') {
-      callouts.push({ label: 'First play', value: m.value, detail: m.detail, anchors: [polar(ringR(m.ring + 0.5), m.from ?? 0)] })
+      callouts.push({ label: `First ${playWord}`, value: m.value, detail: m.detail, anchors: [polar(ringR(m.ring + 0.5), m.from ?? 0)] })
     } else if (m.kind === 'week' && m.plays) {
       callouts.push({ label: 'Most played in a week', value: m.value, detail: m.detail, anchors: m.plays.map((p) => polar(ringR(p.ring + 0.5), p.minute)) })
     }
@@ -289,7 +312,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   }
   const { markers, leaders, boxes } = placeCallouts(ctx, callouts.filter((c) => c.anchors.length > 0), { cx, cy, rClear: Rd + 5.6 * u, rLabel: g.label, top: mainTop + 0.5 * u, bottom: mainBottom, pad, W, u, ink, soft, dark, glass, disc: g.disc, font,
     // Numbered dots in the label's color, or black on the Glass background
-    badge: glass ? { fill: ink, text: '#ffffff', ring: '#ffffff' } : { fill: accent, text: '#0b0a0f', ring: '#0b0a0f' },
+    badge: scrobble ? { fill: SCROBBLE_RED, text: '#ffffff', ring: '#ffffff' } : glass ? { fill: ink, text: '#ffffff', ring: '#ffffff' } : { fill: accent, text: '#0b0a0f', ring: '#0b0a0f' },
   })
 
   // White is only ever the drift line, so it gets a name where it ends, on whichever side is clearest
@@ -365,10 +388,10 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   }
 
   // ---------- Three small charts ----------
-  // On the Glass background each chart sits on its own white card
-  const inset = glass ? 1.8 * u : 0
-  const panelTop = ly + (glass ? 4.4 : 3.8) * u
-  const gap = glass ? 1.4 * u : 3.5 * u
+  // On the carded backgrounds each chart sits on its own card
+  const inset = carded ? 1.8 * u : 0
+  const panelTop = ly + (carded ? 4.4 : 3.8) * u
+  const gap = carded ? 1.4 * u : 3.5 * u
   const cardW = (W - 2 * pad - 2 * gap) / 3
   const pw = cardW - 2 * inset
   const chartTop = panelTop + 4.4 * u
@@ -376,11 +399,14 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   const cardBottom = chartTop + chartH + 1.3 * u
   const panel = (i: number, heading: string, sub: string) => {
     const x = pad + i * (cardW + gap) + inset
-    if (glass) {
+    if (carded) {
       ctx.save()
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.1)'
-      ctx.shadowBlur = 2.4 * u
-      ctx.shadowOffsetY = 0.6 * u
+      // Lit cards cast a shadow; on black they're told apart by being lighter
+      if (glass) {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.1)'
+        ctx.shadowBlur = 2.4 * u
+        ctx.shadowOffsetY = 0.6 * u
+      }
       ctx.fillStyle = card
       ctx.beginPath()
       ctx.roundRect(x - inset, panelTop - 2.9 * u, cardW, cardBottom - (panelTop - 2.9 * u), 1.6 * u)
@@ -416,11 +442,11 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       }
       return ramp(Math.min(steps - 1, Math.floor((lo / sorted.length) * steps)) / (steps - 1))
     }
-    // Paper to accent, then on past it (lighter on midnight, deeper on cream) for the busiest hours
+    // Paper to accent, then on past it (lighter on black, deeper on white) for the busiest hours
     const ramp = (f: number) => (f <= 0.75 ? mix(card, accent, 0.14 + (f / 0.75) * 0.86) : mix(accent, dark ? '#ffffff' : '#000000', ((f - 0.75) / 0.25) * 0.45))
-    // The Glass background rounds off every cell
+    // The carded backgrounds round off every cell
     const cell = (cx0: number, cy0: number, w: number, h: number) => {
-      if (!glass) return ctx.fillRect(cx0, cy0, w, h)
+      if (!carded) return ctx.fillRect(cx0, cy0, w, h)
       ctx.beginPath()
       ctx.roundRect(cx0, cy0, w, h, Math.min(w, h) * 0.22)
       ctx.fill()
@@ -474,9 +500,9 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     months.forEach((m, i) => {
       let top = chartTop + bh
       const parts = [...m.slots.map((v, s) => [v, data.recordColors[s]] as const), [Math.max(0, m.total - m.slots.reduce((a, b) => a + b, 0)), otherColor] as const]
-      // On the Glass background bars have rounded tops, so each stack is cut to one
+      // On the carded backgrounds bars have rounded tops, so each stack is cut to one
       ctx.save()
-      if (glass) {
+      if (carded) {
         const h = (m.total / max) * bh
         ctx.beginPath()
         ctx.roundRect(x + i * bw + bw * 0.08, top - h, bw * 0.84, h, [Math.min(bw * 0.3, h / 2), Math.min(bw * 0.3, h / 2), 0, 0])
@@ -508,7 +534,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
 
   // 3. How songs wear out: the skip rate by how many times I'd already heard the song, against my average.
   // It usually dips once a song is familiar, then climbs back as I tire of it
-  {
+  if (data.wearOut) {
     const x = panel(2, 'How songs wear out', 'Skip rate by times heard')
     const { rates, average, best, wornOut } = data.wearOut
     const bh = chartH - 2.2 * u
@@ -616,10 +642,6 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       })
 
       // Play numbers along the bottom
-      const ordinal = (k: number) => {
-        const teen = k % 100 >= 11 && k % 100 <= 13
-        return `${k}${teen ? 'th' : ['th', 'st', 'nd', 'rd'][k % 10] ?? 'th'}`
-      }
       ctx.fillStyle = soft
       ctx.font = font(500, 1.2 * u)
       ctx.fillText('1st play', x, chartTop + chartH)
@@ -628,11 +650,56 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
       ctx.textAlign = 'right'
       ctx.fillText(n === WEAR_MAX ? `${WEAR_MAX}th+` : ordinal(n), x + pw, chartTop + chartH)
     }
+  } else {
+    // A history that can't say what got skipped still knows what got played again
+    const x = panel(2, 'Back for more', 'Songs played again, by times heard')
+    const rates = data.replays
+    const floor = chartTop + chartH - 2.2 * u
+    const n = rates.length
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = soft
+    ctx.font = font(500, 1.2 * u)
+    ctx.textAlign = 'left'
+
+    if (n < 3) {
+      ctx.fillText('Not enough repeat plays yet', x, floor - 0.6 * u)
+    } else {
+      const px = (i: number) => x + (i / (n - 1)) * pw
+      const py = (r: number) => floor - r * (floor - chartTop)
+
+      ctx.fillStyle = faint
+      ctx.fillRect(x, floor, pw, Math.max(1, 0.12 * u))
+
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 0.32 * u
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      rates.forEach((r, i) => (i === 0 ? ctx.moveTo(px(i), py(r)) : ctx.lineTo(px(i), py(r))))
+      ctx.stroke()
+
+      // The curve only falls: a steep one leaves the top right free, a shallow one the space under it
+      const under = rates[n >> 1] > 0.5
+      const noteY = under ? floor - 2.3 * u : chartTop + 0.9 * u
+      ctx.textAlign = under ? 'left' : 'right'
+      const noteX = under ? x + 0.4 * u : x + pw
+      ctx.fillStyle = ink
+      ctx.font = font(700, 1.3 * u)
+      ctx.fillText(`${Math.round(rates[1] * 100)}% came back`, noteX, noteY)
+      ctx.font = font(500, 1.2 * u)
+      ctx.fillText(`for a 2nd ${playWord}`, noteX, noteY + 1.55 * u)
+
+      ctx.fillStyle = soft
+      ctx.textAlign = 'left'
+      ctx.fillText(`1st ${playWord}`, x, chartTop + chartH)
+      ctx.textAlign = 'right'
+      ctx.fillText(n === WEAR_MAX ? `${WEAR_MAX}th+` : ordinal(n), x + pw, chartTop + chartH)
+    }
   }
 
   // ---------- Your #1, year by year (month by month for a single year) ----------
-  const stripTop = glass ? cardBottom + 2 * u : chartTop + chartH + 2.4 * u
-  if (!glass) {
+  const stripTop = carded ? cardBottom + 2 * u : chartTop + chartH + 2.4 * u
+  if (!carded) {
     ctx.fillStyle = faint
     ctx.fillRect(pad, stripTop - 1.6 * u, W - 2 * pad, Math.max(1, 0.1 * u))
   }
@@ -643,8 +710,8 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillText(multiYear ? 'My #1 artist, year by year' : 'My #1 artist, month by month', pad, stripTop + 0.8 * u)
   const colW = (W - 2 * pad) / periods.length
   const maxTotal = Math.max(...periods.map((p) => p.total), 1)
-  // The cards push the strip down on the Glass background, so it's drawn a little more compactly there
-  const [labelY, barBottom, barMax, nameY] = glass ? [3.6, 6.4, 2.4, 8] : [3.8, 7.2, 2.8, 9]
+  // The cards push the strip down, so it's drawn a little more compactly with them
+  const [labelY, barBottom, barMax, nameY] = carded ? [3.6, 6.4, 2.4, 8] : [3.8, 7.2, 2.8, 9]
   periods.forEach((p, i) => {
     const x = pad + i * colW
     const top = p.slots.indexOf(Math.max(...p.slots))
@@ -655,7 +722,7 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
     const bh = (p.total / maxTotal) * barMax * u
     ctx.fillStyle = has ? data.recordColors[top] : otherColor
     ctx.beginPath()
-    ctx.roundRect(x, stripTop + barBottom * u - bh, colW - 0.8 * u, bh, glass ? Math.min(0.5 * u, bh / 2) : 0)
+    ctx.roundRect(x, stripTop + barBottom * u - bh, colW - 0.8 * u, bh, carded ? Math.min(0.5 * u, bh / 2) : 0)
     ctx.fill()
     ctx.fillStyle = soft
     ctx.font = font(500, 1.25 * u)

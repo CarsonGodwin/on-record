@@ -51,7 +51,7 @@ async function appleDownload(name = 'Apple Media Services information.zip', musi
   return file(name, await zipBytes({ 'Apple Media Services information/Apple_Media_Services.zip': inner, 'Apple Media Services information/Read Me.pdf': 'pdf' }))
 }
 
-const summaryOf = (plays: { title: string; artist: string; skipped: boolean }[]) => plays.map((p) => `${p.title}: ${p.artist}${p.skipped ? ' (skipped)' : ''}`)
+const summaryOf = (plays: { title: string; artist: string; skipped: boolean | null }[]) => plays.map((p) => `${p.title}: ${p.artist}${p.skipped ? ' (skipped)' : ''}`)
 
 describe('loading an Apple Music export', () => {
   it('opens the zips Apple nests, and reads only the music files', async () => {
@@ -193,7 +193,7 @@ describe('a play activity too long to hold as one string', () => {
     const warnings: string[] = []
     const found = await readPlayActivity(FILE_NAMES.playActivity, stream, warnings, { bytes: PLAYS.length, events: 100 })
     expect(warnings).toEqual([TOO_LARGE])
-    expect(found).toEqual({ spotify: [], apple: [], appleSkipped: true, failures: [TOO_LARGE] })
+    expect(found).toEqual({ spotify: [], apple: [], lastfm: [], appleSkipped: true, failures: [TOO_LARGE] })
     expect(read).toBe(2)
   })
 

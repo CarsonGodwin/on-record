@@ -74,5 +74,7 @@ describe('posterMoments', () => {
     const [w] = posterMoments(model, topWeek(2), noRecords)
     expect(w).toMatchObject({ kind: 'week', value: 'Loop', ring: 2, ringEnd: 4, plays: [{ ring: 2, minute: 480 }, { ring: 4, minute: 1350 }] })
     expect(w.detail).toBe(`Band, 2 plays the week of ${formatDate(at(2024, 1, 12))}`)
+    const [scrobbled] = posterMoments(model, topWeek(2), noRecords, 'scrobble')
+    expect(scrobbled.detail).toBe(`Band, 2 scrobbles the week of ${formatDate(at(2024, 1, 12))}`)
   })
 })

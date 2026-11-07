@@ -19,7 +19,7 @@ export function DropZone({ onFiles }: Props) {
       className={dragging ? 'sleeve is-dragging' : 'sleeve'}
       role="button"
       tabIndex={0}
-      aria-label="Drop your Spotify or Apple Music data here, or press Enter to choose files"
+      aria-label="Drop your Spotify, Apple Music or Last.fm data here, or press Enter to choose files"
       onClick={openPicker}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -75,8 +75,7 @@ export function DropZone({ onFiles }: Props) {
         </p>
         <p className="sleeve__hint">
           The <code>.zip</code> from Spotify or Apple
-          <span className="landing__more"> (every part, if Apple sent several), or the folder it unzips to</span>
-          .
+          <span className="landing__more"> (every part, if Apple sent several), or the folder it unzips to</span>, or a Last.fm <code>.csv</code>.
         </p>
         <span className="sleeve__cta" aria-hidden="true">
           <b>

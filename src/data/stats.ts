@@ -1,4 +1,4 @@
-import type { Play } from '../types'
+import type { LoadResult, Play } from '../types'
 
 /*
  * Pure aggregation functions over Play[]. Everything time-based uses the
@@ -34,7 +34,7 @@ export function fromDayNumber(n: number): Date {
 }
 
 export function isSkip(p: Play): boolean {
-  return p.skipped || p.reasonEnd === 'fwdbtn'
+  return p.skipped === true || p.reasonEnd === 'fwdbtn'
 }
 
 export function getYears(plays: Play[]): number[] {
@@ -66,6 +66,30 @@ export interface PlayFilter {
   hidden: ReadonlySet<string>
   /** Leaves out every year outside the range, for a history with a long gap in it. Absent or null keeps them all. */
   years?: YearRange | null
+  /** Counts Last.fm's repeated scrobbles. This picks the list that goes in (withRepeats), so filterPlays never reads it. */
+  allScrobbles?: boolean
+}
+
+/**
+ * How much of a file has to be left out before it's worth stopping someone to say so. A few repeats
+ * turn up in almost any export (a new scrobble moves the pages along as it runs), and those can stay in Load details.
+ */
+const LEFT_OUT_WORTH_SAYING = 0.01
+
+/**
+ * What a Last.fm upload left out, when it's enough to mention up front, or null. Only for an upload of
+ * Last.fm alone, since with another service `plays` isn't just the file's scrobbles and the totals wouldn't add up.
+ */
+export function scrobblesLeftOut({ sources, plays, repeatScrobbles, undatedRows }: LoadResult) {
+  if (sources.length !== 1 || sources[0] !== 'lastfm') return null
+  const total = plays.length + repeatScrobbles.length + undatedRows
+  if (repeatScrobbles.length + undatedRows < total * LEFT_OUT_WORTH_SAYING) return null
+  return { total, shown: plays.length, repeats: repeatScrobbles.length, undated: undatedRows }
+}
+
+/** `plays` with Last.fm's repeated scrobbles added, still sorted by end time */
+export function withRepeats(plays: Play[], repeats: Play[]): Play[] {
+  return repeats.length > 0 ? [...plays, ...repeats].sort((a, b) => a.endTime - b.endTime) : plays
 }
 
 function inYears(p: Play, years: YearRange): boolean {
@@ -112,7 +136,7 @@ export function canHide(artists: readonly Ranked[], hidden: ReadonlySet<string>,
 /** True when two filters leave out the same plays, so hiding an artist and unhiding them again costs nothing */
 export function sameFilter(a: PlayFilter, b: PlayFilter): boolean {
   if (a === b) return true
-  if (a.musicOnly !== b.musicOnly || a.hidden.size !== b.hidden.size) return false
+  if (a.musicOnly !== b.musicOnly || !a.allScrobbles !== !b.allScrobbles || a.hidden.size !== b.hidden.size) return false
   if ((a.years?.[0] ?? null) !== (b.years?.[0] ?? null) || (a.years?.[1] ?? null) !== (b.years?.[1] ?? null)) return false
   for (const artist of a.hidden) if (!b.hidden.has(artist)) return false
   return true
@@ -130,8 +154,8 @@ export interface Summary {
   /** Different songs with a play of 30s or more, the same rule as `streams` */
   tracks: number
   activeDays: number
-  /** Share of music plays that were skipped, 0–1 */
-  skipRate: number
+  /** Share of music plays that were skipped, 0–1, out of the plays that say; null when none do (Last.fm) */
+  skipRate: number | null
   /** Share of music plays with shuffle on, 0–1, out of the plays that say; null when none do (older Apple Music plays) */
   shuffleRate: number | null
   /** Share of listening time that was offline, 0–1 */
@@ -146,6 +170,7 @@ export function summarize(plays: Play[]): Summary {
   let streams = 0
   let musicPlays = 0
   let skips = 0
+  let skipKnown = 0
   let shuffles = 0
   let shuffleKnown = 0
   const artists = new Set<string>()
@@ -161,6 +186,7 @@ export function summarize(plays: Play[]): Summary {
     if (p.kind === 'track') {
       musicMs += p.msPlayed
       musicPlays++
+      if (p.skipped !== null) skipKnown++
       if (isSkip(p)) skips++
       if (p.shuffle !== null) shuffleKnown++
       if (p.shuffle) shuffles++
@@ -179,8 +205,8 @@ export function summarize(plays: Play[]): Summary {
     artists: artists.size,
     tracks: tracks.size,
     activeDays: days.size,
-    skipRate: musicPlays ? skips / musicPlays : 0,
     // With no music at all there's nothing unknown about it, so that stays 0 as it always was
+    skipRate: skipKnown ? skips / skipKnown : musicPlays ? null : 0,
     shuffleRate: shuffleKnown ? shuffles / shuffleKnown : musicPlays ? null : 0,
     offlineShare: totalMs ? offlineMs / totalMs : 0,
   }
@@ -225,6 +251,8 @@ export function wearOut(allPlays: Play[], year: number | null): WearOut {
     heard.set(key, n)
     if ((totals.get(key) ?? 0) < WEAR_MIN_SONG_PLAYS) continue
     if (year !== null && startDate(p).getFullYear() !== year) continue
+    // A play that can't say still counts toward how many times the song's been heard, just not here
+    if (p.skipped === null) continue
     const step = Math.min(n, WEAR_MAX) - 1
     plays[step]++
     if (isSkip(p)) skips[step]++
@@ -257,6 +285,26 @@ export function wearOut(allPlays: Play[], year: number | null): WearOut {
   })
   const back = rates[bestIndex] < average ? rates.findIndex((r, i) => i > bestIndex && r >= average) : -1
   return { rates, average, best: bestIndex + 1, wornOut: back === -1 ? null : back + 1 }
+}
+
+/** A step of replayCurve needs this many songs behind it */
+const REPLAY_MIN_SONGS = 5
+
+/**
+ * The share of songs played at least once, twice, three times and so on, from the 1st play.
+ * It's what the poster shows for a history that can't say what got skipped.
+ */
+export function replayCurve(plays: Play[]): number[] {
+  const counts = new Map<string, number>()
+  for (const p of plays) if (p.kind === 'track') counts.set(trackKey(p), (counts.get(trackKey(p)) ?? 0) + 1)
+  const out: number[] = []
+  for (let n = 1; n <= WEAR_MAX; n++) {
+    let reached = 0
+    for (const count of counts.values()) if (count >= n) reached++
+    if (reached < REPLAY_MIN_SONGS) break
+    out.push(reached / counts.size)
+  }
+  return out
 }
 
 // ---------- Rankings ----------
@@ -315,6 +363,8 @@ export function topItems(plays: Play[], category: Category, rankBy: RankBy, limi
 export function platforms(plays: Play[]): Ranked[] {
   const totals = new Map<string, Ranked>()
   for (const p of plays) {
+    // Last.fm doesn't say, which isn't the same as a device Spotify couldn't name
+    if (!p.platform) continue
     const item = totals.get(p.platform) ?? { key: p.platform, label: p.platform, ms: 0, plays: 0 }
     item.ms += p.msPlayed
     if (p.msPlayed >= COUNTED_PLAY_MS) item.plays++

@@ -139,6 +139,57 @@ export function MissingHistoryPanel({ open, onClose, onReset, failures }: Missin
   )
 }
 
+interface LeftOutProps {
+  open: boolean
+  onClose: () => void
+  /** Turns Show all scrobbles on, and closes */
+  onShowAll: () => void
+  leftOut: { total: number; shown: number; repeats: number; undated: number }
+}
+
+/**
+ * Says up front why a Last.fm upload shows fewer plays than the profile does. Someone who knows
+ * their scrobble count would otherwise take the difference for lost data.
+ */
+export function LeftOutScrobblesPanel({ open, onClose, onShowAll, leftOut: { total, shown, repeats, undated } }: LeftOutProps) {
+  return (
+    <Modal open={open} onClose={onClose} label="Some scrobbles were left out" className="modal--panel">
+      <ModalHead title="Some scrobbles were left out" onClose={onClose} />
+      <p className="settings__note left-out__lead">
+        Your file has {formatNumber(total)} scrobbles, and {formatNumber(shown)} are showing. Last.fm counts them all, which is why its total is higher.
+      </p>
+      <ul className="missing__files">
+        {repeats > 0 && (
+          <li>
+            {formatNumber(repeats)} {repeats === 1 ? 'repeats' : 'repeat'} a song in the same minute. Most repeats are probably a device or app sending the same scrobbles again, so
+            counting them would inflate your top songs and busiest days.
+          </li>
+        )}
+        {undated > 0 && (
+          <li>
+            {formatNumber(undated)} {undated === 1 ? 'is' : 'are'} listed as 1 January 1970. The real time is lost, so {undated === 1 ? 'it can’t' : 'they can’t'} go on a timeline.
+          </li>
+        )}
+      </ul>
+      {repeats > 0 && (
+        <p className="settings__note">
+          Show all scrobbles adds the repeats back{undated > 0 ? ', but not the 1970 ones' : ''}. You can change this later in the search menu.
+        </p>
+      )}
+      <div className="missing__actions">
+        <button type="button" className="button button--small" onClick={onClose}>
+          {repeats > 0 ? 'Keep them out' : 'Got it'}
+        </button>
+        {repeats > 0 && (
+          <button type="button" className="button button--ghost button--small" onClick={onShowAll}>
+            Show all scrobbles
+          </button>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 export interface YearsProps {
   /** Plays that started in each year of the whole export */
   yearCounts: ReadonlyMap<number, number>

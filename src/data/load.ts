@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import type { DataSource, LoadResult, Play } from '../types'
 import { appleFileKind, isAppleArchiveName, type AppleFile } from './appleFiles'
+import type { LastfmFile } from './lastfm'
 import { isBasicHistoryRecord, isStreamRecord, toPlay } from './parse'
 import { generateSampleRecords } from './sample'
 
@@ -14,6 +15,7 @@ interface Batch {
 interface Found {
   spotify: Batch[]
   apple: AppleFile[]
+  lastfm: LastfmFile[]
   /** An Apple Music file or archive couldn't be used, which has already been explained */
   appleSkipped: boolean
   /** The warnings about files that could have held history but weren't read */
@@ -21,7 +23,7 @@ interface Found {
 }
 
 function nothing(): Found {
-  return { spotify: [], apple: [], appleSkipped: false, failures: [] }
+  return { spotify: [], apple: [], lastfm: [], appleSkipped: false, failures: [] }
 }
 
 /** A file that could have held history but wasn't read: a warning, and one the dashboard says up front */
@@ -46,6 +48,9 @@ interface Part {
   skippedRows: number
   duplicateRows: number
   unmatchedArtists: number
+  overlapRows?: number
+  undatedRows?: number
+  repeats?: Play[]
 }
 
 /**
@@ -92,6 +97,10 @@ const MAX_NESTED_ZIPS = 4
  * capped by count: years of daily listening come to a fraction of either limit.
  */
 const PLAY_ACTIVITY_LIMITS: PlayActivityBudget = { bytes: 4 * 1024 * 1024 * 1024, events: 5_000_000 }
+/** A scrobble is about 75 bytes, so this is decades of heavy listening. An upload's scrobble files share it. */
+const LASTFM_LIMITS: PlayActivityBudget = { bytes: MAX_FILE_BYTES, events: 5_000_000 }
+/** Enough rows to tell a scrobble export from any other CSV, without reading the rest of one that isn't */
+const LASTFM_SNIFF_BYTES = 64 * 1024
 
 /** What an upload's play activities may still read */
 export interface PlayActivityBudget {
@@ -114,7 +123,7 @@ function unreadable(name: string, warnings: string[]): Found {
 }
 
 /**
- * Reads dropped or picked files (.zip, .json or Apple's .csv) entirely in the browser.
+ * Reads dropped or picked files (.zip, .json, Apple's .csv or a Last.fm .csv) entirely in the browser.
  * `unreadableNames` are files a dropped folder listed but the browser wouldn't hand over.
  */
 export async function loadFiles(files: File[], unreadableNames: string[] = []): Promise<LoadResult> {
@@ -124,16 +133,20 @@ export async function loadFiles(files: File[], unreadableNames: string[] = []): 
     files = files.slice(0, MAX_FILES)
   }
   const activity = { ...PLAY_ACTIVITY_LIMITS }
+  const scrobbles = { ...LASTFM_LIMITS }
+  // Each file keeps its own warnings, so they come out in file order however the reads finish
+  const fileWarnings = files.map((): string[] => [])
   const found = await Promise.all(
-    files.map((f) =>
-      readFile(f, warnings, activity).catch((err) => {
+    files.map((f, i) =>
+      readFile(f, fileWarnings[i], activity, scrobbles).catch((err) => {
         // A file the browser won't read shouldn't sink the rest of the upload. Anything
         // else is a bug or a failed import, which the page's own error reports as it is.
         if (!isReadError(err)) throw err
-        return unreadable(f.name, warnings)
+        return unreadable(f.name, fileWarnings[i])
       }),
     ),
   )
+  warnings.push(...fileWarnings.flat())
   for (const name of unreadableNames) found.push(unreadable(name, warnings))
   const spotify = readSpotify(
     found.flatMap((f) => f.spotify),
@@ -145,15 +158,18 @@ export async function loadFiles(files: File[], unreadableNames: string[] = []): 
     appleFiles.length > 0
       ? (await import('./apple')).loadApple(appleFiles, warnings, { spotify: spotify.plays, skippedFiles: found.some((f) => f.appleSkipped) })
       : null
-  return collect({ spotify, apple }, warnings, found.flatMap((f) => f.failures))
+  // Last, because the other services decide which of its days are needed. Only people who drop a CSV download it.
+  const lastfmFiles = found.flatMap((f) => f.lastfm)
+  const lastfm = lastfmFiles.length > 0 ? (await import('./lastfm')).loadLastfm(lastfmFiles, [...spotify.plays, ...(apple?.plays ?? [])]) : null
+  return collect({ spotify, apple, lastfm }, warnings, found.flatMap((f) => f.failures))
 }
 
 /** Builds the same LoadResult from generated data, for visitors without an export. */
 export function loadSample(): LoadResult {
-  return collect({ spotify: readSpotify([{ name: 'Sample data', rows: generateSampleRecords() }], []), apple: null }, [], [])
+  return collect({ spotify: readSpotify([{ name: 'Sample data', rows: generateSampleRecords() }], []), apple: null, lastfm: null }, [], [])
 }
 
-async function readFile(file: File, warnings: string[], activity: PlayActivityBudget): Promise<Found> {
+async function readFile(file: File, warnings: string[], activity: PlayActivityBudget, scrobbles: PlayActivityBudget): Promise<Found> {
   const lower = file.name.toLowerCase()
   const found = nothing()
   const appleKind = appleFileKind(file.name)
@@ -196,12 +212,44 @@ async function readFile(file: File, warnings: string[], activity: PlayActivityBu
     return spotifyFile(file.name, await file.text(), warnings)
   }
 
-  warnings.push(
-    lower.endsWith('.csv')
-      ? `${file.name}: skipped (not one of Apple Music’s history files)`
-      : `${file.name}: skipped (not a .zip or .json file)`,
-  )
+  if (lower.endsWith('.csv')) return readLastfmFile(file, warnings, scrobbles)
+
+  warnings.push(`${file.name}: skipped (not a .zip or .json file)`)
   return found
+}
+
+/**
+ * A CSV dropped by itself might be a scrobble export, whose name is usually just a username.
+ * readZip and dropped folders never come here: they only open files they know by name, which
+ * keeps Apple's purchase and account files shut. This reads the start of the file to check,
+ * and anything else is left alone.
+ */
+export async function readLastfmFile(file: File, warnings: string[], budget: PlayActivityBudget): Promise<Found> {
+  const { looksLikeLastfm, lastfmReader } = await import('./lastfm')
+  const head = await file.slice(0, LASTFM_SNIFF_BYTES).text()
+  if (!looksLikeLastfm(head, file.size <= LASTFM_SNIFF_BYTES)) {
+    // Without Apple in its name it's more likely someone's scrobbles in another format, so that gets what to look for
+    const reason = /apple/i.test(file.name) ? 'not one of Apple Music’s history files' : 'not a history file; a Last.fm export has four columns and no header'
+    warnings.push(`${file.name}: skipped (${reason})`)
+    return nothing()
+  }
+
+  const reader = lastfmReader()
+  const tooLarge = new Error('too large')
+  let counted = 0
+  try {
+    await fileText(file)((text) => {
+      budget.bytes -= text.length
+      budget.events -= reader.rows() - counted
+      counted = reader.rows()
+      if (budget.bytes < 0 || budget.events < 0) throw tooLarge
+      reader.push(text)
+    })
+  } catch (err) {
+    if (err !== tooLarge) throw err
+    return failed(`${file.name}: skipped (too large to open safely in the browser)`, warnings)
+  }
+  return { ...nothing(), lastfm: [{ name: file.name, ...reader.end() }] }
 }
 
 /** Reads the history files in a zip, opening the zips Apple nests inside its export */
@@ -261,6 +309,7 @@ async function readZip(zip: JSZip, warnings: string[], depth: number, budget: Zi
   return {
     spotify: results.flatMap((r) => r.spotify),
     apple: results.flatMap((r) => r.apple),
+    lastfm: [],
     appleSkipped: found.appleSkipped || results.some((r) => r.appleSkipped),
     failures: [...found.failures, ...results.flatMap((r) => r.failures)],
   }
@@ -387,15 +436,17 @@ function collect(parts: Record<DataSource, Part | null>, warnings: string[], fai
   let skippedRows = 0
   let duplicateRows = 0
   let unmatchedArtists = 0
+  let overlapRows = 0
 
   // Spotify first, so its plays win any tie exactly as they did before Apple Music was supported
-  for (const source of ['spotify', 'apple'] as const) {
+  for (const source of ['spotify', 'apple', 'lastfm'] as const) {
     const part = parts[source]
     if (!part) continue
     filesRead.push(...part.filesRead)
     skippedRows += part.skippedRows
     duplicateRows += part.duplicateRows
     unmatchedArtists += part.unmatchedArtists
+    overlapRows += part.overlapRows ?? 0
     let added = 0
     for (const play of part.plays) {
       // Same end time + item + duration means the same stream
@@ -412,7 +463,19 @@ function collect(parts: Record<DataSource, Part | null>, warnings: string[], fai
   }
 
   plays.sort((a, b) => a.endTime - b.endTime)
-  return { plays, filesRead, sources, skippedRows, duplicateRows, unmatchedArtists, warnings, failures }
+  return {
+    plays,
+    repeatScrobbles: parts.lastfm?.repeats ?? [],
+    filesRead,
+    sources,
+    skippedRows,
+    duplicateRows,
+    overlapRows,
+    undatedRows: parts.lastfm?.undatedRows ?? 0,
+    unmatchedArtists,
+    warnings,
+    failures,
+  }
 }
 
 function baseName(path: string): string {

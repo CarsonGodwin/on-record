@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Ranked } from '../data/stats'
-import { formatDuration } from '../lib/format'
+import { formatDuration, formatNumber } from '../lib/format'
 import { LAUNCH_KEY } from '../lib/keys'
 import { COARSE, PHONE } from '../lib/pointer'
 import { matches } from '../lib/search'
@@ -25,6 +25,8 @@ interface Item {
   label: string
   /** Shown on the right: a track number, an artist's hours */
   hint?: string
+  /** A line under the label saying what the row is about */
+  note?: string
   /** A keyboard shortcut shown beside the hint */
   shortcut?: string
   /** Extra words that should find this item */
@@ -65,6 +67,11 @@ interface Props extends YearsProps {
   onMusicOnly: (on: boolean) => void
   /** False when there's nothing to leave out, or no music to keep: the row is left off */
   canToggleMusicOnly: boolean
+  /** Whether Last.fm's repeated scrobbles are counted */
+  allScrobbles: boolean
+  /** How many there are. With none the row is left off, so it only shows for Last.fm. */
+  repeatScrobbles: number
+  onAllScrobbles: (on: boolean) => void
   onReset: () => void
 }
 
@@ -125,6 +132,9 @@ function LauncherBody({
   onUnhide,
   onMusicOnly,
   canToggleMusicOnly,
+  allScrobbles,
+  repeatScrobbles,
+  onAllScrobbles,
   onReset,
 }: Props & { mode: 'root' | 'artists' }) {
   const [query, setQuery] = useState('')
@@ -174,6 +184,20 @@ function LauncherBody({
             },
           ]
         : []),
+      ...(repeatScrobbles > 0
+        ? [
+            {
+              key: 'scrobbles',
+              group: 'Commands',
+              label: 'Show all scrobbles?',
+              // Load details isn't on the phone deck, so the reason has to be here as well
+              note: `${formatNumber(repeatScrobbles)} repeats of a song in the same minute are ${allScrobbles ? 'counted' : 'left out'}. Most are probably the same scrobbles sent again.`,
+              toggle: allScrobbles,
+              terms: 'last.fm lastfm repeats duplicates same minute',
+              run: () => onAllScrobbles(!allScrobbles),
+            },
+          ]
+        : []),
       {
         key: 'artists',
         group: 'Commands',
@@ -213,7 +237,7 @@ function LauncherBody({
     ]
     // The hint beside a command finds it too: "podcast" finds the switch, "license" finds About
     return all.filter((item) => matches(query, `${item.label} ${item.hint ?? ''} ${item.terms ?? ''}`))
-  }, [mode, query, artists, hidden, tracks, sides, years, year, range, musicOnly, canToggleMusicOnly, onMusicOnly, onReset, onMode, onJump, onYear])
+  }, [mode, query, artists, hidden, tracks, sides, years, year, range, musicOnly, canToggleMusicOnly, onMusicOnly, allScrobbles, repeatScrobbles, onAllScrobbles, onReset, onMode, onJump, onYear])
 
   const firstPick = items[0]?.names ? 1 : 0
   const { current, from, to } = span(sel, items.length, firstPick)
@@ -345,6 +369,7 @@ function LauncherBody({
                 )}
                 {item.hint && <span className="launcher__hint">{item.hint}</span>}
                 {item.shortcut && <kbd className="launcher__shortcut">{item.shortcut}</kbd>}
+                {item.note && <span className="launcher__note">{item.note}</span>}
               </div>
             </li>
           )

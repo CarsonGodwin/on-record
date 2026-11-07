@@ -13,6 +13,7 @@ import {
   platforms,
   playsPerYear,
   sameFilter,
+  withRepeats,
   startDate,
   summarize,
   topItems,
@@ -334,6 +335,16 @@ describe('sameFilter', () => {
     expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: false, hidden: new Set(['A']) })).toBe(false)
     expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['B']) })).toBe(false)
     expect(sameFilter({ musicOnly: true, hidden: new Set(['A']) }, { musicOnly: true, hidden: new Set(['A', 'B']) })).toBe(false)
+    expect(sameFilter({ musicOnly: true, hidden: new Set(), allScrobbles: true }, { musicOnly: true, hidden: new Set() })).toBe(false)
+  })
+})
+
+describe('withRepeats', () => {
+  it('adds repeats in end time order, and hands back the same list when there are none', () => {
+    const plays = sorted([play(at(2024, 1, 1, 10)), play(at(2024, 1, 1, 12))])
+    const repeat = play(at(2024, 1, 1, 11))
+    expect(withRepeats(plays, [repeat]).map((p) => p.endTime)).toEqual([plays[0].endTime, repeat.endTime, plays[1].endTime])
+    expect(withRepeats(plays, [])).toBe(plays)
   })
 })
 

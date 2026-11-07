@@ -82,14 +82,14 @@ export default function App() {
         <span className="brand">
           My Listening Record<span className="brand__dot" aria-hidden="true" />
         </span>
-        <span className="landing__tag">A Spotify &amp; Apple Music history visualizer</span>
+        <span className="landing__tag">A Spotify, Apple Music &amp; Last.fm history visualizer</span>
       </header>
 
       <main className="landing__main">
         <div className="landing__copy">
           <h1 className="landing__title">One groove for every day you listened.</h1>
           <p className="landing__lede">
-            Drop in your Spotify or Apple Music export and your whole history is pressed into a record.
+            Drop in your Spotify, Apple Music or Last.fm export and your whole history is pressed into a record.
             {/* A phone's first screen keeps to the one sentence, so the sleeve and the demo fit on it too */}
             <span className="landing__more">
               {' '}
@@ -245,6 +245,33 @@ export default function App() {
           </a>{' '}
           with what Load details says (it lists file names and counts, never your listening).
         </p>
+        <h3>
+          Last.fm <span className="beta">Beta</span>
+        </h3>
+        <p className="how-to__time">A few minutes or longer, depending on how much you’ve scrobbled.</p>
+        <ol>
+          <li>
+            Go to{' '}
+            <a href="https://benjaminbenben.com/lastfm-to-csv/" target="_blank" rel="noreferrer">
+              lastfm-to-csv
+            </a>
+            , a free tool made by someone else, and type your Last.fm username.
+          </li>
+          <li>
+            Choose <strong>Fetch tracks</strong> and wait until it says <strong>finished</strong>. Saving sooner gives you
+            only part of your history.
+          </li>
+          <li>
+            Choose <strong>Save</strong> and add the <code>.csv</code> on the sleeve above.
+          </li>
+        </ol>
+        <p className="how-to__note">
+          <a href="guides/lastfm-scrobbles-csv/">The full guide to exporting your Last.fm scrobbles</a>
+        </p>
+        <p className="how-to__note">
+          Last.fm doesn’t record how long a song played or what you skipped, so hours are estimated and Love / Hate stays
+          off. On days a Spotify or Apple Music export also covers, that export’s plays are kept.
+        </p>
       </details>
 
       <p className="colophon">
@@ -256,8 +283,8 @@ export default function App() {
       </p>
 
       <p className="disclaimer">
-        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB or Apple Inc.
-        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc.
+        My Listening Record is an independent project, not affiliated with, endorsed by or sponsored by Spotify AB, Apple Inc. or Last.fm Ltd.
+        Spotify is a trademark of Spotify AB. Apple Music is a trademark of Apple Inc. Last.fm is a trademark of Last.fm Ltd.
       </p>
     </div>
   )
