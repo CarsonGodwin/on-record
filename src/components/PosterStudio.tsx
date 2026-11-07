@@ -1,8 +1,9 @@
-import { useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useSize } from '../lib/hooks'
 import { COARSE } from '../lib/pointer'
-import { SERIES } from '../lib/palette'
+import { SCROBBLE_RED, SERIES, SPOTIFY_GREEN } from '../lib/palette'
 import { InCards, OnStage } from '../lib/stage'
+import { usePanZoom } from '../lib/zoom'
 import { POSTER_DESIGN_SIZES, POSTER_SIZES, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
 import { Segmented } from './ui'
@@ -21,10 +22,10 @@ const DESIGNS: { value: PosterDesign; label: string }[] = [
   // Archived for now (renderers kept in viz/poster.ts): macro, constellation, pulse
 ]
 
-/** On a phone's card the vinyl leads, and the names are short enough for one row */
+/** On a phone's card the names are short enough for one row */
 const CARD_DESIGNS: { value: PosterDesign; label: string }[] = [
-  { value: 'record', label: 'Record' },
   { value: 'deep', label: 'Deep dive' },
+  { value: 'record', label: 'Record' },
   { value: 'sleeve', label: 'Sleeve' },
   { value: 'annotated', label: 'Annotated' },
 ]
@@ -44,9 +45,9 @@ const ULTRA_SCALES = [4, 3, 2]
 /** The full-size poster, then smaller fallbacks for phones whose canvas gives out on a big record */
 const FULL_SCALES = [1, 0.75, 0.5]
 
-const PAPERS: { value: PosterPaper; label: string; swatch: string; deepOnly?: boolean }[] = [
+const PAPERS: { value: PosterPaper; label: string; swatch: string; deepOnly?: boolean; notDeep?: boolean }[] = [
   { value: 'midnight', label: 'Black', swatch: '#0e0d12' },
-  { value: 'cream', label: 'Cream', swatch: '#efe8da' },
+  { value: 'cream', label: 'Cream', swatch: '#efe8da', notDeep: true },
   // Only the Deep dive is drawn in glass; the other designs would just be pale gray
   {
     value: 'glass',
@@ -54,10 +55,56 @@ const PAPERS: { value: PosterPaper; label: string; swatch: string; deepOnly?: bo
     swatch: 'linear-gradient(135deg, #ececf0 42%, #4fe3ff 50%, #2a6dff 56%, #ff2d55 64%, #ececf0 72%)',
     deepOnly: true,
   },
+  // The same: its red label and Helvetica are only drawn on the Deep dive
+  { value: 'scrobble', label: 'Scrobble', swatch: `linear-gradient(135deg, #ffffff 58%, ${SCROBBLE_RED} 58%)`, deepOnly: true },
 ]
 
 /** Names for the color picker's swatches, which are the chart colors in their usual order */
 const ACCENT_NAMES = ['Pink', 'Teal', 'Orange', 'Green', 'Purple', 'Ochre', 'Blue', 'Lime', 'Magenta', 'Brick']
+
+/** Reads as a muddy version of the Scrobble background's red, so that background doesn't offer it */
+const BRICK = SERIES[ACCENT_NAMES.indexOf('Brick')]
+
+/** Close enough to read a Deep dive's smallest text on a phone, which the full-size image over the preview stays sharp for */
+const MAX_ZOOM = 6
+
+interface PosterZoomProps {
+  width: number
+  height: number
+  design: PosterDesign
+  children: ReactNode
+}
+
+/**
+ * Pinch, double tap and pan for the poster on a touch screen. At full view a finger still belongs to
+ * the page or the deck, so a swipe across the poster deals the next card until you've zoomed in.
+ * Its own component so a pan redraws this and not the whole studio.
+ */
+function PosterZoom({ width, height, design, children }: PosterZoomProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const { view, reset } = usePanZoom(ref, { width, height, max: MAX_ZOOM, doubleTap: true })
+  const zoomed = view.s > 1.01
+
+  // Another design has its details somewhere else, so the spot you were looking at means nothing there
+  useEffect(() => {
+    reset()
+  }, [design, reset])
+
+  return (
+    <>
+      <div ref={ref} className={zoomed ? 'studio__zoom is-zoomed' : 'studio__zoom'} data-drag={zoomed ? '' : undefined}>
+        <div className="studio__zoomed" style={{ transform: zoomed ? `translate(${view.x}px, ${view.y}px) scale(${view.s})` : undefined }}>
+          {children}
+        </div>
+      </div>
+      {zoomed && (
+        <button type="button" className="chip-button studio__unzoom" onClick={reset}>
+          Zoom out
+        </button>
+      )}
+    </>
+  )
+}
 
 interface Props {
   data: PosterData
@@ -76,7 +123,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const showing = stage === null || stage === 'poster'
   const [sheet, setSheet] = useState(false)
   useCloseOnBack(sheet, () => setSheet(false))
-  const optionsRef = useRef<HTMLButtonElement>(null)
+  const customizeRef = useRef<HTMLButtonElement>(null)
   const doneRef = useRef<HTMLButtonElement>(null)
   const [size, setSize] = useState<PosterSize>('post')
   const [paper, setPaper] = useState<PosterPaper>('midnight')
@@ -108,15 +155,22 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const cssH = (cssW * spec.height) / spec.width
   const hasUltra = design === 'deep'
   const hasAccent = design === 'deep'
-  const papers = PAPERS.filter((p) => !p.deepOnly || design === 'deep')
-  // The Glass background is kept while you look at other designs, which draw black meanwhile
+  const papers = PAPERS.filter((p) => (design === 'deep' ? !p.notDeep : !p.deepOnly))
+  // A background one design doesn't have is kept while you look at it, which draws black meanwhile
   const activePaper = papers.some((p) => p.value === paper) ? paper : 'midnight'
   const yearAccent = data.tracklist[0]?.color ?? SERIES[0]
-  const accents = SERIES.includes(yearAccent) ? SERIES : [yearAccent, ...SERIES]
-  const activeAccent = accentPick ?? yearAccent
+  // The color used until you pick one: the Scrobble background's red, the Black background's green, else your #1 artist's
+  const paperRed = activePaper === 'scrobble'
+  const paperGreen = activePaper === 'midnight'
+  const baseAccent = paperRed ? SCROBBLE_RED : paperGreen ? SPOTIFY_GREEN : yearAccent
+  const offered = paperRed || paperGreen ? SERIES.filter((color) => color !== BRICK) : SERIES
+  const accents = offered.includes(baseAccent) ? offered : [baseAccent, ...offered]
+  // Brick picked on Glass goes back to this background's color here, and returns when you switch back
+  const pick = (paperRed || paperGreen) && accentPick === BRICK ? null : accentPick
+  const activeAccent = pick ?? baseAccent
   const accent = hasAccent ? activeAccent : undefined
-  // Picking the year's own color goes back to following the year
-  const pickAccent = (color: string) => setAccentPick(color === yearAccent ? null : color)
+  // Picking the color it would use anyway goes back to following it
+  const pickAccent = (color: string) => setAccentPick(color === baseAccent ? null : color)
   const fileName = `my-listening-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
   const optionsKey = `${design}|${activeSize}|${activePaper}|${accent ?? ''}`
 
@@ -142,15 +196,6 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     canvas.addEventListener('contextrestored', back)
     return () => canvas.removeEventListener('contextrestored', back)
   }, [])
-
-  // Phones open on the vinyl, the design the record is named for. Only once, and only over the
-  // page's default, so a design you or another card picked stays picked.
-  const defaulted = useRef(false)
-  useEffect(() => {
-    if (!inCards || defaulted.current) return
-    defaulted.current = true
-    if (design === 'deep') onDesign('record')
-  }, [inCards, design, onDesign])
 
   // What the preview was last drawn from, so coming back to an unchanged poster doesn't draw it again
   const drawn = useRef<unknown[]>([])
@@ -288,7 +333,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
 
   function closeSheet() {
     setSheet(false)
-    requestAnimationFrame(() => optionsRef.current?.focus())
+    requestAnimationFrame(() => customizeRef.current?.focus())
   }
 
   const onSheetKey = (e: KeyboardEvent) => {
@@ -299,11 +344,17 @@ export function PosterStudio({ data, design, onDesign }: Props) {
 
   // Says where the color comes from, or offers the way back to it (shorter on a phone's card)
   const accentNote = (short: boolean) =>
-    accentPick === null ? (
-      short ? 'Your #1 artist’s' : 'From your #1 artist, so it changes with the year'
+    pick === null ? (
+      paperRed || paperGreen ? (
+        short ? 'This background’s' : `${paperRed ? 'Red' : 'Green'}, to go with this background`
+      ) : short ? (
+        'Your #1 artist’s'
+      ) : (
+        'From your #1 artist, so it changes with the year'
+      )
     ) : (
       <button type="button" className="studio__reset" onClick={() => setAccentPick(null)}>
-        {short ? 'Use #1 artist’s' : 'Use my #1 artist’s color'}
+        {paperRed ? 'Use red' : paperGreen ? 'Use green' : short ? 'Use #1 artist’s' : 'Use my #1 artist’s color'}
       </button>
     )
   const accentRow = (
@@ -313,7 +364,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
           key={color}
           type="button"
           className="studio__accent"
-          aria-label={`${ACCENT_NAMES[SERIES.indexOf(color)] ?? 'Gray'}${color === yearAccent ? ', your #1 artist’s color' : ''}`}
+          aria-label={`${color === SCROBBLE_RED ? 'Red' : color === SPOTIFY_GREEN ? 'Spotify green' : (ACCENT_NAMES[SERIES.indexOf(color)] ?? 'Gray')}${color === yearAccent ? ', your #1 artist’s color' : ''}`}
           aria-pressed={activeAccent === color}
           onClick={() => pickAccent(color)}
         >
@@ -323,17 +374,28 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     </div>
   )
 
+  const picture = (
+    <>
+      <canvas
+        ref={canvasRef}
+        className="studio__canvas"
+        style={{ width: cssW, height: cssH }}
+        role="img"
+        aria-label={`Preview of your ${design} poster`}
+      />
+      {pressReady && <img className="studio__press" src={pressReady} alt="" draggable={false} />}
+    </>
+  )
   const preview = (
     <div className="studio__preview" ref={wrapRef}>
       <div className="studio__poster" style={{ width: cssW, height: cssH }}>
-        <canvas
-          ref={canvasRef}
-          className="studio__canvas"
-          style={{ width: cssW, height: cssH }}
-          role="img"
-          aria-label={`Preview of your ${design} poster`}
-        />
-        {pressReady && <img className="studio__press" src={pressReady} alt="" />}
+        {COARSE ? (
+          <PosterZoom width={cssW} height={cssH} design={design}>
+            {picture}
+          </PosterZoom>
+        ) : (
+          picture
+        )}
       </div>
     </div>
   )
@@ -354,7 +416,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
           </p>
         )}
         {sheet ? (
-          <div className="studio__sheet" role="group" aria-label="Poster options" onKeyDown={onSheetKey}>
+          <div className="studio__sheet" role="group" aria-label="Customize poster" onKeyDown={onSheetKey}>
             <div className="studio__row">
               <span className="studio__label">Size</span>
               {sizes.length > 1 && (
@@ -429,8 +491,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
             <div className="studio__bar">
               <button
                 type="button"
-                className="button button--ghost studio__options"
-                ref={optionsRef}
+                className="button button--ghost studio__customize"
+                ref={customizeRef}
                 onClick={openSheet}
               >
                 <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
@@ -438,7 +500,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
                   <circle cx="13" cy="6" r="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
                   <circle cx="7" cy="14" r="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
                 </svg>
-                Options
+                Customize
               </button>
               <button type="button" className="button studio__share" onClick={canShare ? share : download} disabled={busy !== null}>
                 {canShare && (
@@ -547,7 +609,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
           </div>
         )}
         <p className="hint">
-          {COARSE && 'You can also touch and hold the poster to save it. '}Made right here on your device. Nothing is uploaded.
+          {COARSE && 'Pinch the poster to zoom in, or touch and hold it to save it. '}Made right here on your device. Nothing is uploaded.
         </p>
       </div>
     </div>

@@ -291,7 +291,8 @@ export interface DayDetail {
   ms: number
   /** Plays of 30s or more */
   streams: number
-  skips: number
+  /** null when none of the day's songs can say (Last.fm) */
+  skips: number | null
   /** Listening time by hour of day */
   hours: number[]
   artists: { name: string; ms: number; plays: number }[]
@@ -328,6 +329,8 @@ export function dayDetail(plays: Play[], day: number, firstHeard: Map<string, nu
   let ms = 0
   let streams = 0
   let skips = 0
+  let tracks = 0
+  let skipKnown = 0
   const hours = new Array<number>(24).fill(0)
   const artists = new Map<string, DayDetail['artists'][number]>()
   const songs = new Map<string, DayDetail['songs'][number]>()
@@ -335,7 +338,11 @@ export function dayDetail(plays: Play[], day: number, firstHeard: Map<string, nu
     ms += p.msPlayed
     const counted = p.msPlayed >= COUNTED_PLAY_MS
     if (counted) streams++
-    if (p.kind === 'track' && isSkip(p)) skips++
+    if (p.kind === 'track') {
+      tracks++
+      if (p.skipped !== null) skipKnown++
+      if (isSkip(p)) skips++
+    }
     hours[startDate(p).getHours()] += p.msPlayed
 
     const a = artists.get(p.artist) ?? { name: p.artist, ms: 0, plays: 0 }
@@ -359,7 +366,7 @@ export function dayDetail(plays: Play[], day: number, firstHeard: Map<string, nu
     plays: out,
     ms,
     streams,
-    skips,
+    skips: tracks > 0 && skipKnown === 0 ? null : skips,
     hours,
     artists: [...artists.values()].sort((a, b) => b.ms - a.ms),
     songs: [...songs.values()].sort((a, b) => b.plays - a.plays || b.ms - a.ms),
@@ -383,7 +390,8 @@ export interface SongStat {
 export function songStats(plays: Play[], limit: number): SongStat[] {
   const songs = new Map<string, SongStat>()
   for (const p of plays) {
-    if (p.kind !== 'track') continue
+    // Love / Hate compares plays with skips, so a play that can't say would read as one you let play
+    if (p.kind !== 'track' || p.skipped === null) continue
     const key = trackKey(p)
     let s = songs.get(key)
     if (!s) {
@@ -582,12 +590,13 @@ export function takes(plays: Play[], summary: Summary, rec: Records, fun: FunSta
       artists.set(p.artist, a)
     }
     a.ms += p.msPlayed
-    a.starts++
+    if (p.skipped !== null) a.starts++
     if (isSkip(p)) a.skips++
   }
 
   // A heavy skipper with one artist they let play out
-  if (summary.skipRate >= 0.15) {
+  const skipRate = summary.skipRate
+  if (skipRate !== null && skipRate >= 0.15) {
     let spared: [string, { starts: number; skips: number }] | null = null
     for (const entry of artists) {
       const [, a] = entry
@@ -597,16 +606,16 @@ export function takes(plays: Play[], summary: Summary, rec: Records, fun: FunSta
       if (rate < best || (rate === best && a.starts > spared![1].starts)) spared = entry
     }
     // Only a contrast if they get skipped at half the usual rate or less
-    if (spared && spared[1].skips / spared[1].starts <= summary.skipRate / 2) {
+    if (spared && spared[1].skips / spared[1].starts <= skipRate / 2) {
       const [name, a] = spared
       const rate = a.skips / a.starts
       out.push({
         text:
           a.skips === 0
-            ? `Skips ${pct(summary.skipRate)} of everything. Never skipped ${name}, not once.`
-            : `Skips ${pct(summary.skipRate)} of everything, but only ${pct(rate)} of ${name}.`,
+            ? `Skips ${pct(skipRate)} of everything. Never skipped ${name}, not once.`
+            : `Skips ${pct(skipRate)} of everything, but only ${pct(rate)} of ${name}.`,
         proof: `${formatNumber(a.starts)} plays of ${name}, ${formatNumber(a.skips)} skipped`,
-        score: clamp((summary.skipRate - rate) / 0.35) * 0.95,
+        score: clamp((skipRate - rate) / 0.35) * 0.95,
       })
     }
   }

@@ -51,8 +51,20 @@ export function formatMonthShort(month: number): string {
 
 /** What the history is called where a poster credits its data */
 export function historyName(sources: DataSource[]): string {
-  if (sources.includes('apple')) return sources.includes('spotify') ? 'Spotify and Apple Music listening history' : 'Apple Music listening history'
-  return 'Spotify Extended Streaming History'
+  // A scrobble doesn't say how long it played, and the poster's hours shouldn't look like they were recorded
+  if (sources.length === 1 && sources[0] === 'lastfm') return 'Last.fm scrobbles, hours estimated'
+  if (sources.length === 1 && sources[0] === 'apple') return 'Apple Music listening history'
+  if (sources.length < 2) return 'Spotify Extended Streaming History'
+  const names = sources.map((s) => ({ spotify: 'Spotify', apple: 'Apple Music', lastfm: 'Last.fm' })[s])
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} listening history`
+}
+
+/**
+ * What one listen is called on a poster. Only a history that's all Last.fm counts in scrobbles: once
+ * another export is in the mix most of its listens were never scrobbled, so they're plain plays
+ */
+export function playWord(sources: DataSource[]): 'play' | 'scrobble' {
+  return sources.length === 1 && sources[0] === 'lastfm' ? 'scrobble' : 'play'
 }
 
 /** Hour of day as "12 AM", "9 PM" */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDays, formatHour, formatNumber, formatPlays, historyName } from '../../src/lib/format'
+import { formatDays, formatHour, formatNumber, formatPlays, historyName, playWord } from '../../src/lib/format'
 
 const DAY = 86_400_000
 
@@ -47,5 +47,18 @@ describe('historyName', () => {
     expect(historyName(['apple'])).toBe('Apple Music listening history')
     expect(historyName(['spotify', 'apple'])).toBe('Spotify and Apple Music listening history')
     expect(historyName([])).toBe('Spotify Extended Streaming History')
+    expect(historyName(['lastfm'])).toBe('Last.fm scrobbles, hours estimated')
+    expect(historyName(['spotify', 'lastfm'])).toBe('Spotify and Last.fm listening history')
+    expect(historyName(['spotify', 'apple', 'lastfm'])).toBe('Spotify, Apple Music and Last.fm listening history')
+  })
+})
+
+describe('playWord', () => {
+  it('only says scrobble for a history that is all Last.fm', () => {
+    expect(playWord(['lastfm'])).toBe('scrobble')
+    expect(playWord(['spotify'])).toBe('play')
+    expect(playWord(['apple'])).toBe('play')
+    expect(playWord(['spotify', 'lastfm'])).toBe('play')
+    expect(playWord([])).toBe('play')
   })
 })

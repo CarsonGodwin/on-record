@@ -126,7 +126,8 @@ export function Race({ bins, race, colors }: Props) {
             const r = rank.get(name)!
             const visible = r < TOP && ms > 0
             const fillPx = Math.max(4, (ms / max) * barArea)
-            const nameInside = fillPx > name.length * 7.6 + 24
+            // In the bar when it fits, else after it; failing both, it's cut short in whichever has more room, as in the video
+            const nameInside = fillPx > name.length * 7.6 + 24 || fillPx > barArea - fillPx
             return (
               <div
                 key={name}

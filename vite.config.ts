@@ -68,6 +68,7 @@ const PAGES: Record<string, [module: string, component: string]> = {
   'index.html': ['/src/App.tsx', 'default'],
   'guides/spotify-extended-streaming-history/index.html': ['/src/components/Guide.tsx', 'SpotifyGuide'],
   'guides/apple-music-listening-history/index.html': ['/src/components/Guide.tsx', 'AppleGuide'],
+  'guides/lastfm-scrobbles-csv/index.html': ['/src/components/Guide.tsx', 'LastfmGuide'],
   '404.html': ['/src/components/Guide.tsx', 'NotFound'],
 }
 

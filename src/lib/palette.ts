@@ -10,6 +10,12 @@ export const SERIES = ['#ff277c', '#0ca2bc', '#e86104', '#0ba985', '#a053fd', '#
 /** How many top artists get a color of their own */
 export const TOP_ARTISTS = SERIES.length
 
+/** The Scrobble background's label and markers. A theme color, so it stays out of SERIES */
+export const SCROBBLE_RED = '#d51007'
+
+/** The Black Deep dive's label and markers. A theme color, so it stays out of SERIES */
+export const SPOTIFY_GREEN = '#1db954'
+
 /** Anything outside the top 10 */
 export const OTHER = '#4a4652'
 

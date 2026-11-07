@@ -10,6 +10,8 @@ interface Props {
   isSample: boolean
   topArtist: Ranked | undefined
   biggestDay: FunStats['biggestDay']
+  /** Some of the hours come from Last.fm, where they're worked out rather than recorded */
+  estimated: boolean
   onPlay: () => void
   onPoster: () => void
 }
@@ -17,7 +19,7 @@ interface Props {
 // A non-breaking space keeps "410 hrs" together when the line wraps
 const glue = (text: string) => text.replace(' ', '\u00a0')
 
-export function Hero({ summary, year, span, isSample, topArtist, biggestDay, onPlay, onPoster }: Props) {
+export function Hero({ summary, year, span, isSample, topArtist, biggestDay, estimated, onPlay, onPoster }: Props) {
   const ref = useRef<HTMLElement>(null)
   const seen = useSeen(ref, 0.1)
   const total = summary.totalMs / 3_600_000
@@ -62,6 +64,7 @@ export function Hero({ summary, year, span, isSample, topArtist, biggestDay, onP
           </>
         )}
       </p>
+      {estimated && <p className="hero__note">Last.fm doesn’t record how long a song played, so its hours are estimated from the gaps between scrobbles.</p>}
       <div className="hero__actions">
         <button type="button" className="button button--big" onClick={onPlay}>
           <span className="button__icon">▶</span> Take me through it

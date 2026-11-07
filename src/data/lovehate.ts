@@ -66,7 +66,8 @@ function median(values: number[]): number | null {
 export function tallySongs(plays: Play[]): SongTally[] {
   const songs = new Map<string, { tally: SongTally; skipMs: number[] }>()
   for (const p of plays) {
-    if (p.kind !== 'track') continue
+    // A play that can't say whether it was skipped can't count as being let play either
+    if (p.kind !== 'track' || p.skipped === null) continue
     const key = trackKey(p)
     let s = songs.get(key)
     if (!s) {
