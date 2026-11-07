@@ -27,20 +27,10 @@ Everything runs entirely in your browser. There are no servers, and your data is
 3. Download all parts and drop them (or the `.zip` files) onto the site.
 
 **Last.fm** *(Beta)*
-1. Save your scrobbles with [lastfm-to-csv](https://benjaminbenben.com/lastfm-to-csv/), and wait until it says finished. Any `.csv` with four columns and no header works: artist, album, track and a UTC time like `06 Nov 2026, 20:57`.
-2. Drop the file onto the site by itself (a CSV inside a zip or folder isn't opened).
+1. Save your scrobbles as a `.csv` with [lastfm-to-csv](https://benjaminbenben.com/lastfm-to-csv/).
+2. Drop the file onto the site by itself.
 
-Last.fm records what started and when, and nothing else, so it differs from the other two:
-
-| | Spotify | Apple Music | Last.fm |
-|---|---|---|---|
-| Time played | Recorded | Recorded | Estimated from the gaps between scrobbles |
-| Skips | Recorded | Recorded | Never recorded, so Love / Hate and the skip stats are off |
-| Shuffle | Recorded | Newer plays only | Not recorded |
-| Devices | Recorded | Recorded | Not recorded |
-| Podcasts and audiobooks | Recorded | Not in the export | Can't be told apart from songs |
-
-*Note: You can drop exports from several services in together to merge your timelines. On any day a Spotify or Apple Music export covers, its plays replace Last.fm's, since Last.fm usually scrobbled those same listens.*
+*Note: You can drop exports from several services in together to merge your timelines.*
 
 ## Project Structure
 
