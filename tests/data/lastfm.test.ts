@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { dayDetail, songStats } from '../../src/data/insights'
 import { estimateDurations, lastfmReader, looksLikeLastfm, scrobbleTime } from '../../src/data/lastfm'
-import { loadFiles, type PlayActivityBudget } from '../../src/data/load'
+import { loadFiles, loadSample, type PlayActivityBudget } from '../../src/data/load'
 import { tallySongs } from '../../src/data/lovehate'
-import { dayNumber, platforms, replayCurve, summarize, wearOut } from '../../src/data/stats'
+import { COUNTED_PLAY_MS, dayNumber, platforms, replayCurve, scrobblesLeftOut, summarize, wearOut } from '../../src/data/stats'
 import { at, play } from '../helpers'
 
 const MINUTE = 60_000
@@ -73,9 +73,11 @@ describe('lastfmReader', () => {
     const text = `﻿A,"Album, with comma",Song,"06 Nov 2026, 20:57"\n,x,y,"06 Nov 2026, 20:50"\nB,,Song 2,\nC,,Song 3,"01 Jan 1970, 00:00"\n`
     const reader = lastfmReader()
     for (const c of text) reader.push(c)
-    const { scrobbles, skippedRows } = reader.end()
+    const { scrobbles, skippedRows, undatedRows } = reader.end()
     expect(scrobbles).toEqual([{ start: Date.UTC(2026, 10, 6, 20, 57), artist: 'A', album: 'Album, with comma', title: 'Song' }])
     expect(skippedRows).toBe(3)
+    // Only the 1970 row: no artist or no date at all were never a usable scrobble
+    expect(undatedRows).toBe(1)
   })
 })
 
@@ -134,6 +136,76 @@ describe('loadFiles with a Last.fm export', () => {
     const result = await loadFiles([file(text, 'a.csv'), file(text, 'b.csv')])
     expect(result.plays).toHaveLength(10)
     expect(result.duplicateRows).toBe(10)
+    expect(result.repeatScrobbles).toEqual([])
+  })
+
+  it('keeps one of a song repeated in a minute, and holds the rest back', async () => {
+    const [first, ...others] = rows(4)
+    const text = csv([first, first, first, ...others])
+    const result = await loadFiles([file(text)])
+    expect(result.plays).toHaveLength(4)
+    expect(result.repeatScrobbles).toHaveLength(2)
+    expect(result.duplicateRows).toBe(0)
+    expect(result.repeatScrobbles[0]).toMatchObject({ title: result.plays[0].title, msPlayed: COUNTED_PLAY_MS, skipped: null })
+    expect(result.repeatScrobbles[0].endTime - result.repeatScrobbles[0].msPlayed).toBe(START)
+  })
+
+  it('finds no more repeats when a file with repeats is dropped twice', async () => {
+    const [first, ...others] = rows(4)
+    const text = csv([first, first, ...others])
+    const result = await loadFiles([file(text, 'a.csv'), file(text, 'b.csv')])
+    expect(result.plays).toHaveLength(4)
+    expect(result.repeatScrobbles).toHaveLength(1)
+    expect(result.duplicateRows).toBe(5)
+  })
+
+  it('does not hold back repeats on days a Spotify export covers', async () => {
+    const day = Date.UTC(2026, 3, 25, 12)
+    const spotify = [
+      {
+        ts: new Date(day).toISOString(),
+        ms_played: 180_000,
+        platform: 'ios',
+        conn_country: 'US',
+        master_metadata_track_name: 'Song 0',
+        master_metadata_album_artist_name: 'Artist',
+        master_metadata_album_album_name: 'Album',
+        spotify_track_uri: 'spotify:track:zero',
+        reason_start: 'trackdone',
+        reason_end: 'trackdone',
+        shuffle: false,
+        skipped: false,
+        offline: false,
+        incognito_mode: false,
+      },
+    ]
+    const [first] = rows(1, day - 3 * MINUTE)
+    const result = await loadFiles([new File([JSON.stringify(spotify)], 'Streaming_History_Audio_2026.json'), file(csv([first, first]))])
+    expect(result.repeatScrobbles).toEqual([])
+    expect(result.overlapRows).toBe(2)
+  })
+
+  it('mentions what was left out only when it is a real share of the file', async () => {
+    const [first, ...others] = rows(150)
+    const many = await loadFiles([file(csv([first, first, first, ...others]))])
+    expect(scrobblesLeftOut(many)).toEqual({ total: 152, shown: 150, repeats: 2, undated: 0 })
+
+    const undated = await loadFiles([file(`${csv(rows(50))}C,,Song 3,"01 Jan 1970, 00:00"\n`)])
+    expect(scrobblesLeftOut(undated)).toEqual({ total: 51, shown: 50, repeats: 0, undated: 1 })
+
+    const few = await loadFiles([file(csv([first, first, ...rows(500, START + MINUTE)]))])
+    expect(few.repeatScrobbles).toHaveLength(1)
+    expect(scrobblesLeftOut(few)).toBeNull()
+
+    expect(scrobblesLeftOut(await loadFiles([file(csv(rows(10)))]))).toBeNull()
+    expect(scrobblesLeftOut(loadSample())).toBeNull()
+  })
+
+  it('counts scrobbles with no real date on their own', async () => {
+    const result = await loadFiles([file(`${csv(rows(2))}C,,Song 3,"01 Jan 1970, 00:00"\nD,,Song 4,\n`)])
+    expect(result.plays).toHaveLength(2)
+    expect(result.skippedRows).toBe(2)
+    expect(result.undatedRows).toBe(1)
   })
 
   it('leaves other CSVs unread and says so', async () => {
@@ -141,6 +213,12 @@ describe('loadFiles with a Last.fm export', () => {
     expect(result.plays).toHaveLength(0)
     expect(result.filesRead).toEqual([])
     expect(result.warnings[0]).toContain('not one of Apple Music’s history files')
+  })
+
+  it('says what a Last.fm export looks like when a CSV has nothing to do with Apple', async () => {
+    const result = await loadFiles([file('artist,album,track,date\nA,B,Song,"06 Nov 2026, 20:57"\n', 'scrobbles.csv')])
+    expect(result.plays).toHaveLength(0)
+    expect(result.warnings).toEqual(['scrobbles.csv: skipped (not a history file; a Last.fm export has four columns and no header)'])
   })
 
   it('does not open a scrobble CSV inside a zip', async () => {

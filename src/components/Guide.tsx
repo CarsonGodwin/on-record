@@ -286,9 +286,10 @@ export function LastfmGuide() {
           back, open <strong>Settings</strong> on that page and set a request delay.
         </p>
         <p>
-          To check the file, compare the scrobble count on your Last.fm profile with the plays listed under Load details at
-          the bottom of your record. They should be close. A row count that’s an exact multiple of 200 is a sign the last
-          page never arrived.
+          To check the file, compare the scrobble count on your Last.fm profile with Total listening in the Liner Notes of
+          your record, with All time picked. They should be close, though repeats of a song in the same minute stay out
+          until you turn on Show all scrobbles. A row count that’s an exact multiple of 200 is a sign the last page never
+          arrived.
         </p>
 
         <h2>What’s in the file</h2>

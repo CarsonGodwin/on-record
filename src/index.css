@@ -2265,6 +2265,8 @@ th {
 }
 
 .race__fill {
+  /* A long name beside the bar gives way, not the bar */
+  flex-shrink: 0;
   height: 72%;
   display: flex;
   align-items: center;
@@ -2275,7 +2277,10 @@ th {
 }
 
 .race__name {
-  padding-left: 12px;
+  min-width: 0;
+  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 700;
   font-size: 0.95rem;
   color: #fff;
@@ -2284,7 +2289,7 @@ th {
 }
 
 .race__name--out {
-  padding-left: 0;
+  padding: 0;
   margin-right: 8px;
   color: var(--text);
   text-shadow: none;
@@ -2293,6 +2298,9 @@ th {
 }
 
 .race__value {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   margin-left: 10px;
   font-family: var(--mono);
   font-size: 0.8rem;
@@ -4118,6 +4126,34 @@ th {
   max-width: 100%;
 }
 
+/* Zoomed in, the poster is cropped to its own frame and a finger pans instead of scrolling the page */
+.studio__zoom {
+  touch-action: pan-y;
+}
+
+.studio__zoom.is-zoomed {
+  overflow: hidden;
+  border-radius: 4px;
+  touch-action: none;
+}
+
+.dash.is-cards .studio__zoom {
+  touch-action: none;
+}
+
+.studio__zoomed {
+  position: relative;
+  transform-origin: 0 0;
+}
+
+.studio__unzoom {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--bg-raise);
+  color: var(--text);
+}
+
 .studio__canvas {
   display: block;
   max-width: 100%;
@@ -5139,6 +5175,18 @@ kbd {
   white-space: nowrap;
 }
 
+.launcher__item:has(.launcher__note) {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.launcher__note {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .launcher__hint {
   flex-shrink: 0;
   font-family: var(--mono);
@@ -5261,6 +5309,10 @@ kbd {
   padding-left: 18px;
   font-size: 0.95rem;
   overflow-wrap: anywhere;
+}
+
+.left-out__lead {
+  margin-bottom: 12px;
 }
 
 .missing__actions {
@@ -7718,7 +7770,7 @@ html.cards-open body {
   flex: 1;
 }
 
-.dash.is-cards .studio__options {
+.dash.is-cards .studio__customize {
   gap: 8px;
 }
 

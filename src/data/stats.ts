@@ -1,4 +1,4 @@
-import type { Play } from '../types'
+import type { LoadResult, Play } from '../types'
 
 /*
  * Pure aggregation functions over Play[]. Everything time-based uses the
@@ -66,6 +66,30 @@ export interface PlayFilter {
   hidden: ReadonlySet<string>
   /** Leaves out every year outside the range, for a history with a long gap in it. Absent or null keeps them all. */
   years?: YearRange | null
+  /** Counts Last.fm's repeated scrobbles. This picks the list that goes in (withRepeats), so filterPlays never reads it. */
+  allScrobbles?: boolean
+}
+
+/**
+ * How much of a file has to be left out before it's worth stopping someone to say so. A few repeats
+ * turn up in almost any export (a new scrobble moves the pages along as it runs), and those can stay in Load details.
+ */
+const LEFT_OUT_WORTH_SAYING = 0.01
+
+/**
+ * What a Last.fm upload left out, when it's enough to mention up front, or null. Only for an upload of
+ * Last.fm alone, since with another service `plays` isn't just the file's scrobbles and the totals wouldn't add up.
+ */
+export function scrobblesLeftOut({ sources, plays, repeatScrobbles, undatedRows }: LoadResult) {
+  if (sources.length !== 1 || sources[0] !== 'lastfm') return null
+  const total = plays.length + repeatScrobbles.length + undatedRows
+  if (repeatScrobbles.length + undatedRows < total * LEFT_OUT_WORTH_SAYING) return null
+  return { total, shown: plays.length, repeats: repeatScrobbles.length, undated: undatedRows }
+}
+
+/** `plays` with Last.fm's repeated scrobbles added, still sorted by end time */
+export function withRepeats(plays: Play[], repeats: Play[]): Play[] {
+  return repeats.length > 0 ? [...plays, ...repeats].sort((a, b) => a.endTime - b.endTime) : plays
 }
 
 function inYears(p: Play, years: YearRange): boolean {
@@ -112,7 +136,7 @@ export function canHide(artists: readonly Ranked[], hidden: ReadonlySet<string>,
 /** True when two filters leave out the same plays, so hiding an artist and unhiding them again costs nothing */
 export function sameFilter(a: PlayFilter, b: PlayFilter): boolean {
   if (a === b) return true
-  if (a.musicOnly !== b.musicOnly || a.hidden.size !== b.hidden.size) return false
+  if (a.musicOnly !== b.musicOnly || !a.allScrobbles !== !b.allScrobbles || a.hidden.size !== b.hidden.size) return false
   if ((a.years?.[0] ?? null) !== (b.years?.[0] ?? null) || (a.years?.[1] ?? null) !== (b.years?.[1] ?? null)) return false
   for (const artist of a.hidden) if (!b.hidden.has(artist)) return false
   return true

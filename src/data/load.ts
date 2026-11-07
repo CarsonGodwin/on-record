@@ -49,6 +49,8 @@ interface Part {
   duplicateRows: number
   unmatchedArtists: number
   overlapRows?: number
+  undatedRows?: number
+  repeats?: Play[]
 }
 
 /**
@@ -226,7 +228,9 @@ export async function readLastfmFile(file: File, warnings: string[], budget: Pla
   const { looksLikeLastfm, lastfmReader } = await import('./lastfm')
   const head = await file.slice(0, LASTFM_SNIFF_BYTES).text()
   if (!looksLikeLastfm(head, file.size <= LASTFM_SNIFF_BYTES)) {
-    warnings.push(`${file.name}: skipped (not one of Apple Music’s history files)`)
+    // Without Apple in its name it's more likely someone's scrobbles in another format, so that gets what to look for
+    const reason = /apple/i.test(file.name) ? 'not one of Apple Music’s history files' : 'not a history file; a Last.fm export has four columns and no header'
+    warnings.push(`${file.name}: skipped (${reason})`)
     return nothing()
   }
 
@@ -459,7 +463,19 @@ function collect(parts: Record<DataSource, Part | null>, warnings: string[], fai
   }
 
   plays.sort((a, b) => a.endTime - b.endTime)
-  return { plays, filesRead, sources, skippedRows, duplicateRows, overlapRows, unmatchedArtists, warnings, failures }
+  return {
+    plays,
+    repeatScrobbles: parts.lastfm?.repeats ?? [],
+    filesRead,
+    sources,
+    skippedRows,
+    duplicateRows,
+    overlapRows,
+    undatedRows: parts.lastfm?.undatedRows ?? 0,
+    unmatchedArtists,
+    warnings,
+    failures,
+  }
 }
 
 function baseName(path: string): string {

@@ -72,6 +72,8 @@ export interface Play {
 
 export interface LoadResult {
   plays: Play[]
+  /** Last.fm scrobbles of a song already in `plays` for that same minute, added only by Show all scrobbles */
+  repeatScrobbles: Play[]
   /** Names of the files the plays came from */
   filesRead: string[]
   /** Which services the plays came from, in a fixed order (Spotify first) */
@@ -82,6 +84,8 @@ export interface LoadResult {
   duplicateRows: number
   /** Last.fm scrobbles left out because a Spotify or Apple Music export covers those days */
   overlapRows: number
+  /** The skipped rows that are Last.fm scrobbles with no real time (listed as 1 Jan 1970) */
+  undatedRows: number
   /** Apple Music plays whose artist couldn't be found anywhere in the export, kept as UNMATCHED_ARTIST (data/stats.ts) */
   unmatchedArtists: number
   warnings: string[]

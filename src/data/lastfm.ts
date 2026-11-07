@@ -50,6 +50,8 @@ export interface LastfmFile {
   scrobbles: Scrobble[]
   /** Rows with no usable name or date, such as a song still playing when the export ran */
   skippedRows: number
+  /** The skipped rows that are real scrobbles with no real time, which Last.fm lists as 1 Jan 1970 */
+  undatedRows: number
 }
 
 /**
@@ -105,12 +107,15 @@ export function lastfmReader(): LastfmReader {
   const own = stringPool()
   const scrobbles: Scrobble[] = []
   let skippedRows = 0
+  let undatedRows = 0
   const reader = csvReader(
     COLUMNS,
     (row) => {
       const start = scrobbleTime(row.date)
       if (start === null || !row.artist || !row.track) {
         skippedRows++
+        // No date at all is the song playing as the export ran, which was never a scrobble
+        if (start === null && row.date && row.artist && row.track) undatedRows++
         return
       }
       scrobbles.push({ start, artist: own(row.artist), album: own(row.album), title: own(row.track) })
@@ -122,7 +127,7 @@ export function lastfmReader(): LastfmReader {
     rows: () => scrobbles.length + skippedRows,
     end: () => {
       reader.end()
-      return { scrobbles, skippedRows }
+      return { scrobbles, skippedRows, undatedRows }
     },
   }
 }
@@ -140,6 +145,7 @@ function add(map: Map<string, number[]>, key: string, value: number) {
 }
 
 const songKey = (s: Scrobble) => `${s.artist}\u0000${s.title}`
+const scrobbleKey = (s: Scrobble) => `${s.start}\u0000${songKey(s)}`
 
 /**
  * How long each scrobble played, going by the time until the next one started. Any one gap
@@ -213,13 +219,33 @@ function toPlay(s: Scrobble, msPlayed: number): Play {
  * Turns scrobble files into plays. Last.fm usually scrobbles from Spotify or Apple Music, so
  * the same listen can be in `richer` too, under a time and a name that don't quite match.
  * Those exports know more, so on any day one of them covers, its plays are the ones kept.
+ *
+ * The same song in the same minute counts once, since most of these are a device or app sending
+ * a batch again (one song can show up 11 times in a minute). They come back as `repeats` for
+ * Show all scrobbles, because Last.fm counts them and a very short song could be a real one.
  */
 export function loadLastfm(files: LastfmFile[], richer: Play[]) {
-  // Sorted and deduped first, so a file dropped twice or two overlapping files can't disturb the gaps
+  // Copies are compared within a file, so dropping a file twice or two overlapping files adds no repeats
+  const copies = new Map<string, number>()
+  const repeated: Scrobble[] = []
+  for (const file of files) {
+    const inFile = new Map<string, number>()
+    for (const s of file.scrobbles) {
+      const key = scrobbleKey(s)
+      const n = (inFile.get(key) ?? 0) + 1
+      inFile.set(key, n)
+      if (n > (copies.get(key) ?? 0)) {
+        copies.set(key, n)
+        if (n > 1) repeated.push(s)
+      }
+    }
+  }
+
+  // Sorted and deduped first, so a repeat can't disturb the gaps
   const sorted = files.flatMap((f) => f.scrobbles).sort((a, b) => a.start - b.start)
   const seen = new Set<string>()
   const scrobbles = sorted.filter((s) => {
-    const key = `${s.start}\u0000${songKey(s)}`
+    const key = scrobbleKey(s)
     if (seen.has(key)) return false
     seen.add(key)
     return true
@@ -236,14 +262,20 @@ export function loadLastfm(files: LastfmFile[], richer: Play[]) {
   scrobbles.forEach((s, i) => {
     if (!covered.has(Math.floor(s.start / DAY_MS))) plays.push(toPlay(s, lengths[i]))
   })
+  // All in the minute the first copy already took, so each is the least that counts as a play
+  const repeats = repeated.filter((s) => !covered.has(Math.floor(s.start / DAY_MS))).map((s) => toPlay(s, COUNTED_PLAY_MS))
   shareSpotifyIds(plays, richer)
+  shareSpotifyIds(repeats, richer)
 
   return {
     plays,
+    repeats,
     filesRead: files.map((f) => f.name),
     skippedRows: files.reduce((sum, f) => sum + f.skippedRows, 0),
-    duplicateRows: sorted.length - scrobbles.length,
+    undatedRows: files.reduce((sum, f) => sum + f.undatedRows, 0),
+    // Only copies from overlapping files: the repeats have a line of their own in the load details
+    duplicateRows: sorted.length - scrobbles.length - repeated.length,
     unmatchedArtists: 0,
-    overlapRows: scrobbles.length - plays.length,
+    overlapRows: scrobbles.length - plays.length + repeated.length - repeats.length,
   }
 }
